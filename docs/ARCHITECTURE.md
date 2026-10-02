@@ -362,3 +362,15 @@ Implemented:
   inspector. CSS comments are dropped on save.
 - Dragging a freely positioned element does not reparent it; use Layout mode or ⇧A.
 - External edits made while a gesture is in progress are ignored until the next change on disk.
+
+### Responsive/state authoring
+
+The single-element inspector includes a dedicated responsive/state section.
+`document/variants.ts` uses PostCSS to patch exact primary-class rules at the selected
+root or simple max-width media context. These are normal styles.css declarations;
+undo/redo and autosave follow the existing document path. Base inspector controls
+keep writing base styles. Canvas-only `stylePreview` sets the selected artboard's
+viewport and uses the selector parser to substitute the selected pseudo state with
+an element identity attribute at equivalent specificity. Preview CSS is cached by
+immutable sheet identity and is never serialized. Preview clears on selection or
+project changes; stopping it restores normal artboard sizing.

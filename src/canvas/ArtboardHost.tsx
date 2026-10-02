@@ -11,6 +11,7 @@
  */
 import { useLayoutEffect, useRef } from 'react';
 import { serializeStyleSheet, serializeTokenSheet } from '../document/css.ts';
+import { previewVariantCss } from '../document/variants.ts';
 import { rootOf } from '../document/tree.ts';
 import type { NodeId } from '../document/types.ts';
 import { useEditor } from '../editor/store.ts';
@@ -111,12 +112,15 @@ export function ArtboardHost({ id }: { id: NodeId }) {
         const root = domElement(id);
         if (!root) return;
         const r = root.getBoundingClientRect();
-        iframe.style.width = px(r.right + Math.max(0, r.left));
+        const state = useEditor.getState();
+        const preview = state.stylePreview;
+        const previewWidth = preview && state.doc.nodes[preview.id] && rootOf(state.doc, preview.id) === id ? preview.maxWidth : null;
+        iframe.style.width = px(previewWidth ?? r.right + Math.max(0, r.left));
         iframe.style.height = px(r.bottom + Math.max(0, r.top));
       };
       const observe = () => {
         const root = domElement(id);
-        if (root === observed) return;
+        if (root === observed) { fit(); return; }
         if (observed) resize.unobserve(observed);
         if (root) resize.observe(root);
         observed = root;
@@ -124,13 +128,19 @@ export function ArtboardHost({ id }: { id: NodeId }) {
       };
 
       let lastDoc: unknown = null;
+      let lastPreview: unknown = null;
       const render = () => {
-        const { doc: design } = useEditor.getState();
-        if (design === lastDoc || !design.nodes[id]) return;
+        const { doc: design, stylePreview } = useEditor.getState();
+        if ((design === lastDoc && stylePreview === lastPreview) || !design.nodes[id]) return;
+        const preview = stylePreview && design.nodes[stylePreview.id] && rootOf(design, stylePreview.id) === id ? stylePreview : null;
+        if (stylePreview !== lastPreview) iframe.style.width = px(preview?.maxWidth ?? DEFAULT_VIEWPORT_WIDTH);
         lastDoc = design;
+        lastPreview = stylePreview;
         const tokenCss = cached(design.tokens, serializeTokenSheet);
         if (tokens.textContent !== tokenCss) tokens.textContent = tokenCss;
-        const css = cached(design.styles, serializeStyleSheet);
+        const node = preview ? design.nodes[preview.id] : null;
+        const cls = node?.kind === 'element' ? node.classes[0] : null;
+        const css = preview && cls ? previewVariantCss(design.styles, cls, preview) : cached(design.styles, serializeStyleSheet);
         if (style.textContent !== css) style.textContent = css;
         renderer.render(design, id);
         observe();

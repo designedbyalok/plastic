@@ -1,3 +1,4 @@
+import { VariantsSection } from './VariantsSection.tsx';
 import { resolvedTheme, useTheme } from '../../app/theme.ts';
 import { ChevronDown, Pipette } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState } from 'react';
@@ -51,6 +52,7 @@ export function Inspector() {
               </div>
             </section>
           )}
+          {single && <VariantsSection key={single.id} el={single} />}
           {single && <ContentSection el={single} />}
           {single && <BehaviorSection el={single} />}
           {single && <TableSection el={single} />}

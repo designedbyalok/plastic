@@ -7,6 +7,7 @@
  *    never in undo history.
  */
 import { create } from 'zustand';
+import type { StylePreview } from '../document/variants.ts';
 import type { DesignDocument, NodeId } from '../document/types.ts';
 import { starterDocument } from '../elements/insertables.ts';
 import type { Viewport } from '../canvas/coords.ts';
@@ -61,6 +62,8 @@ export interface EditorState {
   readonly storageLocation: string;
   /** Base URL that the project's relative asset paths (assets/…) resolve against, if served. */
   readonly assetBase: string | null;
+  /** Canvas-only responsive/state simulation; never saved or exported. */
+  readonly stylePreview: StylePreview | null;
 
   /** File of the page shown on the canvas. Always a page of `doc`. */
   readonly activePage: string;
@@ -156,6 +159,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   saveStatus: 'idle',
   storageLocation: '',
   assetBase: null,
+  stylePreview: null,
   selection: [],
   hoverId: null,
   editingTextId: null,
@@ -240,6 +244,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     for (const id of view.collapsed ?? []) collapsed[id] = true;
     set((s) => ({
       doc,
+      stylePreview: null,
       history: EMPTY_HISTORY,
       tx: null,
       revision: s.revision + 1,
@@ -260,7 +265,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     if (next !== activePage) set({ activePage: next, selection: [], hoverId: null, editingTextId: null, vectorEdit: null });
   },
   setLeftTab(tab) {
-    set({ leftTab: tab });
+    set({ stylePreview: null, leftTab: tab });
   },
 
   select(ids) {

@@ -25,7 +25,10 @@ code editor, tokens, pages, undo/redo, local files, cloud accounts, and MCP tool
 
 ## Further product work
 
-- [ ] Visual breakpoint/state editing that writes ordinary CSS rules.
+- [x] First visual breakpoint/state editor: presets and custom max-width breakpoints;
+  default, hover, focus, focus-visible, active and disabled states. Add/edit/remove ordinary
+  CSS declarations in a dedicated inspector section with undo/redo and canvas-only preview.
+  Discover imported simple max-width queries; preserve other conditions in the code editor.
 - [ ] Inspector provenance: show the selector, inline declaration, theme or breakpoint
   supplying a computed value and explain where an edit will be applied.
 - [ ] Explicit reusable component structure/instances, preserving ordinary HTML output.
@@ -74,3 +77,20 @@ code editor, tokens, pages, undo/redo, local files, cloud accounts, and MCP tool
 - Historical cloud revisions are retained until project deletion. Add measured retention
   and orphan-upload cleanup before high-volume deployment, without deleting revisions that
   active editors still reference.
+
+## Responsive/state editor verification
+
+- PostCSS edits exact primary-class rules at the selected simple max-width context, keeping
+  comments, fallbacks, importance and unrelated media/supports rules. Existing base controls
+  continue to edit base declarations. The section identifies its class, state and width.
+- Canvas preview uses a temporary iframe viewport and a selector-parser transform at the
+  original specificity. It simulates selected states across applicable CSS contexts without
+  changing HTML, styles.css, metadata or document revisions. Stopping preview restores sizing.
+- Unit coverage includes creating classes/overrides, repeated rules, removal, custom widths,
+  class renaming, selector specificity, export isolation and existing undo/redo history.
+- Browser smoke verification covers adding a 375px hover override, automatic saving, reload,
+  computed color and viewport width in preview, and restoration to the base color/480px box.
+- Initial visual authoring covers max-width queries and the listed states on one selected
+  element. Complex selectors/conditions, min-width/container queries and additional states
+  remain editable through the existing code editor; preview does not reproduce native input
+  interactions or actually disable controls. Full inspector provenance is next.
