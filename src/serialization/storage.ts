@@ -1,8 +1,10 @@
 /**
  * Where projects live. In development the dev server exposes a folder of project folders on
- * disk; without it (a static build) the browser's localStorage is used. Tauri will add a
- * native implementation behind the same interfaces.
+ * disk; on useplastic.app they're in the signed-in user's cloud storage (R2 via the Worker);
+ * anywhere else (a static build) the browser's localStorage is used. Tauri will add a native
+ * implementation behind the same interfaces.
  */
+import { detectBackend } from '../auth/client';
 import { PROJECT_FILE_NAME, isPageFile, type ProjectFiles } from './index';
 
 export interface ProjectSummary {
@@ -25,6 +27,8 @@ export interface ProjectStorage {
 }
 
 export interface Workspace {
+  /** disk: a folder via the dev server; cloud: the user's account; browser: localStorage. */
+  readonly kind: 'disk' | 'cloud' | 'browser';
   /** Human-readable location of the workspace, e.g. "workspace". */
   readonly location: string;
   /** Projects, most recently edited first. */
@@ -85,6 +89,7 @@ function onHot(event: string, handler: (data: unknown) => void): () => void {
 // --- dev server (files on disk) ----------------------------------------------------------------
 
 class DevServerWorkspace implements Workspace {
+  readonly kind = 'disk';
   constructor(public readonly location: string) {}
 
   async list(): Promise<ProjectSummary[]> {
@@ -159,6 +164,7 @@ const LEGACY_KEY = 'plastic:project';
 type LocalProjects = Record<string, { files: ProjectFiles; updatedAt: number }>;
 
 class LocalStorageWorkspace implements Workspace {
+  readonly kind = 'browser';
   readonly location = 'this browser';
   private readonly listeners = new Set<() => void>();
 
@@ -221,6 +227,92 @@ class LocalStorageWorkspace implements Workspace {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
+
+  remove(id: string): void {
+    const projects = this.read();
+    delete projects[id];
+    this.write(projects);
+  }
+}
+
+/**
+ * Files made in this browser before signing in. On the cloud workspace, Home offers to move
+ * them into the account; each is removed here once it's been copied.
+ */
+export const browserFiles = {
+  list: (): Promise<ProjectSummary[]> => new LocalStorageWorkspace().list(),
+  remove: (id: string): void => new LocalStorageWorkspace().remove(id),
+};
+
+// --- cloud (useplastic.app) --------------------------------------------------------------------
+
+class CloudWorkspace implements Workspace {
+  readonly kind = 'cloud';
+  readonly location = 'Your account';
+  private readonly listeners = new Set<() => void>();
+
+  async list(): Promise<ProjectSummary[]> {
+    const response = await fetch('/api/projects');
+    if (!response.ok) throw new Error(`Could not list files: ${response.status}`);
+    const data = (await response.json()) as { projects?: unknown[] };
+    return (data.projects ?? []).flatMap((p) => {
+      const v = p as { id?: unknown; updatedAt?: unknown; files?: unknown };
+      return typeof v.id === 'string' && isFiles(v.files) ? [{ id: v.id, updatedAt: Number(v.updatedAt) || 0, files: pickFiles(v.files) }] : [];
+    });
+  }
+
+  async create(title: string, files: ProjectFiles, options: { assetsFrom?: string } = {}): Promise<string> {
+    const response = await fetch('/api/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title, files, assetsFrom: options.assetsFrom }),
+    });
+    if (!response.ok) throw new Error(`Could not create file: ${response.status}`);
+    this.listeners.forEach((fn) => fn());
+    return ((await response.json()) as { id: string }).id;
+  }
+
+  assetBase(id: string): string {
+    return `/api/projects/${encodeURIComponent(id)}/`;
+  }
+
+  // Figma import in the cloud converts on Cloudflare (next step); until then it's local only.
+  readonly importFigma = null;
+
+  open(id: string): ProjectStorage {
+    const endpoint = `/api/projects/${encodeURIComponent(id)}`;
+    /** What the server has, so saves send only the files that changed. */
+    let saved: ProjectFiles | null = null;
+    return {
+      id,
+      location: this.location,
+      assetBase: this.assetBase(id),
+      async load() {
+        const response = await fetch(endpoint);
+        if (!response.ok) return null;
+        const data = (await response.json()) as { files?: unknown };
+        saved = isFiles(data.files) ? pickFiles(data.files) : null;
+        return saved;
+      },
+      async save(files) {
+        const changed = Object.fromEntries(Object.entries(files).filter(([name, text]) => saved?.[name] !== text));
+        const response = await fetch(endpoint, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ files: changed, names: Object.keys(files) }),
+        });
+        if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+        saved = files;
+      },
+      // Live updates from other tabs and agents come with realtime sync (Durable Objects).
+      onExternalChange: () => () => {},
+    };
+  }
+
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
 }
 
 let workspace: Promise<Workspace> | null = null;
@@ -235,9 +327,10 @@ export function connectWorkspace(): Promise<Workspace> {
           return new DevServerWorkspace(typeof data.location === 'string' ? data.location : 'workspace');
         }
       } catch {
-        // fall through to browser storage
+        // fall through
       }
     }
+    if ((await detectBackend()).auth) return new CloudWorkspace();
     return new LocalStorageWorkspace();
   })();
   return workspace;

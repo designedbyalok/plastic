@@ -24,6 +24,13 @@
       "migrations_dir": "migrations"
     }
   ],
+  "r2_buckets": [
+    {
+      // Project files and images, under users/<user id>/projects/<project id>/.
+      "binding": "FILES",
+      "bucket_name": "plastic-files"
+    }
+  ],
   "vars": {
     // Public URL of the app. `wrangler dev` overrides it from .dev.vars.
     "BETTER_AUTH_URL": "https://useplastic.app"

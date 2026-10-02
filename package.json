@@ -11,7 +11,7 @@
     "test": "vitest run",
     "preview": "vite preview",
     "mcp": "bun server/mcp/stdio.ts",
-    "cf:dev": "vite build && wrangler dev",
+    "cf:dev": "vite build && wrangler dev --local-upstream localhost:8787",
     "db:migrate:local": "wrangler d1 migrations apply plastic --local",
     "db:migrate:remote": "wrangler d1 migrations apply plastic --remote",
     "deploy": "bun run build && wrangler deploy"

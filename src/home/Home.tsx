@@ -2,14 +2,14 @@
  * Home: the workspace's files, most recently edited first. Each file is a folder on disk;
  * its name is the document's <title> and its thumbnail is the design itself.
  */
-import { Clock, FileUp, Folder, Layers3, LayoutGrid, List, LogOut, Minus, Plus, Search } from 'lucide-react';
+import { Clock, Cloud, FileUp, Folder, Layers3, LayoutGrid, List, LogOut, Minus, Plus, Search } from 'lucide-react';
 import { useAccount } from '../auth/AuthGate';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react';
 import { fileHref, linkClick, navigate } from '../app/router';
 import type { DesignDocument } from '../document/types';
 import { createProject } from '../editor/persistence';
 import { STYLES_FILE, TOKENS_FILE, parseProject } from '../serialization';
-import { connectWorkspace, type ProjectSummary, type Workspace } from '../serialization/storage';
+import { browserFiles, connectWorkspace, type ProjectSummary, type Workspace } from '../serialization/storage';
 import { DropOverlay, ImportDialog, isFigmaFile, useFileDrop, type ImportState } from './FigmaImport';
 import { Thumbnail } from './Thumbnail';
 import { editedAgo } from './time';
@@ -69,6 +69,9 @@ function useNow(intervalMs = 60_000): number {
 export function Home() {
   const [files, setFiles] = useState<FileEntry[] | null>(null);
   const [location, setLocation] = useState('workspace');
+  const [kind, setKind] = useState<Workspace['kind']>('disk');
+  const [browserCount, setBrowserCount] = useState(0);
+  const [moving, setMoving] = useState(false);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<View>(() => (readPref(VIEW_KEY) === 'list' ? 'list' : 'grid'));
   const [creating, setCreating] = useState(false);
@@ -82,6 +85,8 @@ export function Home() {
   const refresh = useCallback(async () => {
     const workspace = await connectWorkspace();
     setLocation(workspace.location);
+    setKind(workspace.kind);
+    if (workspace.kind === 'cloud') setBrowserCount((await browserFiles.list()).length);
     setCanImport(!!workspace.importFigma);
     const list = await workspace.list();
     setFiles(list.map((p) => toEntry(p, workspace)).filter((f): f is FileEntry => f !== null));
@@ -165,6 +170,23 @@ export function Home() {
     onFocus: () => setSelected(id),
   });
 
+  /** Copy files saved in this browser (before accounts) into the account, then clear them here. */
+  const moveBrowserFiles = async () => {
+    if (moving) return;
+    setMoving(true);
+    try {
+      const workspace = await connectWorkspace();
+      for (const p of await browserFiles.list()) {
+        const title = toEntry(p, workspace)?.title ?? p.id;
+        await workspace.create(title, p.files);
+        browserFiles.remove(p.id);
+      }
+    } finally {
+      setMoving(false);
+      await refresh();
+    }
+  };
+
   const changeView = (next: View) => {
     setView(next);
     writePref(VIEW_KEY, next);
@@ -172,7 +194,7 @@ export function Home() {
 
   return (
     <div className="home">
-      <Sidebar location={location} query={query} onQuery={setQuery} searchRef={searchRef} />
+      <Sidebar location={location} kind={kind} query={query} onQuery={setQuery} searchRef={searchRef} />
       <main className="home-main">
         <header className="home-header">
           <div className="home-header-inner">
@@ -222,6 +244,16 @@ export function Home() {
 
         <section className="home-files" aria-label="Files" onClick={() => setSelected(null)}>
           <div className="home-files-inner">
+            {kind === 'cloud' && browserCount > 0 && (
+              <div className="home-move">
+                <span>
+                  {browserCount === 1 ? '1 file is' : `${browserCount} files are`} saved only in this browser. Move {browserCount === 1 ? 'it' : 'them'} to your account to keep {browserCount === 1 ? 'it' : 'them'} everywhere.
+                </span>
+                <button type="button" className="home-import" disabled={moving} onClick={(e) => (e.stopPropagation(), void moveBrowserFiles())}>
+                  {moving ? 'Moving…' : 'Move to my account'}
+                </button>
+              </div>
+            )}
             {files === null ? null : visible.length === 0 ? (
               <EmptyState searching={!!query.trim()} onNew={() => void newFile()} />
             ) : view === 'grid' ? (
@@ -244,7 +276,7 @@ export function Home() {
                       <Thumbnail doc={f.doc} css={f.css} base={f.base} />
                     </span>
                     <span className="home-row-title">{f.title}</span>
-                    <span className="home-row-path">{`${location}/${f.id}`}</span>
+                    <span className="home-row-path">{kind === 'disk' ? `${location}/${f.id}` : location}</span>
                     <span className="home-row-time">{editedAgo(f.updatedAt, now)}</span>
                   </a>
                 ))}
@@ -268,7 +300,7 @@ export function Home() {
   );
 }
 
-function Sidebar({ location, query, onQuery, searchRef }: { location: string; query: string; onQuery(q: string): void; searchRef: React.RefObject<HTMLInputElement | null> }) {
+function Sidebar({ location, kind, query, onQuery, searchRef }: { location: string; kind: Workspace['kind']; query: string; onQuery(q: string): void; searchRef: React.RefObject<HTMLInputElement | null> }) {
   const [cardDismissed, setCardDismissed] = useState(() => readPref(CARD_KEY) === '1');
   const account = useAccount();
   return (
@@ -301,11 +333,23 @@ function Sidebar({ location, query, onQuery, searchRef }: { location: string; qu
 
           <div className="home-divider" />
 
-          <div className="home-nav-heading" title={`Files are folders in ${location}/`}>
-            <Folder size={15} strokeWidth={1.5} />
-            Local workspace
-          </div>
-          <div className="home-nav-path">{location}/</div>
+          {kind === 'cloud' ? (
+            <>
+              <div className="home-nav-heading" title="Saved to your Plastic account">
+                <Cloud size={15} strokeWidth={1.5} />
+                Your files
+              </div>
+              <div className="home-nav-path">Saved to your account</div>
+            </>
+          ) : (
+            <>
+              <div className="home-nav-heading" title={kind === 'disk' ? `Files are folders in ${location}/` : 'Saved in this browser'}>
+                <Folder size={15} strokeWidth={1.5} />
+                {kind === 'disk' ? 'Local workspace' : 'This browser'}
+              </div>
+              <div className="home-nav-path">{kind === 'disk' ? `${location}/` : 'Saved in this browser only'}</div>
+            </>
+          )}
 
           {!cardDismissed && (
             <div className="home-card-note">
