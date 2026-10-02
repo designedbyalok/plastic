@@ -2,14 +2,13 @@
  * Home: the workspace's files, most recently edited first. Each file is a folder on disk;
  * its name is the document's <title> and its thumbnail is the design itself.
  */
-import { Layers3 } from 'lucide-react';
+import { Clock, Folder, Layers3, LayoutGrid, List, Minus, Plus, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fileHref, linkClick, navigate } from '../app/router';
 import type { DesignDocument } from '../document/types';
 import { createProject } from '../editor/persistence';
 import { parseProject } from '../serialization';
 import { connectWorkspace, type ProjectSummary } from '../serialization/storage';
-import { ClockIcon, FolderIcon, GridIcon, ListIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
 import { Thumbnail } from './Thumbnail';
 import { editedAgo } from './time';
 import './home.css';
@@ -128,7 +127,7 @@ export function Home() {
             <h1 className="home-title">{query.trim() ? 'Search' : 'Recents'}</h1>
             <div className="home-actions">
               <button type="button" className="home-new" onClick={() => void newFile()} disabled={creating}>
-                <PlusIcon />
+                <Plus size={12} strokeWidth={2} />
                 New file
               </button>
               <div className="home-view-toggle" role="radiogroup" aria-label="View">
@@ -142,7 +141,7 @@ export function Home() {
                     className={`home-view-option${view === v ? ' is-active' : ''}`}
                     onClick={() => changeView(v)}
                   >
-                    {v === 'grid' ? <GridIcon /> : <ListIcon />}
+                    {v === 'grid' ? <LayoutGrid size={15} strokeWidth={1.5} /> : <List size={15} strokeWidth={1.5} />}
                   </button>
                 ))}
               </div>
@@ -201,19 +200,19 @@ function Sidebar({ location, query, onQuery, searchRef }: { location: string; qu
 
         <nav aria-label="Workspace">
           <label className="home-search">
-            <SearchIcon className="home-search-icon" />
+            <Search size={13} strokeWidth={1.75} className="home-search-icon" />
             <input ref={searchRef} type="search" placeholder="Search" aria-label="Search files" value={query} onChange={(e) => onQuery(e.target.value)} />
             <kbd className="home-search-kbd">⌘F</kbd>
           </label>
           <a className="home-nav-item is-active" href="/" aria-current="page" onClick={linkClick}>
-            <ClockIcon />
+            <Clock size={15} strokeWidth={1.5} />
             Recents
           </a>
 
           <div className="home-divider" />
 
           <div className="home-nav-heading" title={`Files are folders in ${location}/`}>
-            <FolderIcon />
+            <Folder size={15} strokeWidth={1.5} />
             Local workspace
           </div>
           <div className="home-nav-path">{location}/</div>
@@ -233,7 +232,7 @@ function Sidebar({ location, query, onQuery, searchRef }: { location: string; qu
                   writePref(CARD_KEY, '1');
                 }}
               >
-                <MinusIcon />
+                <Minus size={12} strokeWidth={1.5} />
               </button>
             </div>
           )}
@@ -252,7 +251,7 @@ function EmptyState({ searching, onNew }: { searching: boolean; onNew(): void })
         <>
           <p>No files yet.</p>
           <button type="button" className="home-new" onClick={onNew}>
-            <PlusIcon />
+            <Plus size={12} strokeWidth={2} />
             New file
           </button>
         </>

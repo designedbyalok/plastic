@@ -7,7 +7,7 @@ import { useEditor } from '../editor/store';
 import { CodePanel } from '../panels/CodePanel';
 import { Inspector } from '../panels/inspector/Inspector';
 import { LayersPanel } from '../panels/LayersPanel';
-import { Toolbar } from '../panels/Toolbar';
+import { ToolRail } from '../panels/ToolRail';
 import { linkClick } from './router';
 
 type Status = 'opening' | 'open' | 'missing';
@@ -51,10 +51,10 @@ export function Editor({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="app">
-      <Toolbar />
+    <div className="app editor">
       <div className="workspace">
         <LayersPanel />
+        <ToolRail />
         <main className="stage">
           {status === 'open' && <Canvas />}
           {codeOpen && <CodePanel />}

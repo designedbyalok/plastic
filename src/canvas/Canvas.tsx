@@ -51,7 +51,7 @@ export function Canvas() {
     if (store.editingTextId) finishTextEditing(true);
     const active = document.activeElement as HTMLElement | null;
     if (active && active !== document.body) active.blur?.();
-    if (e.button === 1 || (e.button === 0 && store.spacePressed)) {
+    if (e.button === 1 || (e.button === 0 && (store.spacePressed || store.tool.kind === 'hand'))) {
       e.preventDefault();
       startPan(native);
       return;
@@ -78,15 +78,10 @@ export function Canvas() {
     }
   };
 
-  const grid = 24 * viewport.zoom;
   return (
     <div
       ref={ref}
-      className={`canvas tool-${tool.kind}${spacePressed ? ' is-panning' : ''}`}
-      style={{
-        backgroundSize: `${grid}px ${grid}px`,
-        backgroundPosition: `${viewport.x}px ${viewport.y}px`,
-      }}
+      className={`canvas tool-${tool.kind}${spacePressed || tool.kind === 'hand' ? ' is-panning' : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerLeave={() => useEditor.getState().setHover(null)}

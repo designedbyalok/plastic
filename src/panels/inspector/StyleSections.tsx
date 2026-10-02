@@ -1,246 +1,370 @@
-/** Presentation sections. Every control writes a plain CSS declaration. */
-import { ArrowDown, ArrowRight, X } from 'lucide-react';
+/**
+ * Presentation sections, ordered like a design tool (Layout, Radius, Opacity, Fill…) but every
+ * control writes a plain CSS declaration. Optional sections stay collapsed behind a + until
+ * something is set, and − clears exactly the declarations that section owns.
+ */
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ArrowDown, ArrowRight, LayoutGrid, X } from 'lucide-react';
 import { useState } from 'react';
 import { domElement, isOutOfFlow, styleOf } from '../../canvas/dom';
-import { setDeclaration, setFrame } from '../../document/ops';
+import { setDeclaration, setFrame, setStyleOnNodes } from '../../document/ops';
 import { getElement, getParentId, isRoot } from '../../document/tree';
 import type { ElementNode, NodeId } from '../../document/types';
 import { elementSpec } from '../../elements/registry';
-import { setFreePositioning } from '../../editor/commands';
+import { addFlexOrWrap, setFreePositioning } from '../../editor/commands';
 import { useEditor } from '../../editor/store';
-import { ColorField, CssField, CssSegmented, CssSelect, Grid, MIXED, Row, Section, Segmented, TextInput, computedValue, setStyle, useDeclared } from './fields';
+import {
+  Checkbox, ColorInput, CssInput, CssSegmented, CssSelect, CssSlider, MIXED, Row, Section, Segmented, TextInput,
+  clearStyles, computedValue, setStyle, useAnyDeclared, useDeclared,
+} from './fields';
 
 type Ids = { ids: readonly NodeId[] };
-
-export function PositionSection({ ids }: Ids) {
-  const doc = useEditor((s) => s.doc);
-  const roots = ids.filter((id) => isRoot(doc, id));
-  if (roots.length === ids.length) {
-    if (ids.length !== 1) return null;
-    const id = ids[0]!;
-    const frame = doc.frames[id] ?? { x: 0, y: 0 };
-    const set = (axis: 'x' | 'y', v: string) => {
-      const n = parseFloat(v);
-      if (Number.isFinite(n)) useEditor.getState().apply('Move frame', (d) => setFrame(d, id, { ...frame, [axis]: n }), { coalesce: `frame:${id}` });
-    };
-    return (
-      <Section title="Canvas">
-        <Grid>
-          <Row label="X" hint="Artboard position on the canvas (editor metadata, not CSS)">
-            <TextInput value={String(frame.x)} onChange={(v) => set('x', v)} />
-          </Row>
-          <Row label="Y">
-            <TextInput value={String(frame.y)} onChange={(v) => set('y', v)} />
-          </Row>
-        </Grid>
-      </Section>
-    );
-  }
-  if (roots.length) return null;
-  const free = ids.every((id) => isOutOfFlow(domElement(id)));
-  return (
-    <Section title="Position">
-      <Row label="Mode" hint="Free: position absolute (exploration). Layout: flows inside its parent's flex/grid/block layout.">
-        <Segmented
-          ariaLabel="Positioning"
-          value={free ? 'free' : 'flow'}
-          choices={[
-            { value: 'flow', label: 'Layout', title: 'Flow in parent layout' },
-            { value: 'free', label: 'Free', title: 'position: absolute' },
-          ]}
-          onChange={(v) => setFreePositioning(ids, v === 'free')}
-        />
-      </Row>
-      {free && (
-        <Grid>
-          <CssField ids={ids} prop="left" label="Left" />
-          <CssField ids={ids} prop="top" label="Top" />
-          <CssField ids={ids} prop="right" label="Right" />
-          <CssField ids={ids} prop="bottom" label="Bottom" />
-          <CssField ids={ids} prop="z-index" label="Z" />
-        </Grid>
-      )}
-    </Section>
-  );
-}
 
 const JUSTIFY = ['flex-start', 'center', 'flex-end', 'space-between', 'space-around', 'space-evenly'];
 const ALIGN = ['stretch', 'flex-start', 'center', 'flex-end', 'baseline'];
 
+// --- Layout ------------------------------------------------------------------------------------
+
 export function LayoutSection({ ids }: Ids) {
   const doc = useEditor((s) => s.doc);
+  const allRoots = ids.every((id) => isRoot(doc, id));
+  const anyRoot = ids.some((id) => isRoot(doc, id));
+  const free = !anyRoot && ids.every((id) => isOutOfFlow(domElement(id)));
   const containers = ids.every((id) => {
     const el = getElement(doc, id);
     return el && elementSpec(el.tag).acceptsChildren;
   });
   const declaredDisplay = useDeclared(ids, 'display');
-  if (!containers) return null;
   const display = declaredDisplay === MIXED ? '' : declaredDisplay || computedValue(ids[0], 'display');
   const mode = display.includes('flex') ? 'flex' : display.includes('grid') ? 'grid' : 'block';
+  const direction = useDeclared(ids, 'flex-direction');
+  const clipped = useDeclared(ids, 'overflow') === 'hidden';
+
 
   return (
-    <Section title="Layout">
-      <Row label="Display" hint="display">
-        <Segmented
-          ariaLabel="Display"
-          value={mode}
-          choices={[
-            { value: 'block', label: 'Block' },
-            { value: 'flex', label: 'Flex' },
-            { value: 'grid', label: 'Grid' },
-          ]}
-          onChange={(v) => setStyle(ids, 'display', v === 'block' && !declaredDisplay ? '' : v)}
-        />
-      </Row>
-      {mode === 'flex' && (
-        <>
-          <CssSegmented
-            ids={ids}
-            prop="flex-direction"
-            label="Direction"
+    <Section
+      title="Layout"
+      aside={
+        !anyRoot ? (
+          <Segmented
+            ariaLabel="Positioning"
+            value={free ? 'free' : 'flow'}
             choices={[
-              { value: 'row', label: <ArrowRight size={13} />, title: 'Row (horizontal)' },
-              { value: 'column', label: <ArrowDown size={13} />, title: 'Column (vertical)' },
+              { value: 'flow', label: 'Flow', title: 'Flows in its parent’s layout' },
+              { value: 'free', label: 'Free', title: 'position: absolute' },
             ]}
+            onChange={(v) => setFreePositioning(ids, v === 'free')}
           />
-          <CssSelect ids={ids} prop="justify-content" label="Justify" options={JUSTIFY} />
-          <CssSelect ids={ids} prop="align-items" label="Align" options={ALIGN} />
-          <Grid>
-            <CssField ids={ids} prop="gap" label="Gap" />
-            <CssSelect ids={ids} prop="flex-wrap" label="Wrap" options={['nowrap', 'wrap']} />
-          </Grid>
-        </>
+        ) : undefined
+      }
+    >
+      {allRoots && ids.length === 1 && <FramePosition id={ids[0]!} />}
+      {free && (
+        <Row>
+          <CssInput ids={ids} prop="left" prefix="X" numeric />
+          <CssInput ids={ids} prop="top" prefix="Y" numeric />
+        </Row>
       )}
-      {mode === 'grid' && (
+      <Row>
+        <CssInput ids={ids} prop="width" prefix="W" numeric />
+        <CssInput ids={ids} prop={allRoots ? 'min-height' : 'height'} prefix="H" numeric />
+      </Row>
+
+      {containers && mode !== 'block' ? (
         <>
-          <Row label="Columns" hint="grid-template-columns">
-            <div className="stack-tight">
-              <Segmented
-                ariaLabel="Column count"
-                value=""
-                choices={[1, 2, 3, 4].map((n) => ({ value: String(n), label: String(n), title: `${n} equal columns` }))}
-                onChange={(n) => setStyle(ids, 'grid-template-columns', `repeat(${n}, minmax(0, 1fr))`)}
-              />
-              <CssFieldInline ids={ids} prop="grid-template-columns" />
-            </div>
+          <Row>
+            <Segmented
+              ariaLabel="Layout"
+              value={mode === 'grid' ? 'grid' : direction.startsWith('column') ? 'column' : 'row'}
+              choices={[
+                { value: 'row', label: <ArrowRight size={13} />, title: 'Flex row' },
+                { value: 'column', label: <ArrowDown size={13} />, title: 'Flex column' },
+                { value: 'grid', label: <LayoutGrid size={12} />, title: 'Grid' },
+              ]}
+              onChange={(v) =>
+                useEditor.getState().apply('Set layout', (d) =>
+                  v === 'grid'
+                    ? setStyleOnNodes(setStyleOnNodes(d, ids, 'display', 'grid'), ids, 'grid-template-columns', 'repeat(2, minmax(0, 1fr))')
+                    : setStyleOnNodes(setStyleOnNodes(d, ids, 'display', 'flex'), ids, 'flex-direction', v),
+                )
+              }
+            />
+            <button
+              type="button"
+              className="icon-button"
+              title="Remove layout (back to block)"
+              aria-label="Remove layout"
+              onClick={() => clearStyles(ids, ['display', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'gap', 'grid-template-columns'], 'Remove layout')}
+            >
+              <X size={12} />
+            </button>
           </Row>
-          <Grid>
-            <CssField ids={ids} prop="gap" label="Gap" />
-            <CssSelect ids={ids} prop="align-items" label="Align" options={['stretch', 'start', 'center', 'end']} />
-          </Grid>
+          {mode === 'flex' ? (
+            <Row>
+              <CssSelect ids={ids} prop="justify-content" label="Justify" options={JUSTIFY} />
+              <CssSelect ids={ids} prop="align-items" label="Align" options={ALIGN} />
+            </Row>
+          ) : (
+            <Row>
+              <CssInput ids={ids} prop="grid-template-columns" prefix="Cols" mono />
+            </Row>
+          )}
+          <Row>
+            <CssInput ids={ids} prop="gap" prefix="Gap" numeric />
+            <CssInput ids={ids} prop="padding" prefix="Pad" />
+          </Row>
+        </>
+      ) : (
+        <>
+          {(containers || ids.length > 1) && (
+            <Row>
+              <button type="button" className="insp-button" onClick={addFlexOrWrap}>
+                {containers && ids.length === 1 ? 'Add flex' : 'Wrap in flex'} <span className="insp-kbd">⇧ A</span>
+              </button>
+            </Row>
+          )}
+          {containers && (
+            <Row>
+              <CssInput ids={ids} prop="padding" prefix="Pad" />
+            </Row>
+          )}
         </>
       )}
+
+      <FlexChildRow ids={ids} />
+
+      <Row>
+        <Checkbox checked={clipped} onChange={(on) => setStyle(ids, 'overflow', on ? 'hidden' : '')} label="Clip content" />
+      </Row>
     </Section>
   );
 }
 
-function CssFieldInline({ ids, prop }: { ids: readonly NodeId[]; prop: string }) {
-  const declared = useDeclared(ids, prop);
-  return <TextInput mono value={declared === MIXED ? '' : declared} placeholder={computedValue(ids[0], prop)} onChange={(v) => setStyle(ids, prop, v)} />;
+function FramePosition({ id }: { id: NodeId }) {
+  const frame = useEditor((s) => s.doc.frames[id] ?? { x: 0, y: 0 });
+  const set = (axis: 'x' | 'y', v: string) => {
+    const n = parseFloat(v);
+    if (Number.isFinite(n)) useEditor.getState().apply('Move frame', (d) => setFrame(d, id, { ...frame, [axis]: n }), { coalesce: `frame:${id}` });
+  };
+  return (
+    <Row>
+      <TextInput prefix="X" value={String(frame.x)} onChange={(v) => set('x', v)} ariaLabel="Canvas X" />
+      <TextInput prefix="Y" value={String(frame.y)} onChange={(v) => set('y', v)} ariaLabel="Canvas Y" />
+    </Row>
+  );
 }
 
 /** Controls that only make sense because of the parent's layout (flex/grid item). */
-export function ChildLayoutSection({ ids }: Ids) {
+function FlexChildRow({ ids }: Ids) {
   const doc = useEditor((s) => s.doc);
   const parents = new Set(ids.map((id) => getParentId(doc, id)));
-  const parentId = parents.size === 1 ? [...parents][0] : null;
-  const parentEl = domElement(parentId);
+  const parentEl = domElement(parents.size === 1 ? [...parents][0] : null);
   if (!parentEl || ids.some((id) => isOutOfFlow(domElement(id)))) return null;
   const display = styleOf(parentEl).display;
   if (display.includes('flex')) {
     return (
-      <Section title="In flex parent">
-        <Grid>
-          <CssField ids={ids} prop="flex" label="Flex" placeholder="0 1 auto" />
-          <CssSelect ids={ids} prop="align-self" label="Self" options={['auto', ...ALIGN]} />
-        </Grid>
-      </Section>
+      <Row>
+        <CssInput ids={ids} prop="flex" prefix="Flex" placeholder="0 1 auto" />
+        <CssSelect ids={ids} prop="align-self" label="Self" options={['auto', ...ALIGN]} />
+      </Row>
     );
   }
   if (display.includes('grid')) {
     return (
-      <Section title="In grid parent">
-        <Grid>
-          <CssField ids={ids} prop="grid-column" label="Column" placeholder="auto" />
-          <CssField ids={ids} prop="grid-row" label="Row" placeholder="auto" />
-        </Grid>
-      </Section>
+      <Row>
+        <CssInput ids={ids} prop="grid-column" prefix="Col" placeholder="auto" />
+        <CssInput ids={ids} prop="grid-row" prefix="Row" placeholder="auto" />
+      </Row>
     );
   }
   return null;
 }
 
-export function SizeSection({ ids }: Ids) {
+// --- Radius / Opacity --------------------------------------------------------------------------
+
+export function RadiusSection({ ids }: Ids) {
   return (
-    <Section title="Size">
-      <Grid>
-        <CssField ids={ids} prop="width" label="W" />
-        <CssField ids={ids} prop="height" label="H" />
-        <CssField ids={ids} prop="min-width" label="Min W" placeholder="—" />
-        <CssField ids={ids} prop="min-height" label="Min H" placeholder="—" />
-        <CssField ids={ids} prop="max-width" label="Max W" placeholder="—" />
-        <CssField ids={ids} prop="max-height" label="Max H" placeholder="—" />
-      </Grid>
+    <Section title="Radius">
+      <Row>
+        <CssSlider ids={ids} prop="border-radius" min={0} max={48} label="Radius" />
+        <span className="insp-narrow">
+          <CssInput ids={ids} prop="border-radius" numeric />
+        </span>
+      </Row>
     </Section>
   );
 }
 
-export function SpacingSection({ ids }: Ids) {
+export function OpacitySection({ ids }: Ids) {
+  const declared = useDeclared(ids, 'opacity');
+  const value = declared === MIXED ? '' : declared;
+  const percent = value === '' ? '' : String(Math.round(parseFloat(value) * 100));
   return (
-    <Section title="Spacing">
-      <CssField ids={ids} prop="padding" label="Padding" />
-      <CssField ids={ids} prop="margin" label="Margin" />
+    <Section title="Opacity">
+      <Row>
+        <CssSlider ids={ids} prop="opacity" min={0} max={100} unit="" scale={100} label="Opacity" />
+        <span className="insp-narrow">
+          <TextInput
+            ariaLabel="Opacity percent"
+            suffix="%"
+            value={percent}
+            placeholder={declared === MIXED ? 'Mixed' : '100'}
+            onChange={(v) => {
+              const n = parseFloat(v);
+              setStyle(ids, 'opacity', v.trim() === '' || !Number.isFinite(n) ? '' : String(Math.max(0, Math.min(100, n)) / 100));
+            }}
+          />
+        </span>
+      </Row>
     </Section>
   );
 }
 
-export function AppearanceSection({ ids }: Ids) {
+// --- Optional sections (+ / −) -----------------------------------------------------------------
+
+/** A section that is collapsed until one of its props is set, or the user presses +. */
+function OptionalSection({ ids, title, props, onAdd, children }: Ids & { title: string; props: readonly string[]; onAdd?(): void; children: React.ReactNode }) {
+  const declared = useAnyDeclared(ids, props);
+  const [opened, setOpened] = useState(false);
+  const open = declared || opened;
   return (
-    <Section title="Appearance">
-      <ColorField ids={ids} prop="background" label="Fill" />
-      <CssField ids={ids} prop="border" label="Border" placeholder="1px solid #e5e7eb" />
-      <Grid>
-        <CssField ids={ids} prop="border-radius" label="Radius" />
-        <CssField ids={ids} prop="opacity" label="Opacity" />
-      </Grid>
-      <CssField ids={ids} prop="box-shadow" label="Shadow" placeholder="0 1px 3px rgb(0 0 0 / 0.1)" />
-      <CssSelect ids={ids} prop="overflow" label="Overflow" options={['visible', 'hidden', 'auto', 'clip']} />
+    <Section
+      title={title}
+      empty={!open}
+      onAdd={() => {
+        setOpened(true);
+        onAdd?.();
+      }}
+      onRemove={() => {
+        setOpened(false);
+        if (declared) clearStyles(ids, props, `Remove ${title.toLowerCase()}`);
+      }}
+    >
+      {children}
     </Section>
   );
 }
 
-export function TypographySection({ ids }: Ids) {
+export function FillSection({ ids }: Ids) {
   return (
-    <Section title="Text">
-      <ColorField ids={ids} prop="color" label="Color" />
-      <CssField ids={ids} prop="font-family" label="Font" />
-      <Grid>
-        <CssField ids={ids} prop="font-size" label="Size" />
+    <OptionalSection ids={ids} title="Fill" props={['background', 'background-color', 'background-image']} onAdd={() => setStyle(ids, 'background', '#ffffff')}>
+      <Row>
+        <ColorInput ids={ids} prop="background" computedProp="background-color" />
+      </Row>
+    </OptionalSection>
+  );
+}
+
+const TEXT_PROPS = ['color', 'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-align'];
+
+export function TextSection({ ids, textual }: Ids & { textual: boolean }) {
+  const body = (
+    <>
+      <Row>
+        <ColorInput ids={ids} prop="color" />
+      </Row>
+      <Row>
+        <CssInput ids={ids} prop="font-family" placeholder="inherit" />
+      </Row>
+      <Row>
+        <CssInput ids={ids} prop="font-size" prefix="Size" numeric />
         <CssSelect ids={ids} prop="font-weight" label="Weight" options={['300', '400', '500', '600', '700', '800']} />
-        <CssField ids={ids} prop="line-height" label="Line" />
-        <CssField ids={ids} prop="letter-spacing" label="Tracking" />
-      </Grid>
-      <CssSegmented
-        ids={ids}
-        prop="text-align"
-        label="Align"
-        choices={['left', 'center', 'right', 'justify'].map((v) => ({ value: v, label: v[0]!.toUpperCase() + v.slice(1, 3) }))}
-      />
-    </Section>
+      </Row>
+      <Row>
+        <CssInput ids={ids} prop="line-height" prefix="Line" />
+        <CssInput ids={ids} prop="letter-spacing" prefix="Track" />
+      </Row>
+      <Row>
+        <CssSegmented
+          ids={ids}
+          prop="text-align"
+          label="Align"
+          choices={[
+            { value: 'left', label: <AlignLeft size={13} />, title: 'Align left' },
+            { value: 'center', label: <AlignCenter size={13} />, title: 'Align center' },
+            { value: 'right', label: <AlignRight size={13} />, title: 'Align right' },
+            { value: 'justify', label: <AlignJustify size={13} />, title: 'Justify' },
+          ]}
+        />
+      </Row>
+    </>
+  );
+  // Text elements always show typography; containers only once something is set (it inherits).
+  if (textual) return <Section title="Text" onRemove={undefined}>{body}</Section>;
+  return (
+    <OptionalSection ids={ids} title="Text" props={TEXT_PROPS}>
+      {body}
+    </OptionalSection>
   );
 }
+
+export function BorderSection({ ids }: Ids) {
+  return (
+    <OptionalSection ids={ids} title="Border" props={['border', 'border-width', 'border-style', 'border-color']} onAdd={() => setStyle(ids, 'border', '1px solid #d1d5db')}>
+      <Row>
+        <CssInput ids={ids} prop="border" placeholder="1px solid #d1d5db" />
+      </Row>
+    </OptionalSection>
+  );
+}
+
+export function ShadowSection({ ids }: Ids) {
+  return (
+    <OptionalSection ids={ids} title="Shadow" props={['box-shadow']} onAdd={() => setStyle(ids, 'box-shadow', '0 1px 3px rgb(0 0 0 / 0.12)')}>
+      <Row>
+        <CssInput ids={ids} prop="box-shadow" placeholder="0 1px 3px rgb(0 0 0 / 0.12)" />
+      </Row>
+    </OptionalSection>
+  );
+}
+
+export function MarginSection({ ids }: Ids) {
+  return (
+    <OptionalSection ids={ids} title="Margin" props={['margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left']}>
+      <Row>
+        <CssInput ids={ids} prop="margin" placeholder="0" />
+      </Row>
+    </OptionalSection>
+  );
+}
+
+export function ConstraintsSection({ ids }: Ids) {
+  return (
+    <OptionalSection ids={ids} title="Min / max size" props={['min-width', 'max-width', 'min-height', 'max-height']}>
+      <Row>
+        <CssInput ids={ids} prop="min-width" prefix="Min W" numeric />
+        <CssInput ids={ids} prop="max-width" prefix="Max W" numeric />
+      </Row>
+      <Row>
+        <CssInput ids={ids} prop="min-height" prefix="Min H" numeric />
+        <CssInput ids={ids} prop="max-height" prefix="Max H" numeric />
+      </Row>
+    </OptionalSection>
+  );
+}
+
+// --- All CSS -----------------------------------------------------------------------------------
 
 /** Every declaration on the primary class: the escape hatch to all of CSS. */
 export function CssSection({ el }: { el: ElementNode }) {
   const rule = useEditor((s) => (el.classes[0] ? s.doc.styles.rules[el.classes[0]] : undefined));
+  const [open, setOpen] = useState(false);
   const [prop, setProp] = useState('');
   const cls = el.classes[0];
   const ids = [el.id];
+  const count = Object.keys(rule ?? {}).length;
   return (
-    <Section title={cls ? `CSS · .${cls}` : 'CSS'} defaultOpen={false}>
+    <Section
+      title={
+        <button type="button" className="insp-disclosure" aria-expanded={open} onClick={() => setOpen(!open)}>
+          CSS{cls ? <code>.{cls}</code> : null}
+          <span className="insp-count">{count}</span>
+        </button>
+      }
+      empty={!open}
+    >
       {Object.entries(rule ?? {}).map(([p, v]) => (
-        <div key={p} className="raw-row">
-          <code className="raw-key">{p}</code>
+        <div key={p} className="insp-row insp-raw">
+          <code className="insp-raw-key">{p}</code>
           <TextInput mono value={v} ariaLabel={p} onChange={(value) => setStyle(ids, p, value)} />
           <button
             type="button"
@@ -252,11 +376,11 @@ export function CssSection({ el }: { el: ElementNode }) {
           </button>
         </div>
       ))}
-      <div className="raw-row">
+      <div className="insp-row">
         <input
-          className="text-input is-mono"
-          placeholder="add property…  e.g. transition"
-          aria-label="New CSS property"
+          className="insp-input is-mono"
+          placeholder="property: value"
+          aria-label="New CSS declaration"
           value={prop}
           spellCheck={false}
           onChange={(e) => setProp(e.target.value)}

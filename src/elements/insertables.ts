@@ -26,12 +26,9 @@ const controlStyle = {
   font: 'inherit',
 };
 
+/** Neutral grey placeholder (a solid block, no drawing) until a real image is chosen. */
 const PLACEHOLDER_IMAGE =
-  'data:image/svg+xml,' +
-  encodeURIComponent(
-    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 160'><rect width='240' height='160' fill='#e5e7eb'/>" +
-      "<circle cx='96' cy='60' r='10' fill='#9ca3af'/><path d='M70 116l34-38 22 24 14-14 30 28z' fill='#9ca3af'/></svg>",
-  );
+  'data:image/svg+xml,' + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 160'><rect width='240' height='160' fill='#e5e7eb'/></svg>");
 
 export const FRAME_SIZE = { width: 480, height: 640 };
 

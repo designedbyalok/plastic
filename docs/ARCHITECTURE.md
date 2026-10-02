@@ -45,7 +45,7 @@ src/
     gestures.ts      Pointer gestures (select, move, resize, marquee, insert, pan)
     Overlay.tsx      Screen-space selection, handles, guides
     textEditing.ts   Inline contenteditable text editing
-  panels/          Toolbar, layers, inspector, code view
+  panels/          Tool rail, layers, inspector, code view
   home/            Home screen: the workspace's files, with live thumbnails
   app/             Routes (/ and /file/<id>), editor screen, editor chrome CSS
 server/

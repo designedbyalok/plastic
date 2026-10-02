@@ -12,7 +12,11 @@ import { starterDocument } from '../elements/insertables';
 import type { Viewport } from '../canvas/coords';
 import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
 
-export type Tool = { readonly kind: 'select' } | { readonly kind: 'frame' } | { readonly kind: 'insert'; readonly itemId: string };
+export type Tool =
+  | { readonly kind: 'select' }
+  | { readonly kind: 'hand' }
+  | { readonly kind: 'frame' }
+  | { readonly kind: 'insert'; readonly itemId: string };
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -45,6 +49,7 @@ export interface EditorState {
   readonly viewport: Viewport;
   readonly collapsed: Readonly<Record<NodeId, true>>;
   readonly codeOpen: boolean;
+  readonly layersOpen: boolean;
   readonly spacePressed: boolean;
 
   apply(label: string, recipe: (doc: DesignDocument) => DesignDocument, options?: ApplyOptions): void;
@@ -65,6 +70,7 @@ export interface EditorState {
   setCollapsed(id: NodeId, collapsed: boolean): void;
   setEditingText(id: NodeId | null): void;
   setCodeOpen(open: boolean): void;
+  setLayersOpen(open: boolean): void;
   setSpacePressed(pressed: boolean): void;
   setSaveState(status: SaveStatus, savedRevision?: number, location?: string): void;
 }
@@ -88,6 +94,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   viewport: { x: 80, y: 80, zoom: 1 },
   collapsed: {},
   codeOpen: false,
+  layersOpen: true,
   spacePressed: false,
 
   apply(label, recipe, options = {}) {
@@ -198,6 +205,9 @@ export const useEditor = create<EditorState>()((set, get) => ({
   },
   setCodeOpen(open) {
     set({ codeOpen: open });
+  },
+  setLayersOpen(open) {
+    set({ layersOpen: open });
   },
   setSpacePressed(pressed) {
     if (get().spacePressed !== pressed) set({ spacePressed: pressed });

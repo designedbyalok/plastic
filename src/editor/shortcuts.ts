@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { INSERTABLES } from '../elements/insertables';
 import {
-  deleteSelection, duplicateSelection, enterSelection, nudgeSelection, selectParent, wrapSelectionInStack,
+  addFlexOrWrap, deleteSelection, duplicateSelection, enterSelection, nudgeSelection, selectParent,
   zoomBy, zoomTo, zoomToFit, zoomToSelection,
 } from './commands';
 import { saveNow } from './persistence';
@@ -44,7 +44,7 @@ export function useShortcuts(): void {
         return;
       }
       if (e.shiftKey) {
-        if (key === 'a') wrapSelectionInStack();
+        if (key === 'a') addFlexOrWrap();
         else if (e.code === 'Digit0') zoomTo(1);
         else if (e.code === 'Digit1') zoomToFit();
         else if (e.code === 'Digit2') zoomToSelection();

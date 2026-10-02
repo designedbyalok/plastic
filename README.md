@@ -35,14 +35,18 @@ npm run build
 
 ## Try the first workflow
 
+Tools are in the rail beside the layers panel; semantic elements (button, input, labeled
+field, select, checkbox, table…) are in its **Insert element** menu, or on their shortcut.
+
 1. **F**, then drag on the canvas: a frame (artboard).
 2. **H**, click in the frame, type "Sign in", Enter.
 3. **I** and click: an input. **B** and click: a button.
 4. Drag a marquee over the three on the frame's background, press **⇧A**: they are wrapped in a
    vertical flex stack (direction and gap inferred).
-5. In the inspector change **Gap** and **Padding**; set **Tag** to `<form>`.
+5. In the inspector's **Layout** section change **Gap** and **Pad**; set **Tag** to `<form>`.
+   Optional sections (Fill, Text, Border, Shadow…) stay collapsed until you press **+**.
 6. Select the input: change **Type** to `email`, the **Placeholder**, tick **Required**.
-7. Toggle **</>** in the toolbar to see the exact files being written.
+7. Press **Code** (top of the inspector) to see the exact files being written.
 8. Reload the page: everything comes back from disk.
 
 Shortcuts are listed in the inspector when nothing is selected.

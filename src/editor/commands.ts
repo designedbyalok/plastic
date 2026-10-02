@@ -1,6 +1,6 @@
 /**
  * Editor commands: user intents that may need live layout measurements before producing a
- * pure document edit. Shortcuts, toolbar buttons and (later) an agent API all call these.
+ * pure document edit. Shortcuts, the tool rail, the inspector and (later) an agent API all call these.
  */
 import { fitRect, screenToWorld, unionRects, zoomAround, type Rect } from '../canvas/coords';
 import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf, styleOf } from '../canvas/dom';
@@ -78,6 +78,25 @@ export function wrapSelectionInStack(): void {
     return result.doc;
   });
   if (stackId) state().select([stackId]);
+}
+
+/**
+ * ⇧A / "Add flex": a single container without a layout becomes a flex column; anything else
+ * (several elements, or a non-container) is wrapped in a new flex stack.
+ */
+export function addFlexOrWrap(): void {
+  const { selection, doc } = state();
+  const only = selection.length === 1 ? getElement(doc, selection[0]) : undefined;
+  const el = only ? domElement(only.id) : null;
+  if (only && el && elementSpec(only.tag).acceptsChildren && !/flex|grid/.test(styleOf(el).display)) {
+    state().apply('Add flex', (d) => {
+      let next = setStyleOnNodes(d, [only.id], 'display', 'flex');
+      next = setStyleOnNodes(next, [only.id], 'flex-direction', 'column');
+      return setStyleOnNodes(next, [only.id], 'gap', '12px');
+    });
+    return;
+  }
+  wrapSelectionInStack();
 }
 
 /** Switch between free positioning and layout positioning without the element jumping. */

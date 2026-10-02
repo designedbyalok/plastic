@@ -23,7 +23,8 @@ import { finishTextEditing } from './textEditing';
  * so any rule in styles.css overrides them.
  */
 const EDITOR_CSS = `
-:where(html, body) { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+/* Keep the browser's default white page canvas: an artboard looks like its root on a real page. */
+:where(html, body) { margin: 0; padding: 0; overflow: hidden; }
 [contenteditable] { outline: none; cursor: text; }
 `;
 
