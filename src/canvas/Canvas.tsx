@@ -7,7 +7,7 @@ import { canEditText } from '../editor/commands';
 import { useEditor } from '../editor/store';
 import { ArtboardHost } from './ArtboardHost';
 import { zoomAround } from './coords';
-import { domElement, nodeIdFromPath, setViewportElement, toScreen } from './dom';
+import { nodeIdAt, setViewportElement, toScreen } from './dom';
 import { insertAt, startFrameDraw, startPan, startSelectGesture } from './gestures';
 import { Overlay } from './Overlay';
 import { finishTextEditing, useTextEditing } from './textEditing';
@@ -47,12 +47,10 @@ export function Canvas() {
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     const native = e.nativeEvent;
     const store = useEditor.getState();
-    if (store.editingTextId) {
-      const editingEl = domElement(store.editingTextId);
-      if (editingEl && native.composedPath().includes(editingEl)) return;
-      finishTextEditing(true);
-    }
-    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur();
+    // The editing artboard receives its own pointer events, so anything reaching here is outside it.
+    if (store.editingTextId) finishTextEditing(true);
+    const active = document.activeElement as HTMLElement | null;
+    if (active && active !== document.body) active.blur?.();
     if (e.button === 1 || (e.button === 0 && store.spacePressed)) {
       e.preventDefault();
       startPan(native);
@@ -67,13 +65,13 @@ export function Canvas() {
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.buttons) return;
-    useEditor.getState().setHover(nodeIdFromPath(e.nativeEvent.composedPath()));
+    useEditor.getState().setHover(nodeIdAt(e.clientX, e.clientY));
   };
 
   const onDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const store = useEditor.getState();
     if (store.tool.kind !== 'select') return;
-    const hit = nodeIdFromPath(e.nativeEvent.composedPath());
+    const hit = nodeIdAt(e.clientX, e.clientY);
     if (hit && canEditText(store.doc, hit)) {
       store.select([hit]);
       store.setEditingText(hit);

@@ -2,7 +2,7 @@
 import { getElement, isRoot, subtreeIds } from '../document/tree';
 import type { DesignDocument, ElementNode, NodeId } from '../document/types';
 import { elementSpec } from '../elements/registry';
-import { domElement, elementsAtPoint, isOutOfFlow, toScreenRect } from './dom';
+import { clientRectOf, domElement, elementsAtPoint, isOutOfFlow, styleOf, toScreenRect } from './dom';
 import type { Line } from './gestureStore';
 
 export interface FlowInsertion {
@@ -32,14 +32,17 @@ export function flowInsertion(
 ): FlowInsertion | null {
   const el = domElement(container.id);
   if (!el) return null;
-  const style = getComputedStyle(el);
+  const style = styleOf(el);
   const column = isColumnFlow(style);
   const kept = container.children.filter((c) => !excluded.has(c));
   const flowChildren = kept
     .filter((c) => doc.nodes[c]?.kind === 'element')
     .map((id) => ({ id, el: domElement(id) }))
     .filter((c): c is { id: NodeId; el: HTMLElement } => !!c.el && !isOutOfFlow(c.el))
-    .map((c) => ({ id: c.id, rect: toScreenRect(c.el.getBoundingClientRect()), client: c.el.getBoundingClientRect() }));
+    .map((c) => {
+      const client = clientRectOf(c.el);
+      return { id: c.id, rect: toScreenRect(client), client };
+    });
 
   const before = flowChildren.find(({ client: r }) =>
     column ? clientY < r.top + r.height / 2 : clientY < r.top || (clientY <= r.bottom && clientX < r.left + r.width / 2),
@@ -56,7 +59,7 @@ export function flowInsertion(
   if (before) return { index: kept.indexOf(before.id), line: line(before.rect, 'start') };
   const last = flowChildren[flowChildren.length - 1];
   if (last) return { index: kept.indexOf(last.id) + 1, line: line(last.rect, 'end') };
-  const box = toScreenRect(el.getBoundingClientRect());
+  const box = toScreenRect(clientRectOf(el));
   const inset = 6;
   return { index: kept.length, line: { x1: box.x + inset, y1: box.y + inset, x2: box.x + box.width - inset, y2: box.y + inset } };
 }
@@ -95,7 +98,7 @@ export function containerAt(doc: DesignDocument, clientX: number, clientY: numbe
 export function insertsInFlow(doc: DesignDocument, container: ElementNode): boolean {
   const el = domElement(container.id);
   if (!el) return false;
-  const display = getComputedStyle(el).display;
+  const display = styleOf(el).display;
   if (display.includes('flex') || display.includes('grid') || display.startsWith('inline')) return true;
   if (isRoot(doc, container.id)) return false;
   return container.children.some((c) => doc.nodes[c]?.kind === 'element' && !isOutOfFlow(domElement(c)));

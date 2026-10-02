@@ -3,7 +3,7 @@
  * pure document edit. Shortcuts, toolbar buttons and (later) an agent API all call these.
  */
 import { fitRect, screenToWorld, unionRects, zoomAround, type Rect } from '../canvas/coords';
-import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf } from '../canvas/dom';
+import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf, styleOf } from '../canvas/dom';
 import { instantiate } from '../document/factory';
 import { duplicateNodes, insertChild, removeNodes, setFrame, setStyleOnNodes, stripPosition, wrapInStack } from '../document/ops';
 import { getElement, getParentId, hasOnlyTextChildren, isRoot, topmostIds } from '../document/tree';
@@ -92,7 +92,7 @@ export function setFreePositioning(ids: readonly NodeId[], free: boolean): void 
       for (const o of offsets) {
         const parentId = getParentId(next, o.id);
         const parentEl = domElement(parentId);
-        if (parentId && parentEl && getComputedStyle(parentEl).position === 'static') {
+        if (parentId && parentEl && styleOf(parentEl).position === 'static') {
           next = setStyleOnNodes(next, [parentId], 'position', 'relative');
         }
         next = setStyleOnNodes(next, [o.id], 'position', 'absolute');
@@ -113,7 +113,7 @@ export function nudgeSelection(dx: number, dy: number): void {
   const roots = ids.filter((id) => isRoot(doc, id));
   const free = ids.filter((id) => !isRoot(doc, id) && isOutOfFlow(domElement(id)));
   const starts = free.map((id) => {
-    const cs = getComputedStyle(domElement(id)!);
+    const cs = styleOf(domElement(id)!);
     return { id, left: parseFloat(cs.left) || 0, top: parseFloat(cs.top) || 0 };
   });
   state().apply(
@@ -200,7 +200,7 @@ export function zoomToFit(): void {
   const { doc } = state();
   const rects = doc.roots
     .map((id) => hostOf(id))
-    .filter((h): h is HTMLElement => !!h)
+    .filter((h): h is HTMLIFrameElement => !!h)
     .map((h) => {
       const r = h.getBoundingClientRect();
       const origin = getViewportElement()?.getBoundingClientRect();

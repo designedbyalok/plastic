@@ -16,7 +16,12 @@ export class DomRenderer {
   private readonly spacers = new Map<NodeId, Text[]>();
   private root: Node | null = null;
 
-  constructor(private readonly mount: ShadowRoot) {}
+  private readonly document: Document;
+
+  /** `mount` is the artboard document's <body>; nodes are created in that document. */
+  constructor(private readonly mount: Element) {
+    this.document = mount.ownerDocument;
+  }
 
   render(doc: DesignDocument, rootId: NodeId): void {
     const seen = new Set<NodeId>();
@@ -28,7 +33,7 @@ export class DomRenderer {
     }
     for (const [id, node] of this.dom) {
       if (seen.has(id)) continue;
-      if (node instanceof Element) unregisterElement(id, node);
+      if (isElement(node)) unregisterElement(id, node);
       this.dom.delete(id);
       this.rendered.delete(id);
       this.spacers.delete(id);
@@ -42,7 +47,7 @@ export class DomRenderer {
 
   dispose(): void {
     this.root?.parentNode?.removeChild(this.root);
-    for (const [id, node] of this.dom) if (node instanceof Element) unregisterElement(id, node);
+    for (const [id, node] of this.dom) if (isElement(node)) unregisterElement(id, node);
     this.dom.clear();
     this.rendered.clear();
     this.spacers.clear();
@@ -57,9 +62,9 @@ export class DomRenderer {
     let dom = this.dom.get(id);
     let prev = this.rendered.get(id);
     const reusable =
-      dom && (node.kind === 'text' ? dom.nodeType === 3 : dom instanceof Element && (dom as Element).localName === node.tag);
+      dom && (node.kind === 'text' ? dom.nodeType === 3 : isElement(dom) && dom.localName === node.tag);
     if (!dom || !reusable) {
-      if (dom instanceof Element) unregisterElement(id, dom);
+      if (dom && isElement(dom)) unregisterElement(id, dom);
       dom = this.create(node, inSvg);
       prev = undefined;
       this.dom.set(id, dom);
@@ -87,6 +92,7 @@ export class DomRenderer {
   }
 
   private create(node: DocNode, inSvg: boolean): Node {
+    const document = this.document;
     if (node.kind === 'text') return document.createTextNode(node.text);
     let el: Element;
     try {
@@ -122,7 +128,7 @@ export class DomRenderer {
   private spacer(parentId: NodeId, index: number): Text {
     let list = this.spacers.get(parentId);
     if (!list) this.spacers.set(parentId, (list = []));
-    return (list[index] ??= document.createTextNode(' '));
+    return (list[index] ??= this.document.createTextNode(' '));
   }
 }
 
@@ -137,8 +143,13 @@ function reconcileChildren(parent: Element, kids: readonly Node[]): void {
 
 /** Live form state follows the attributes, since nobody types into the design while editing it. */
 function syncFormState(el: Element): void {
-  if (el instanceof HTMLInputElement) {
-    el.checked = el.hasAttribute('checked');
-    if (el.type !== 'file') el.value = el.getAttribute('value') ?? '';
-  }
+  if (el.localName !== 'input') return;
+  const input = el as HTMLInputElement;
+  input.checked = input.hasAttribute('checked');
+  if (input.type !== 'file') input.value = input.getAttribute('value') ?? '';
+}
+
+/** Realm-safe element check (design nodes belong to the artboard iframe's realm). */
+function isElement(node: Node): node is Element {
+  return node.nodeType === 1;
 }

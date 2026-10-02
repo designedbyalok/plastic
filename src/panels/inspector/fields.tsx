@@ -5,7 +5,7 @@
  */
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
-import { domElement } from '../../canvas/dom';
+import { domElement, styleOf } from '../../canvas/dom';
 import { setStyleOnNodes } from '../../document/ops';
 import { getElement } from '../../document/tree';
 import type { DesignDocument, NodeId } from '../../document/types';
@@ -107,7 +107,7 @@ export function declaredValue(doc: DesignDocument, ids: readonly NodeId[], prop:
 
 export function computedValue(id: NodeId | undefined, prop: string): string {
   const el = domElement(id);
-  return el ? getComputedStyle(el).getPropertyValue(prop) : '';
+  return el ? styleOf(el).getPropertyValue(prop) : '';
 }
 
 export function setStyle(ids: readonly NodeId[], prop: string, value: string): void {

@@ -11,7 +11,7 @@ import type { DesignDocument, NodeId, Point } from '../document/types';
 import { FRAME_SIZE, insertable } from '../elements/insertables';
 import { elementSpec } from '../elements/registry';
 import { rectFromPoints, rectsIntersect, screenToWorld, type Rect } from './coords';
-import { domElement, isOutOfFlow, nodeIdFromPath, screenRectOf, toScreen } from './dom';
+import { clientRectOf, domElement, isOutOfFlow, nodeIdAt, screenRectOf, styleOf, toScreen } from './dom';
 import { useGesture } from './gestureStore';
 import { containerAt, findDropTarget, flowInsertion, insertsInFlow, type DropTarget } from './layout';
 
@@ -88,7 +88,7 @@ export function startPan(e: PointerEvent): void {
 
 export function startSelectGesture(e: PointerEvent): void {
   const { doc, selection } = editor();
-  const hit = nodeIdFromPath(e.composedPath());
+  const hit = nodeIdAt(e.clientX, e.clientY);
   if (!hit) {
     const base = e.shiftKey ? [...selection] : [];
     if (!e.shiftKey) editor().select([]);
@@ -122,7 +122,7 @@ function startMove(e: PointerEvent, hit: NodeId): void {
 function startFreeMove(e: PointerEvent, ids: readonly NodeId[]): void {
   const zoom = editor().viewport.zoom;
   const starts = ids.map((id) => {
-    const cs = getComputedStyle(domElement(id)!);
+    const cs = styleOf(domElement(id)!);
     return { id, left: parseFloat(cs.left) || 0, top: parseFloat(cs.top) || 0 };
   });
   const tx = transactional();
@@ -224,8 +224,8 @@ export function startResize(e: PointerEvent, id: NodeId, handle: Handle): void {
   if (!el) return;
   const { doc, viewport } = editor();
   const zoom = viewport.zoom;
-  const cs = getComputedStyle(el);
-  const rect = el.getBoundingClientRect();
+  const cs = styleOf(el);
+  const rect = clientRectOf(el);
   const startW = rect.width / zoom;
   const startH = rect.height / zoom;
   const contentBox = cs.boxSizing !== 'border-box';
@@ -316,10 +316,10 @@ export function insertAt(e: PointerEvent, itemId: string): void {
     });
   } else {
     const el = domElement(container.id)!;
-    const r = el.getBoundingClientRect();
+    const r = clientRectOf(el);
     const left = (e.clientX - r.left) / viewport.zoom - el.clientLeft;
     const top = (e.clientY - r.top) / viewport.zoom - el.clientTop;
-    const needsPositioning = getComputedStyle(el).position === 'static';
+    const needsPositioning = styleOf(el).position === 'static';
     editor().apply(`Insert ${item.label}`, (d) => {
       const made = instantiate(d, withRootStyle(item.spec(), { position: 'absolute', left: px(left), top: px(top) }));
       newId = made.id;

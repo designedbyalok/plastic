@@ -1,91 +1,183 @@
 /**
- * One artboard = one root element rendered into its own Shadow DOM. The shadow root isolates
- * the design's CSS from the editor's CSS in both directions, while keeping the design in the
- * same document (cheap hit testing and measurement). See docs/ARCHITECTURE.md (rendering).
+ * One artboard = one root element rendered into its own same-origin <iframe>.
+ *
+ * The iframe is a real viewport, sized to the root element, so `@media` queries, viewport
+ * units, `@font-face`, `:root` variables and `body` rules behave exactly as in the exported page.
+ * It also isolates the design's CSS from the editor's in both directions.
+ *
+ * The iframe never receives pointer events (except while inline-editing its text): the canvas
+ * hit-tests into its document instead, so every gesture has a single event path.
+ * See docs/ARCHITECTURE.md (rendering).
  */
 import { useLayoutEffect, useRef } from 'react';
 import { serializeStyleSheet } from '../document/css';
+import { rootOf } from '../document/tree';
 import type { NodeId, StyleSheet } from '../document/types';
 import { useEditor } from '../editor/store';
-import { onRerenderRequest, registerHost } from './dom';
+import { domElement, onRerenderRequest, registerHost } from './dom';
 import { DomRenderer } from './renderer';
+import { finishTextEditing } from './textEditing';
 
-/** Editor-only rules. They only affect non-visual behavior (cursor, editing outline). */
+/**
+ * Editor-only rules, placed *before* the design CSS and wrapped in :where() (zero specificity)
+ * so any rule in styles.css overrides them.
+ */
 const EDITOR_CSS = `
-:host { all: initial; display: block; cursor: inherit; }
-* { cursor: inherit !important; }
-[contenteditable] { cursor: text !important; outline: none; }
+:where(html, body) { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+[contenteditable] { outline: none; cursor: text; }
 `;
+
+/** Width used for a root whose width depends on the viewport (e.g. `width: auto`). */
+const DEFAULT_VIEWPORT_WIDTH = 1440;
 
 const cssCache = new WeakMap<StyleSheet, string>();
 
 function designCss(sheet: StyleSheet): string {
   let css = cssCache.get(sheet);
   if (css === undefined) {
-    // `:root` never matches inside a shadow tree; map document-level variables onto the host.
-    css = EDITOR_CSS + serializeStyleSheet(sheet).replace(/:root\b/g, ':host');
+    css = serializeStyleSheet(sheet);
     cssCache.set(sheet, css);
   }
   return css;
 }
 
-/** Stop the design's native behavior (focus, typing, toggling, navigating) while editing it. */
-function blockNativeInteraction(root: ShadowRoot): () => void {
-  const inEditable = (e: Event) => e.composedPath().some((t) => t instanceof HTMLElement && t.isContentEditable);
+const READY_ATTR = 'data-plastic-artboard';
+
+/** Give the iframe a standards-mode document (about:blank starts in quirks mode). */
+function prepareDocument(frame: HTMLIFrameElement): Document | null {
+  const doc = frame.contentDocument;
+  if (!doc) return null;
+  if (!doc.documentElement.hasAttribute(READY_ATTR)) {
+    doc.open();
+    doc.write(`<!doctype html><html lang="en" ${READY_ATTR}><head><meta charset="utf-8"></head><body></body></html>`);
+    doc.close();
+  }
+  return doc;
+}
+
+/** Stop the design's native behavior (focus, toggling, navigating, submitting) while editing it. */
+function blockNativeInteraction(doc: Document): () => void {
+  const isEditable = (t: EventTarget | null) => !!t && (t as HTMLElement).isContentEditable === true;
   const prevent = (e: Event) => {
-    if (!inEditable(e)) e.preventDefault();
+    if (!isEditable(e.target)) e.preventDefault();
   };
   const unfocus = (e: Event) => {
-    if (!inEditable(e) && e.target instanceof HTMLElement) e.target.blur();
+    if (!isEditable(e.target)) (e.target as HTMLElement | null)?.blur?.();
   };
   const types = ['mousedown', 'click', 'auxclick', 'dragstart', 'submit'] as const;
-  types.forEach((t) => root.addEventListener(t, prevent, true));
-  root.addEventListener('focusin', unfocus, true);
+  types.forEach((t) => doc.addEventListener(t, prevent, true));
+  doc.addEventListener('focusin', unfocus, true);
   return () => {
-    types.forEach((t) => root.removeEventListener(t, prevent, true));
-    root.removeEventListener('focusin', unfocus, true);
+    types.forEach((t) => doc.removeEventListener(t, prevent, true));
+    doc.removeEventListener('focusin', unfocus, true);
   };
 }
 
+function px(n: number): string {
+  return `${Math.max(1, Math.ceil(n))}px`;
+}
+
 export function ArtboardHost({ id }: { id: NodeId }) {
-  const hostRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
   const frame = useEditor((s) => s.doc.frames[id]);
+  const editingHere = useEditor((s) => !!s.editingTextId && !!s.doc.nodes[s.editingTextId] && rootOf(s.doc, s.editingTextId) === id);
 
   useLayoutEffect(() => {
-    const host = hostRef.current!;
-    const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
-    shadow.replaceChildren();
-    const style = document.createElement('style');
-    shadow.appendChild(style);
-    const renderer = new DomRenderer(shadow);
-    const unblock = blockNativeInteraction(shadow);
-    const unregister = registerHost(id, host);
+    const iframe = frameRef.current!;
+    let teardown: (() => void) | null = null;
 
-    let lastDoc: unknown = null;
-    const render = () => {
-      const { doc } = useEditor.getState();
-      if (doc === lastDoc || !doc.nodes[id]) return;
-      lastDoc = doc;
-      const css = designCss(doc.styles);
-      if (style.textContent !== css) style.textContent = css;
-      renderer.render(doc, id);
-    };
-    render();
-    const unsubscribe = useEditor.subscribe(render);
-    const offRerender = onRerenderRequest(() => {
-      lastDoc = null;
-      renderer.invalidate();
+    const setup = () => {
+      teardown?.();
+      const doc = prepareDocument(iframe);
+      if (!doc) return;
+      const win = doc.defaultView!;
+      const guard = doc.createElement('style');
+      const style = doc.createElement('style');
+      guard.textContent = EDITOR_CSS;
+      doc.head.append(guard, style);
+      const renderer = new DomRenderer(doc.body);
+      const unblock = blockNativeInteraction(doc);
+      const unregister = registerHost(id, iframe);
+
+      // The viewport follows the root element's box, so media queries see the artboard width.
+      let observed: Element | null = null;
+      const resize = new win.ResizeObserver(() => fit());
+      const fit = () => {
+        const root = domElement(id);
+        if (!root) return;
+        const r = root.getBoundingClientRect();
+        iframe.style.width = px(r.right + Math.max(0, r.left));
+        iframe.style.height = px(r.bottom + Math.max(0, r.top));
+      };
+      const observe = () => {
+        const root = domElement(id);
+        if (root === observed) return;
+        if (observed) resize.unobserve(observed);
+        if (root) resize.observe(root);
+        observed = root;
+        fit();
+      };
+
+      let lastDoc: unknown = null;
+      const render = () => {
+        const { doc: design } = useEditor.getState();
+        if (design === lastDoc || !design.nodes[id]) return;
+        lastDoc = design;
+        const css = designCss(design.styles);
+        if (style.textContent !== css) style.textContent = css;
+        renderer.render(design, id);
+        observe();
+      };
       render();
-    });
+      const unsubscribe = useEditor.subscribe(render);
+      const offRerender = onRerenderRequest(() => {
+        lastDoc = null;
+        renderer.invalidate();
+        render();
+      });
+      // Clicking elsewhere inside this artboard while editing text ends the edit.
+      const onPointerDown = (e: PointerEvent) => {
+        const editing = domElement(useEditor.getState().editingTextId);
+        if (editing && !editing.contains(e.target as Node)) finishTextEditing(true);
+      };
+      doc.addEventListener('pointerdown', onPointerDown);
+
+      teardown = () => {
+        unsubscribe();
+        offRerender();
+        unregister();
+        unblock();
+        resize.disconnect();
+        doc.removeEventListener('pointerdown', onPointerDown);
+        renderer.dispose();
+        guard.remove();
+        style.remove();
+        teardown = null;
+      };
+    };
+
+    iframe.style.width = px(DEFAULT_VIEWPORT_WIDTH);
+    setup();
+    // Some browsers replace the initial about:blank document on load; set up again if so.
+    const onLoad = () => {
+      if (!iframe.contentDocument?.documentElement.hasAttribute(READY_ATTR)) setup();
+    };
+    iframe.addEventListener('load', onLoad);
     return () => {
-      unsubscribe();
-      offRerender();
-      unregister();
-      unblock();
-      renderer.dispose();
-      shadow.replaceChildren();
+      iframe.removeEventListener('load', onLoad);
+      teardown?.();
     };
   }, [id]);
 
-  return <div ref={hostRef} className="artboard-host" style={{ left: frame?.x ?? 0, top: frame?.y ?? 0 }} />;
+  return (
+    <div className="artboard-host" style={{ left: frame?.x ?? 0, top: frame?.y ?? 0 }}>
+      <iframe
+        ref={frameRef}
+        className="artboard-frame"
+        title={`Artboard ${id}`}
+        tabIndex={-1}
+        style={{ pointerEvents: editingHere ? 'auto' : 'none' }}
+      />
+    </div>
+  );
 }

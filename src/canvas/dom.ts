@@ -2,13 +2,19 @@
  * Bridge from document ids to the live DOM elements the renderer created, plus helpers that
  * convert DOM measurements into screen space. This is the only place the editor touches the
  * rendered design directly.
+ *
+ * Design elements live inside per-artboard iframes (other documents, other JS realms), so:
+ *  - rects are mapped from the iframe's own coordinates into the editor window (`clientRectOf`),
+ *  - computed styles come from the element's own window (`styleOf`),
+ *  - never use `instanceof` on design nodes (it fails across realms); check `nodeType` instead.
  */
 import { ID_ATTR } from '../document/markup';
 import type { NodeId, Point } from '../document/types';
 import type { Rect } from './coords';
 
 const elements = new Map<NodeId, Element>();
-const hosts = new Map<NodeId, HTMLElement>();
+/** Artboard iframes by root id. */
+const hosts = new Map<NodeId, HTMLIFrameElement>();
 const rerenderListeners = new Set<() => void>();
 let viewportElement: HTMLElement | null = null;
 
@@ -26,14 +32,14 @@ export function domElement(id: NodeId | null | undefined): HTMLElement | null {
   return el && el.isConnected ? (el as HTMLElement) : null;
 }
 
-export function registerHost(rootId: NodeId, host: HTMLElement): () => void {
+export function registerHost(rootId: NodeId, host: HTMLIFrameElement): () => void {
   hosts.set(rootId, host);
   return () => {
     if (hosts.get(rootId) === host) hosts.delete(rootId);
   };
 }
 
-export function hostOf(rootId: NodeId): HTMLElement | null {
+export function hostOf(rootId: NodeId): HTMLIFrameElement | null {
   return hosts.get(rootId) ?? null;
 }
 
@@ -61,6 +67,26 @@ export function toScreen(clientX: number, clientY: number): Point {
   return { x: clientX - (r?.left ?? 0), y: clientY - (r?.top ?? 0) };
 }
 
+/** An artboard iframe's scale: its on-screen width over its CSS width (the zoom, measured). */
+function frameScale(frame: HTMLIFrameElement, rect: DOMRect): number {
+  return frame.offsetWidth ? rect.width / frame.offsetWidth : 1;
+}
+
+/** Bounding rect of any design element in editor-window client coordinates. */
+export function clientRectOf(el: Element): DOMRect {
+  const r = el.getBoundingClientRect();
+  const frame = el.ownerDocument.defaultView?.frameElement as HTMLIFrameElement | null | undefined;
+  if (!frame || el.ownerDocument === document) return r;
+  const fr = frame.getBoundingClientRect();
+  const scale = frameScale(frame, fr);
+  return new DOMRect(fr.left + frame.clientLeft * scale + r.left * scale, fr.top + frame.clientTop * scale + r.top * scale, r.width * scale, r.height * scale);
+}
+
+/** Computed style from the element's own window (required for iframe content). */
+export function styleOf(el: Element): CSSStyleDeclaration {
+  return (el.ownerDocument.defaultView ?? window).getComputedStyle(el);
+}
+
 export function toScreenRect(r: DOMRect): Rect {
   const origin = toScreen(0, 0);
   return { x: r.left + origin.x, y: r.top + origin.y, width: r.width, height: r.height };
@@ -68,38 +94,42 @@ export function toScreenRect(r: DOMRect): Rect {
 
 export function screenRectOf(id: NodeId): Rect | null {
   const el = domElement(id);
-  return el ? toScreenRect(el.getBoundingClientRect()) : null;
+  return el ? toScreenRect(clientRectOf(el)) : null;
+}
+
+function isElement(value: unknown): value is Element {
+  return typeof value === 'object' && value !== null && (value as Node).nodeType === 1;
 }
 
 export function nodeIdOf(target: EventTarget | null | undefined): NodeId | null {
-  return target instanceof Element ? target.getAttribute(ID_ATTR) : null;
+  return isElement(target) ? target.getAttribute(ID_ATTR) : null;
 }
 
-/** Deepest design element in an event's composed path (crosses shadow roots). */
-export function nodeIdFromPath(path: readonly EventTarget[]): NodeId | null {
-  for (const target of path) {
-    const id = nodeIdOf(target);
-    if (id) return id;
-  }
-  return null;
-}
-
-/** Design elements under a client point, deepest first. */
+/**
+ * Design elements under a client point, deepest first. Artboard iframes never receive pointer
+ * events themselves; the canvas hit-tests into their documents instead.
+ */
 export function elementsAtPoint(clientX: number, clientY: number): HTMLElement[] {
-  for (const host of hosts.values()) {
-    const root = host.shadowRoot;
-    const r = host.getBoundingClientRect();
-    if (!root || clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) continue;
-    const hits = root
-      .elementsFromPoint(clientX, clientY)
-      .filter((el): el is HTMLElement => el.getRootNode() === root && el.hasAttribute(ID_ATTR));
+  for (const frame of [...hosts.values()].reverse()) {
+    const doc = frame.contentDocument;
+    const r = frame.getBoundingClientRect();
+    if (!doc || clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) continue;
+    const scale = frameScale(frame, r);
+    const hits = doc
+      .elementsFromPoint((clientX - r.left) / scale, (clientY - r.top) / scale)
+      .filter((el): el is HTMLElement => el.hasAttribute(ID_ATTR));
     if (hits.length) return hits;
   }
   return [];
 }
 
+/** The deepest design element under a client point. */
+export function nodeIdAt(clientX: number, clientY: number): NodeId | null {
+  return nodeIdOf(elementsAtPoint(clientX, clientY)[0]);
+}
+
 export function isOutOfFlow(el: Element | null): boolean {
   if (!el) return false;
-  const position = getComputedStyle(el).position;
+  const position = styleOf(el).position;
   return position === 'absolute' || position === 'fixed';
 }

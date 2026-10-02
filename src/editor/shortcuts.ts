@@ -8,8 +8,8 @@ import { saveNow } from './persistence';
 import { useEditor } from './store';
 
 function isTyping(e: KeyboardEvent): boolean {
-  const target = e.composedPath()[0];
-  if (!(target instanceof HTMLElement)) return false;
+  const target = e.composedPath()[0] as HTMLElement | undefined;
+  if (!target || target.nodeType !== 1) return false;
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }
 

@@ -9,7 +9,7 @@ import type { NodeId } from '../document/types';
 import { layerName } from '../elements/registry';
 import { useEditor } from '../editor/store';
 import type { Rect } from './coords';
-import { domElement, hostOf, screenRectOf, toScreenRect } from './dom';
+import { domElement, hostOf, screenRectOf, styleOf, toScreenRect } from './dom';
 import { startFrameMove, startResize, type Handle } from './gestures';
 import { useGesture } from './gestureStore';
 
@@ -32,7 +32,7 @@ function measure(): Measured {
   const parentId = only ? getParentId(doc, only) : null;
   const parentEl = domElement(parentId);
   if (parentEl && parentId && !isRoot(doc, parentId)) {
-    const display = getComputedStyle(parentEl).display;
+    const display = styleOf(parentEl).display;
     if (display.includes('flex') || display.includes('grid')) parent = screenRectOf(parentId);
   }
   const titles = doc.roots.flatMap((id) => {

@@ -23,8 +23,7 @@ function begin(id: string): void {
   const original = el.textContent ?? '';
   el.setAttribute('contenteditable', 'plaintext-only');
   el.focus();
-  const selection = (el.getRootNode() as ShadowRoot & { getSelection?: () => Selection | null }).getSelection?.() ?? window.getSelection();
-  selection?.selectAllChildren(el);
+  el.ownerDocument.getSelection()?.selectAllChildren(el);
 
   let done = false;
   const finish = (commit: boolean) => {
@@ -35,7 +34,10 @@ function begin(id: string): void {
     el.removeEventListener('keydown', onKey);
     el.removeEventListener('blur', onBlur);
     el.removeAttribute('contenteditable');
-    window.getSelection()?.removeAllRanges();
+    el.ownerDocument.getSelection()?.removeAllRanges();
+    el.blur();
+    // Keyboard focus was inside the artboard iframe; hand it back so shortcuts work again.
+    window.focus();
     const store = useEditor.getState();
     store.setEditingText(null);
     if (commit && text !== original) store.apply('Edit text', (d) => setText(d, id, text));

@@ -39,7 +39,7 @@ src/
   canvas/          The spatial editing environment
     coords.ts        Document / world / screen coordinate math
     renderer.ts      Keyed doc → DOM reconciler
-    ArtboardHost.tsx One shadow root per artboard
+    ArtboardHost.tsx One iframe per artboard (a real viewport)
     dom.ts           id ↔ live element bridge, hit testing, measurement
     layout.ts        Questions answered by the browser's layout (flow insertion index…)
     gestures.ts      Pointer gestures (select, move, resize, marquee, insert, pan)
@@ -107,12 +107,14 @@ Transient gesture visuals (marquee, drop line, ghost) live in a separate tiny st
 ## 4. Rendering architecture
 
 ```
-Canvas (viewport, overflow hidden)
+Canvas (viewport, overflow hidden) ← receives every pointer event
 ├── World layer   transform: translate(x, y) scale(zoom)   ← the only place zoom is applied
 │   └── ArtboardHost (position: absolute at frames[id])
-│       └── #shadow-root
-│           ├── <style>  editor guard rules + styles.css
-│           └── <div class="frame" data-pl-id>  ← the real design DOM
+│       └── <iframe> (pointer-events: none, sized to the root element)
+│           └── standards-mode document
+│               ├── <style>  editor guard rules (zero specificity)
+│               ├── <style>  styles.css, verbatim
+│               └── <body> → <div class="frame" data-pl-id>  ← the real design DOM
 └── Overlay (screen space, pointer-events: none except handles/titles)
 ```
 
@@ -120,17 +122,26 @@ Canvas (viewport, overflow hidden)
   nodes to real elements — the same tags, attributes and classes as the saved HTML. No React
   components per design element: the design is not React, and keeping React out of it means
   attribute names, whitespace and void elements match the file exactly.
-- **Shadow DOM per artboard** isolates the design's CSS from the editor's CSS in both directions
-  while keeping everything in one document (cheap hit testing via `composedPath()` and
-  `shadowRoot.elementsFromPoint`, direct measurement with `getBoundingClientRect`).
-  *Known trade-off:* `@media` queries evaluate against the editor window, not the artboard
-  width, and `@font-face` inside shadow roots is ignored. Responsive design will want one
-  `<iframe>` per artboard (true per-artboard viewport). All measurement already goes through
-  `canvas/dom.ts`, so that swap is localized.
+- **One same-origin iframe per artboard.** Each artboard is a real browsing viewport whose size
+  follows its root element (a `ResizeObserver` inside the iframe resizes the iframe to the root's
+  box). So `@media` queries, viewport units, `@font-face`, `:root` variables and `body` rules
+  behave exactly as in the exported page, and a 375px frame really is a 375px viewport. A root
+  whose width depends on the viewport (`width: auto`) starts at a 1440px viewport.
+  Iframes also isolate the design's CSS from the editor's in both directions.
+- **One event path.** Iframes never receive pointer events (`pointer-events: none`), except the
+  artboard currently being text-edited. The canvas gets every event and hit-tests into the
+  iframe document (`elementsAtPoint` maps client → iframe coordinates using the measured
+  scale). Gestures therefore never deal with events from several documents.
+- **Crossing the boundary.** All measurement goes through `canvas/dom.ts`: `clientRectOf` maps an
+  element's rect from iframe coordinates into the editor window, and `styleOf` reads computed
+  style from the element's own window. Design nodes belong to another JS realm, so the canvas
+  code never uses `instanceof` on them (it checks `nodeType`/`localName`).
+- **Standards mode.** The iframe starts as `about:blank` (quirks mode), so it is rewritten once
+  with `<!doctype html>` before the design is mounted.
 - **Whitespace fidelity.** The serializer writes element-only children one per line; the renderer
   inserts a single collapsible space between those same children. Inline layouts therefore look
   identical in the editor and in the exported file.
-- **The design is inert while editing.** Capture-phase listeners in each shadow root cancel
+- **The design is inert while editing.** Capture-phase listeners in each artboard document cancel
   focus, clicks, form submission and dragging. Event-handler attributes and `javascript:` URLs
   are kept in the document but never applied to the live DOM; `<script>` is not imported.
 
@@ -192,8 +203,9 @@ workspace/demo/
   copy-pasted) opens fine: missing and duplicate ids are regenerated. The code view can hide
   them for a clean export.
 - **styles.css**: single-class rules are parsed into editable declarations; anything else
-  (`:root` variables, `@media`, complex selectors) is preserved verbatim. Comments are not yet
-  preserved.
+  (`:root` variables, `@media`, complex selectors) is preserved verbatim, **on the same side of
+  the class rules as in the file**: `:root`/`@font-face` before them, `@media` overrides after
+  them, so saving never changes the cascade. Comments are not yet preserved.
 - **project.json is optional.** Deleting it loses only canvas placement and names; artboards
   without a stored position are laid out left to right.
 - **Storage** is an interface (`serialization/storage.ts`). In development the Vite plugin reads,
@@ -284,7 +296,8 @@ Implemented:
 
 ## Next steps (in priority order)
 
-1. **Per-artboard iframes** for real responsive behavior (`@media`, viewport units, fonts).
+1. **Breakpoint editing**: show which `@media` rules apply to an artboard and edit them visually
+   (today they are preserved and honored, but only editable as text).
 2. **State styles**: `:hover`, `:focus-visible`, `:invalid`, `:disabled` as editable rules, with a
    state switcher on the canvas.
 3. **CSS variables / basic tokens**: edit `:root` custom properties and bind controls to them.
@@ -299,7 +312,10 @@ Implemented:
 
 ## Known limitations
 
-- `@media` / `@font-face` inside shadow roots (see 4).
+- Content that overflows the root element (e.g. absolutely positioned children outside it) is
+  clipped by the artboard's iframe.
+- Clicking inside the artboard being text-edited, but outside the edited element, ends the
+  edit without also selecting what was clicked.
 - Only single-class rules are visually editable; other CSS is preserved but not editable in the
   inspector. CSS comments are dropped on save.
 - Dragging a freely positioned element does not reparent it; use Layout mode or ⇧A.

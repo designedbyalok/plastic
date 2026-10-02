@@ -1,7 +1,7 @@
 /** Presentation sections. Every control writes a plain CSS declaration. */
 import { ArrowDown, ArrowRight, X } from 'lucide-react';
 import { useState } from 'react';
-import { domElement, isOutOfFlow } from '../../canvas/dom';
+import { domElement, isOutOfFlow, styleOf } from '../../canvas/dom';
 import { setDeclaration, setFrame } from '../../document/ops';
 import { getElement, getParentId, isRoot } from '../../document/tree';
 import type { ElementNode, NodeId } from '../../document/types';
@@ -146,7 +146,7 @@ export function ChildLayoutSection({ ids }: Ids) {
   const parentId = parents.size === 1 ? [...parents][0] : null;
   const parentEl = domElement(parentId);
   if (!parentEl || ids.some((id) => isOutOfFlow(domElement(id)))) return null;
-  const display = getComputedStyle(parentEl).display;
+  const display = styleOf(parentEl).display;
   if (display.includes('flex')) {
     return (
       <Section title="In flex parent">
