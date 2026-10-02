@@ -4,13 +4,27 @@
  */
 import { useSyncExternalStore, type MouseEvent } from 'react';
 
-export type Route = { readonly name: 'home' } | { readonly name: 'file'; readonly id: string };
+export type Route =
+  | { readonly name: 'home' }
+  | { readonly name: 'files'; readonly folderId: string | null }
+  | { readonly name: 'archive' }
+  | { readonly name: 'profile' }
+  | { readonly name: 'file'; readonly id: string };
 
 const NAVIGATE_EVENT = 'plastic:navigate';
 
 export function parseRoute(pathname: string): Route {
-  const match = /^\/file\/([^/]+)\/?$/.exec(pathname);
-  return match ? { name: 'file', id: decodeURIComponent(match[1]!) } : { name: 'home' };
+  const file = /^\/file\/([^/]+)\/?$/.exec(pathname);
+  if (file) return { name: 'file', id: decodeURIComponent(file[1]!) };
+  const folder = /^\/files(?:\/([^/]+))?\/?$/.exec(pathname);
+  if (folder) return { name: 'files', folderId: folder[1] ? decodeURIComponent(folder[1]) : null };
+  if (/^\/archive\/?$/.test(pathname)) return { name: 'archive' };
+  if (/^\/profile\/?$/.test(pathname)) return { name: 'profile' };
+  return { name: 'home' };
+}
+
+export function folderHref(id: string | null): string {
+  return id ? `/files/${encodeURIComponent(id)}` : '/files';
 }
 
 export function fileHref(id: string): string {

@@ -9,7 +9,7 @@
  *   files are downloaded once.
  * - A save uploads only changed files, then one small commit.
  *
- *   GET    /api/projects                         → { location, projects: [{ id, title, updatedAt, files }] }
+ *   GET    /api/projects                         → { location, projects: [{ id, title, updatedAt, files, folderId, archivedAt }] }
  *   POST   /api/projects                         { title, assetsFrom? } → { id }
  *   GET    /api/projects/<id>                    → { files: { name: version } } (files: null if missing)
  *   GET    /api/projects/<id>/files/<name>?v=…   → the file (immutable when ?v is given)
@@ -21,6 +21,7 @@
  */
 import type { Env } from './env.ts';
 import { CLIENT_ID, room } from './live.ts';
+import { deleteProject, placeProject, recordEdit } from './library.ts';
 
 /** Same rules as the local workspace (server/projectStore.ts). */
 const PROJECT_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -69,6 +70,8 @@ interface Row {
   title: string;
   updated_at: number;
   files: string;
+  folder_id?: string | null;
+  archived_at?: number | null;
 }
 
 /**
@@ -133,17 +136,20 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
 
   if (path.length === 0) {
     if (method === 'GET') {
-      const { results } = await env.DB.prepare('select id, title, updated_at, files from project where owner_id = ? order by updated_at desc').bind(owner).all<Row>();
-      const projects = await Promise.all(results.map(async (row) => ({ id: row.id, title: row.title, updatedAt: row.updated_at, files: await backfill(env, owner, row) })));
+      const { results } = await env.DB.prepare('select id, title, updated_at, files, folder_id, archived_at from project where owner_id = ? order by updated_at desc').bind(owner).all<Row>();
+      const projects = await Promise.all(
+        results.map(async (row) => ({ id: row.id, title: row.title, updatedAt: row.updated_at, files: await backfill(env, owner, row), folderId: row.folder_id ?? null, archivedAt: row.archived_at ?? null })),
+      );
       return json({ location: LOCATION, projects: projects.filter((p) => Object.keys(p.files).some((n) => n.endsWith('.html'))) });
     }
     if (method === 'POST') {
-      const body = await readBody<{ title?: unknown; assetsFrom?: unknown }>(request);
+      const body = await readBody<{ title?: unknown; assetsFrom?: unknown; folderId?: unknown }>(request);
       if (!body) return error(400, 'Expected { title }.');
       const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : 'Untitled';
       const id = await uniqueId(env, owner, title);
       const now = Date.now();
-      await env.DB.prepare("insert into project (owner_id, id, title, created_at, updated_at, files) values (?, ?, ?, ?, ?, '{}')").bind(owner, id, title, now, now).run();
+      const folderId = typeof body.folderId === 'string' && (await env.DB.prepare('select 1 from folder where owner_id = ? and id = ?').bind(owner, body.folderId).first()) ? body.folderId : null;
+      await env.DB.prepare("insert into project (owner_id, id, title, created_at, updated_at, files, folder_id) values (?, ?, ?, ?, ?, '{}', ?)").bind(owner, id, title, now, now, folderId).run();
       if (typeof body.assetsFrom === 'string' && PROJECT_ID.test(body.assetsFrom) && (await getRow(env, owner, body.assetsFrom))) await copyAssets(env, owner, body.assetsFrom, id);
       return json({ id }, 201);
     }
@@ -154,7 +160,13 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
   if (!PROJECT_ID.test(id)) return error(404, 'Not found.');
   const prefix = projectPrefix(owner, id);
 
+  if (path.length === 2 && path[1] === 'place') {
+    if (method !== 'PATCH') return error(405, 'Method not allowed.');
+    return placeProject(request, env, owner, id);
+  }
+
   if (path.length === 1) {
+    if (method === 'DELETE') return deleteProject(env, owner, id);
     if (method !== 'GET') return error(405, 'Method not allowed.');
     const row = await getRow(env, owner, id);
     return json({ location: LOCATION, files: row ? await backfill(env, owner, row) : null });
@@ -194,6 +206,7 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
     const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : row.title;
     const now = Date.now();
     await env.DB.prepare('update project set files = ?, title = ?, updated_at = ? where owner_id = ? and id = ?').bind(JSON.stringify(files), title, now, owner, id).run();
+    await recordEdit(env, owner);
     // Files that are gone (e.g. a deleted page) are removed from R2.
     const removed = Object.keys(before).filter((n) => !(n in files));
     if (removed.length) await env.FILES.delete(removed.map((n) => prefix + n));

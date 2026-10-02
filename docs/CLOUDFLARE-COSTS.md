@@ -22,7 +22,8 @@ R2 is the only one that bills, so R2 writes and lists are the scarcest resource.
 | Open the app | 1–2 (`/api/health` is browser-cached for 10 min; session check uses the signed cookie) | 0 (cookie cache) | — | — |
 | Home (file list) | 1 | 1 indexed query | 0 — thumbnails are cached by version, downloaded once | — |
 | Open a file | 1 + files not yet cached | 1 row | 1 read per uncached file | 1 WebSocket connect |
-| Autosave | 1 per changed file + 1 commit | 1 read + 1 write | 1 write (Class A) per changed file | 1/20 (announce over the socket) |
+| Autosave | 1 per changed file + 1 commit | 1 read + 2 writes (project row, today's activity counter) | 1 write (Class A) per changed file | 1/20 (announce over the socket) |
+| Folders, archive, profile, activity | 1 | 1–2 rows | 0 (deleting a file forever lists and removes its objects once) | — |
 | Another tab receiving a change | 1 per changed file | — | 1 read per changed file | 1/20 |
 | Figma import | 2 + files + images | 3 | 1 write per file and image | — |
 | Idle open editor | heartbeat every 45 s | — | — | answered by the runtime without waking the room |

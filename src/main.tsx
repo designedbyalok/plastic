@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { App } from './app/App.tsx';
 import './app/app.css';
 import { useEditor } from './editor/store.ts';
+import { applyTheme } from './app/theme.ts';
+
+applyTheme();
 
 // Dev-only handle for debugging from the console: __plastic.getState()
 if (import.meta.env.DEV) Object.assign(window, { __plastic: useEditor });

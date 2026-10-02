@@ -3,6 +3,7 @@
  * ORM). One instance per isolate; the bindings are the same for every request it serves.
  */
 import { betterAuth } from 'better-auth';
+import { username } from 'better-auth/plugins';
 import type { Env } from './env.ts';
 
 export type Auth = ReturnType<typeof createAuth>;
@@ -28,6 +29,10 @@ export function createAuth(env: Env) {
       // No email provider yet; turn this on once verification emails can be sent.
       requireEmailVerification: false,
     },
+    plugins: [
+      // @handles for profiles: 3–30 characters, letters, numbers, dots and underscores.
+      username({ minUsernameLength: 3, maxUsernameLength: 30 }),
+    ],
     socialProviders: {
       ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET ? { github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET } } : {}),
       ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } } : {}),

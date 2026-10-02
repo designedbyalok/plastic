@@ -3,11 +3,13 @@
  * sign-in; the local dev server has no accounts — your files are on your disk.
  */
 import { createAuthClient } from 'better-auth/react';
+import { usernameClient } from 'better-auth/client/plugins';
 
 export const authClient = createAuthClient({
   basePath: '/api/auth',
   // The session cookie is long-lived; re-checking it on every window focus is a request for nothing.
   sessionOptions: { refetchOnWindowFocus: false },
+  plugins: [usernameClient()],
 });
 
 export interface Backend {

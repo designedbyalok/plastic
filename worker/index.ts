@@ -7,10 +7,12 @@
  *   *    /api/auth/*       → Better Auth (sign up/in/out, sessions, OAuth callbacks)
  *   *    /api/projects/*   → the signed-in user's files (see projects.ts); …/live is the
  *                             WebSocket for live sync (see live.ts)
+ *   *    /api/folders/*, GET /api/activity → folders and profile activity (see library.ts)
  */
 import { getAuth, providers } from './auth.ts';
 import type { Env } from './env.ts';
 import { handleProjects } from './projects.ts';
+import { activity, handleFolders } from './library.ts';
 
 export { ProjectRoom } from './live.ts';
 
@@ -27,7 +29,8 @@ export default {
       if (!env.BETTER_AUTH_SECRET) return json({ error: 'BETTER_AUTH_SECRET is not set.' }, 500);
       return getAuth(env).handler(request);
     }
-    if (url.pathname === '/api/projects' || url.pathname.startsWith('/api/projects/')) {
+    const scoped = ['/api/projects', '/api/folders', '/api/activity'].find((p) => url.pathname === p || url.pathname.startsWith(`${p}/`));
+    if (scoped) {
       if (!env.BETTER_AUTH_SECRET) return json({ error: 'BETTER_AUTH_SECRET is not set.' }, 500);
       const session = await getAuth(env).api.getSession({ headers: request.headers });
       if (!session) return json({ error: 'Sign in to see your files.' }, 401);
@@ -38,6 +41,8 @@ export default {
         if (origin && origin !== new URL(env.BETTER_AUTH_URL).origin && origin !== url.origin) return json({ error: 'Cross-origin request.' }, 403);
       }
       const path = url.pathname.split('/').slice(3).filter(Boolean).map(decodeURIComponent);
+      if (scoped === '/api/folders') return handleFolders(request, env, session.user.id, path);
+      if (scoped === '/api/activity') return request.method === 'GET' ? activity(env, session.user.id) : json({ error: 'Method not allowed.' }, 405);
       return handleProjects(request, env, session.user.id, path);
     }
     if (url.pathname.startsWith('/api/')) return json({ error: 'Not found' }, 404);

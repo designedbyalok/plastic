@@ -1,3 +1,4 @@
+import { resolvedTheme, useTheme } from '../../app/theme.ts';
 import { ChevronDown, Pipette } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { zoomBy, zoomTo, zoomToFit, zoomToSelection } from '../../editor/commands.ts';
@@ -144,12 +145,13 @@ function ZoomMenu() {
   );
 }
 
-const DEFAULT_CANVAS = '#282828';
+/** The theme's canvas color (pages without their own color show it). */
+const CANVAS_DEFAULTS = { dark: '#282828', light: '#f2f2f2' } as const;
 
 /** "#28282880" → { hex: "282828", alpha: 50 }. */
-function splitColor(color: string): { hex: string; alpha: number } {
+function splitColor(color: string, fallback: string): { hex: string; alpha: number } {
   const m = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(color);
-  if (!m) return { hex: DEFAULT_CANVAS.slice(1), alpha: 100 };
+  if (!m) return { hex: fallback.slice(1), alpha: 100 };
   return { hex: m[1]!.toLowerCase(), alpha: m[2] ? Math.round((parseInt(m[2], 16) / 255) * 100) : 100 };
 }
 
@@ -161,10 +163,13 @@ function joinColor(hex: string, alpha: number): string {
 /** Nothing selected: settings for the page itself, and connecting agents. */
 function EmptyInspector() {
   const page = useEditor((s) => s.doc.pages.find((p) => p.file === s.activePage) ?? s.doc.pages[0]!);
-  const { hex, alpha } = splitColor(page.canvas ?? DEFAULT_CANVAS);
+  const theme = useTheme();
+  const fallback = CANVAS_DEFAULTS[theme === 'system' ? resolvedTheme() : theme];
+  const { hex, alpha } = splitColor(page.canvas ?? fallback, fallback);
   const [hexDraft, setHexDraft] = useState<string | null>(null);
   const set = (color: string) => {
-    const value = color.toLowerCase() === DEFAULT_CANVAS ? null : color;
+    // Picking the theme's own canvas color means "no page color": it keeps following the theme.
+    const value = color.toLowerCase() === fallback ? null : color;
     useEditor.getState().apply('Canvas color', (d) => setPageCanvas(d, page.file, value), { coalesce: `canvas:${page.file}` });
   };
   const eyeDropper = (window as { EyeDropper?: new () => { open(): Promise<{ sRGBHex: string }> } }).EyeDropper;

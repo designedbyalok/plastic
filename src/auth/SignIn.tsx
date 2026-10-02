@@ -1,5 +1,6 @@
 /** Sign in or create an account (email and password, plus GitHub/Google when configured). */
-import { Layers3, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { Logo } from '../app/Logo.tsx';
 import { useState, type FormEvent } from 'react';
 import { authClient } from './client.ts';
 import './auth.css';
@@ -41,7 +42,7 @@ export function SignIn({ providers }: { providers: readonly string[] }) {
     <div className="auth">
       <main className="auth-card">
         <div className="auth-mark" aria-hidden="true">
-          <Layers3 size={18} strokeWidth={1.75} />
+          <Logo size={40} />
         </div>
         <h1 className="auth-title">{mode === 'sign-in' ? 'Sign in to Plastic' : 'Create your Plastic account'}</h1>
         <p className="auth-subtitle">Design with real HTML and CSS.</p>

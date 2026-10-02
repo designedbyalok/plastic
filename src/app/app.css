@@ -2,25 +2,70 @@
    Values follow the Paper editor reference: dark panels, hairline dividers, 24px controls. */
 
 :root {
+  /* Theme tokens. Dark is the default; [data-theme="light"] below swaps them. */
+  --ink: 255 255 255;
   --ui-panel: #2a2a2a;
   --ui-canvas: #282828;
+  --ui-home: #222222;
   --ui-line: #373737;
   --ui-control: #373737;
   --ui-control-shadow: inset 0 1px 0 #ffffff08, inset 0 0 1px 0.5px #ffffff11, 0 1px 0.5px #00000018, 0 0 3px -1px #000000aa;
+  --ui-raised: #404040;
+  --ui-raised-strong: #4a4a4a;
+  --ui-popover: #1e1e1e;
+  --ui-popover-shadow: 0 0 0 1px rgb(var(--ink) / 0.08), 0 8px 24px #00000080;
+  --ui-backdrop: #00000073;
   --ui-row-selected: #3c3c3c;
-  --ui-hover: #ffffff0d;
-  --ui-text: #ffffffe6;
-  --ui-secondary: #ffffffa6;
-  --ui-muted: #ffffff93;
-  --ui-faint: #ffffff66;
-  --ui-icon: #ffffffb8;
+  --ui-hover: rgb(var(--ink) / 0.05);
+  --ui-text: rgb(var(--ink) / 0.9);
+  --ui-secondary: rgb(var(--ink) / 0.65);
+  --ui-muted: rgb(var(--ink) / 0.58);
+  --ui-faint: rgb(var(--ink) / 0.4);
+  --ui-icon: rgb(var(--ink) / 0.72);
+  --ui-invert: #f2f2f2;
+  --ui-invert-hover: #ffffff;
+  --ui-invert-text: #1e1e1e;
   --ui-accent: #4d8ae4;
   --ui-accent-text: #8db4f0;
   --ui-accent-soft: #4d8ae433;
+  --ui-warn: #f7c063;
   --ui-danger: #f26b6b;
+  --ui-danger-text: #ffb4b4;
   --ui-success: #5fbf8f;
   --ui-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --ink: 0 0 0;
+  --ui-panel: #ffffff;
+  --ui-canvas: #f2f2f2;
+  --ui-home: #f7f7f7;
+  --ui-line: #e5e5e5;
+  --ui-control: #f2f2f2;
+  --ui-control-shadow: inset 0 0 0 1px #0000000d, 0 1px 0.5px #0000000a;
+  --ui-raised: #e9e9e9;
+  --ui-raised-strong: #dedede;
+  --ui-popover: #ffffff;
+  --ui-popover-shadow: 0 0 0 1px #00000014, 0 8px 24px #0000001f;
+  --ui-backdrop: #00000033;
+  --ui-row-selected: #ebebeb;
+  --ui-text: rgb(0 0 0 / 0.88);
+  --ui-secondary: rgb(0 0 0 / 0.6);
+  --ui-muted: rgb(0 0 0 / 0.52);
+  --ui-faint: rgb(0 0 0 / 0.36);
+  --ui-icon: rgb(0 0 0 / 0.66);
+  --ui-invert: #1e1e1e;
+  --ui-invert-hover: #000000;
+  --ui-invert-text: #ffffff;
+  --ui-accent: #3b7ddd;
+  --ui-accent-text: #2563c9;
+  --ui-accent-soft: #3b7ddd24;
+  --ui-warn: #a86a0c;
+  --ui-danger: #d93636;
+  --ui-danger-text: #c42b2b;
+  --ui-success: #22895a;
+  color-scheme: light;
 }
 
 * {
@@ -168,7 +213,7 @@ html.is-resizing-panel * {
   border-radius: 10px;
   corner-shape: superellipse(1.3);
   background: var(--ui-panel);
-  box-shadow: 0 0 0 1px #ffffff14, 0 4px 14px #00000059;
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.08), 0 4px 14px #00000059;
 }
 
 .collapsed-title {
@@ -199,7 +244,7 @@ html.is-resizing-panel * {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  color: #ffffff80;
+  color: rgb(var(--ink) / 0.5);
 }
 
 .file-mark {
@@ -227,8 +272,8 @@ html.is-resizing-panel * {
   min-width: 248px;
   padding: 4px;
   border-radius: 10px;
-  background: #1e1e1e;
-  box-shadow: 0 0 0 1px #ffffff14, 0 8px 24px #00000080;
+  background: var(--ui-popover);
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.08), 0 8px 24px #00000080;
 }
 
 .file-menu-item {
@@ -268,7 +313,7 @@ html.is-resizing-panel * {
 }
 
 .file-menu-item:hover kbd {
-  color: #ffffffb3;
+  color: rgb(var(--ink) / 0.7);
 }
 
 .file-menu-divider {
@@ -444,7 +489,7 @@ html.is-resizing-panel * {
 }
 
 .page-row:hover {
-  background: #ffffff08;
+  background: rgb(var(--ink) / 0.03);
 }
 
 .page-row.is-selected {
@@ -564,7 +609,7 @@ html.is-resizing-panel * {
 }
 
 .token-row:hover {
-  background: #ffffff08;
+  background: rgb(var(--ink) / 0.03);
 }
 
 .token-row:focus-visible {
@@ -585,7 +630,7 @@ html.is-resizing-panel * {
 .token-swatch {
   overflow: hidden;
   border-radius: 4px;
-  box-shadow: inset 0 0 0 1px #ffffff1f;
+  box-shadow: inset 0 0 0 1px rgb(var(--ink) / 0.12);
 }
 
 .token-swatch input {
@@ -601,7 +646,7 @@ html.is-resizing-panel * {
   width: 11px;
   height: 11px;
   border-radius: 1px;
-  background: repeating-conic-gradient(#ffffff59 0 25%, #ffffff17 0 50%) 0 0 / 5.5px 5.5px;
+  background: repeating-conic-gradient(rgb(var(--ink) / 0.35) 0 25%, rgb(var(--ink) / 0.09) 0 50%) 0 0 / 5.5px 5.5px;
 }
 
 .token-name {
@@ -692,7 +737,7 @@ html.is-resizing-panel * {
   border: 0;
   border-radius: 12px;
   corner-shape: superellipse(1.3);
-  box-shadow: 0 0 0 1px #ffffff14, 0 4px 14px #00000059;
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.08), 0 4px 14px #00000059;
   transform: translateY(-50%);
 }
 
@@ -728,14 +773,14 @@ html.is-resizing-panel * {
 }
 
 .rail-button.is-active::before {
-  background: #444444;
+  background: var(--ui-raised);
   box-shadow: var(--ui-control-shadow);
 }
 
 .rail-divider {
   height: 1px;
   margin: 8px 12px;
-  background: #ffffff1a;
+  background: rgb(var(--ink) / 0.1);
 }
 
 .rail-menu-anchor {
@@ -749,8 +794,8 @@ html.is-resizing-panel * {
   min-width: 200px;
   padding: 4px;
   border-radius: 10px;
-  background: #1e1e1e;
-  box-shadow: 0 0 0 1px #ffffff14, 0 8px 24px #00000080;
+  background: var(--ui-popover);
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.08), 0 8px 24px #00000080;
 }
 
 .rail-menu {
@@ -802,7 +847,7 @@ html.is-resizing-panel * {
 
 .rail-menu-item:hover kbd,
 .insp-menu-item:hover kbd {
-  color: #ffffffcc;
+  color: rgb(var(--ink) / 0.8);
 }
 
 /* --- canvas ------------------------------------------------------------------------------- */
@@ -863,7 +908,7 @@ html.is-resizing-panel * {
   height: 18px;
   padding: 0 2px;
   overflow: hidden;
-  color: #ffffff80;
+  color: rgb(var(--ink) / 0.5);
   font-size: 11px;
   line-height: 18px;
   white-space: nowrap;
@@ -920,7 +965,7 @@ html.is-resizing-panel * {
 
 .ov-draft {
   border: 1px solid var(--ui-accent);
-  background: #ffffffcc;
+  background: rgb(var(--ink) / 0.8);
 }
 
 .ov-handle {
@@ -1065,7 +1110,7 @@ html.is-resizing-panel * {
 .insp-menu-divider {
   height: 1px;
   margin: 4px -4px;
-  background: #ffffff14;
+  background: rgb(var(--ink) / 0.08);
 }
 
 /* Token binding: button inside style fields, chip for bound values, picker. */
@@ -1104,7 +1149,7 @@ html.is-resizing-panel * {
 }
 
 .insp-token-button:hover {
-  background: #4a4a4a;
+  background: var(--ui-raised-strong);
   color: var(--ui-text);
 }
 
@@ -1139,13 +1184,13 @@ html.is-resizing-panel * {
   border: 0;
   border-radius: 4px;
   background: #4d8ae42e;
-  color: #cfe0fb;
+  color: var(--ui-accent-text);
   cursor: pointer;
 }
 
 .insp-token-chip.is-missing .insp-token-chip-main {
   background: #f26b6b26;
-  color: #ffc9c9;
+  color: var(--ui-danger-text);
 }
 
 .insp-token-chip-name {
@@ -1161,7 +1206,7 @@ html.is-resizing-panel * {
   width: 10px;
   height: 10px;
   border-radius: 3px;
-  box-shadow: inset 0 0 0 1px #ffffff33;
+  box-shadow: inset 0 0 0 1px rgb(var(--ink) / 0.2);
 }
 
 .insp-token-chip-detach {
@@ -1267,7 +1312,7 @@ html.is-resizing-panel * {
 }
 
 .insp-title.is-empty {
-  color: #ffffff80;
+  color: rgb(var(--ink) / 0.5);
 }
 
 .insp-header-actions {
@@ -1278,7 +1323,7 @@ html.is-resizing-panel * {
 }
 
 .insp-header-actions > .icon-button {
-  color: #ffffff80;
+  color: rgb(var(--ink) / 0.5);
 }
 
 .insp-header-actions > .icon-button:hover,
@@ -1350,7 +1395,7 @@ html.is-resizing-panel * {
 }
 
 .insp-iconbar button + button {
-  box-shadow: inset 1px 0 0 #00000044, inset 1.5px 0 0 #ffffff14;
+  box-shadow: inset 1px 0 0 #00000044, inset 1.5px 0 0 rgb(var(--ink) / 0.08);
 }
 
 .insp-iconbar button:hover {
@@ -1493,7 +1538,7 @@ textarea.insp-input {
 }
 
 .insp-select option {
-  background: #2a2a2a;
+  background: var(--ui-panel);
 }
 
 .insp-swatch {
@@ -1514,7 +1559,7 @@ textarea.insp-input {
 .insp-swatch::-webkit-color-swatch {
   border: 0;
   border-radius: 3px;
-  box-shadow: inset 0 0 0 1px #ffffff26;
+  box-shadow: inset 0 0 0 1px rgb(var(--ink) / 0.15);
 }
 
 .insp-button {
@@ -1535,7 +1580,7 @@ textarea.insp-input {
 }
 
 .insp-button:hover {
-  background: #404040;
+  background: var(--ui-raised);
 }
 
 .insp-kbd {
@@ -1575,7 +1620,7 @@ textarea.insp-input {
   height: 16px;
   border-radius: 5px;
   background: var(--ui-control);
-  box-shadow: inset 0 1px 0 #ffffff08, inset 0 0 1px 0.5px #ffffff33, 0 1px 0.5px #00000018, 0 0 3px -1px #000000aa;
+  box-shadow: inset 0 1px 0 rgb(var(--ink) / 0.03), inset 0 0 1px 0.5px rgb(var(--ink) / 0.2), 0 1px 0.5px #00000018, 0 0 3px -1px #000000aa;
   color: transparent;
 }
 
@@ -1618,7 +1663,7 @@ textarea.insp-input {
 
 .insp-segment.is-active {
   background: var(--ui-hover);
-  box-shadow: inset 0 1px 0 #ffffff08, inset 0 0 1px 0.5px #ffffff22, 0 1px 0.5px #00000018, 0 0 3px -1px #000000aa;
+  box-shadow: inset 0 1px 0 rgb(var(--ink) / 0.03), inset 0 0 1px 0.5px rgb(var(--ink) / 0.13), 0 1px 0.5px #00000018, 0 0 3px -1px #000000aa;
   color: var(--ui-text);
 }
 
@@ -1633,7 +1678,7 @@ textarea.insp-input {
 .insp-slider::-webkit-slider-runnable-track {
   height: 12px;
   border-radius: 6px;
-  background: linear-gradient(to right, #ffffff40 var(--fill, 0%), #ffffff1a var(--fill, 0%));
+  background: linear-gradient(to right, rgb(var(--ink) / 0.25) var(--fill, 0%), rgb(var(--ink) / 0.1) var(--fill, 0%));
 }
 
 .insp-slider::-webkit-slider-thumb {
@@ -1761,7 +1806,7 @@ textarea.insp-input {
   height: 38%;
   min-height: 160px;
   border-top: 1px solid var(--ui-line);
-  background: #1e1e1e;
+  background: var(--ui-popover);
 }
 
 .code-tabs {
@@ -1817,7 +1862,7 @@ textarea.insp-input {
   margin: 0;
   padding: 12px 16px;
   overflow: auto;
-  color: #d4d4d8;
+  color: var(--ui-text);
   font-family: var(--ui-mono);
   font-size: 11.5px;
   line-height: 1.6;
@@ -1861,8 +1906,8 @@ textarea.insp-input {
   gap: 4px 24px;
   padding: 14px 16px;
   border-radius: 12px;
-  background: #1e1e1e;
-  box-shadow: 0 0 0 1px #ffffff14, 0 12px 32px #00000099;
+  background: var(--ui-popover);
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.08), 0 12px 32px #00000099;
 }
 
 .shortcuts-group h3 {
@@ -1926,7 +1971,7 @@ textarea.insp-input {
   overflow: hidden;
   border-radius: 14px;
   background: var(--ui-panel);
-  box-shadow: 0 0 0 1px #ffffff14, 0 24px 64px #000000b3;
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.08), 0 24px 64px #000000b3;
 }
 
 .dialog-header {
@@ -1964,15 +2009,15 @@ textarea.insp-input {
   padding: 0 24px;
   border: 0;
   border-radius: 8px;
-  background: #f2f2f2;
-  color: #1e1e1e;
+  background: var(--ui-invert);
+  color: var(--ui-invert-text);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
 }
 
 .dialog-primary:hover {
-  background: #ffffff;
+  background: var(--ui-invert-hover);
 }
 
 .agents-body {
@@ -2007,7 +2052,7 @@ textarea.insp-input {
 }
 
 .agents-item:hover {
-  background: #ffffff08;
+  background: rgb(var(--ink) / 0.03);
   color: var(--ui-text);
 }
 
@@ -2052,8 +2097,8 @@ textarea.insp-input {
   height: 20px;
   margin-top: -1px;
   border-radius: 50%;
-  background: #d9d9d9;
-  color: #1e1e1e;
+  background: var(--ui-invert);
+  color: var(--ui-invert-text);
   font-size: 12px;
   font-weight: 600;
 }
@@ -2086,7 +2131,7 @@ textarea.insp-input {
 
 .agents-oneclick {
   border-radius: 10px;
-  background: #ffffff0a;
+  background: rgb(var(--ink) / 0.04);
 }
 
 .agents-oneclick-row {
@@ -2117,7 +2162,7 @@ textarea.insp-input {
 }
 
 .agents-oneclick-button:hover:not(:disabled) {
-  background: #404040;
+  background: var(--ui-raised);
 }
 
 .agents-oneclick-button:disabled {
@@ -2128,7 +2173,7 @@ textarea.insp-input {
 .agents-oneclick-error {
   margin: 0;
   padding: 8px 16px 12px;
-  color: #ffb4b4;
+  color: var(--ui-danger-text);
   font-family: var(--ui-mono);
   font-size: 11px;
   white-space: pre-wrap;
@@ -2176,14 +2221,14 @@ textarea.insp-input {
 .agents-code {
   position: relative;
   border-radius: 8px;
-  background: #ffffff0a;
+  background: rgb(var(--ink) / 0.04);
 }
 
 .agents-code pre {
   margin: 0;
   padding: 10px 40px 10px 12px;
   overflow-x: auto;
-  color: #e4e4e7;
+  color: var(--ui-text);
   font-family: var(--ui-mono);
   font-size: 11.5px;
   line-height: 17px;
@@ -2222,7 +2267,7 @@ textarea.insp-input {
 }
 
 .agents-prompt:hover {
-  border-color: #4a4a4a;
+  border-color: var(--ui-raised-strong);
   color: var(--ui-text);
 }
 
@@ -2259,7 +2304,7 @@ textarea.insp-input {
   padding: 6px 8px;
   border-radius: 6px;
   background: #f5a5241a;
-  color: #f7c063;
+  color: var(--ui-warn);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -2274,12 +2319,12 @@ textarea.insp-input {
 }
 
 .token-row.is-missing .token-value {
-  color: #f7c063;
+  color: var(--ui-warn);
 }
 
 .token-missing {
   flex: none;
-  color: #f7c063;
+  color: var(--ui-warn);
 }
 
 /* The open file menu floats above the tool rail and canvas. */

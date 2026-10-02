@@ -30,6 +30,7 @@
     "tests"
   ],
   "exclude": [
-    "tests/mcp.test.ts"
+    "tests/mcp.test.ts",
+    "tests/library.test.ts"
   ]
 }

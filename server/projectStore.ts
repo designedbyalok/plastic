@@ -102,6 +102,11 @@ export class ProjectStore {
     for (const name of names) await fsp.copyFile(path.join(source, name), path.join(target, name));
   }
 
+  /** Permanently remove a project folder (only for archived files; see the library). */
+  async remove(id: string): Promise<void> {
+    await fsp.rm(this.dirOf(id), { recursive: true, force: true });
+  }
+
   async readAsset(id: string, name: string): Promise<Buffer | null> {
     if (!ASSET_NAME.test(name)) return null;
     return fsp.readFile(path.join(this.dirOf(id), 'assets', name)).catch(() => null);

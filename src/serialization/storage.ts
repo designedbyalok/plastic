@@ -4,7 +4,7 @@
  * anywhere else (a static build) the browser's localStorage is used. Tauri will add a native
  * implementation behind the same interfaces.
  */
-import { detectBackend } from '../auth/client.ts';
+import { authClient, detectBackend } from '../auth/client.ts';
 import { PROJECT_FILE_NAME, isPageFile, type ProjectFiles } from './index.ts';
 
 export interface ProjectSummary {
@@ -12,6 +12,34 @@ export interface ProjectSummary {
   /** Last modification time (ms since epoch). */
   readonly updatedAt: number;
   readonly files: ProjectFiles;
+  /** The folder it's filed in (null: top level of Files). */
+  readonly folderId?: string | null;
+  /** When it was archived (null: not archived). */
+  readonly archivedAt?: number | null;
+}
+
+export interface Folder {
+  readonly id: string;
+  readonly name: string;
+  readonly createdAt: number;
+}
+
+export interface PlaceChange {
+  readonly folderId?: string | null;
+  readonly archived?: boolean;
+}
+
+/** Edits per day ("YYYY-MM-DD") over the last year, and how many files there are. */
+export interface Activity {
+  readonly days: Readonly<Record<string, number>>;
+  readonly files: number;
+}
+
+export interface Profile {
+  readonly name: string;
+  readonly username: string | null;
+  /** Account email (cloud only). */
+  readonly email?: string;
 }
 
 export interface ProjectStorage {
@@ -36,7 +64,20 @@ export interface Workspace {
   /** Projects, most recently edited first. */
   list(): Promise<ProjectSummary[]>;
   /** Create a project; returns its id. `assetsFrom` copies another project's assets/. */
-  create(title: string, files: ProjectFiles, options?: { assetsFrom?: string }): Promise<string>;
+  create(title: string, files: ProjectFiles, options?: { assetsFrom?: string; folderId?: string | null }): Promise<string>;
+  folders(): Promise<Folder[]>;
+  createFolder(name: string): Promise<Folder>;
+  renameFolder(id: string, name: string): Promise<void>;
+  /** Delete a folder; its files move back to the top of Files. */
+  deleteFolder(id: string): Promise<void>;
+  /** Move a file into a folder (null: top level) and/or archive or restore it. */
+  place(id: string, change: PlaceChange): Promise<void>;
+  /** Permanently delete an archived file. */
+  deleteProject(id: string): Promise<void>;
+  activity(): Promise<Activity>;
+  profile(): Promise<Profile>;
+  /** Throws with a readable message (e.g. a username that's taken). */
+  updateProfile(profile: { name: string; username: string | null }): Promise<void>;
   open(id: string): ProjectStorage;
   /** URL a project's folder is served from, for its assets/ (null when assets aren't served). */
   assetBase(id: string): string | null;
@@ -98,16 +139,68 @@ class DevServerWorkspace implements Workspace {
     const response = await fetch('/__plastic/workspace');
     const data = (await response.json()) as { projects?: unknown[] };
     return (data.projects ?? []).flatMap((p) => {
-      const v = p as { id?: unknown; updatedAt?: unknown; files?: unknown };
-      return typeof v.id === 'string' && isFiles(v.files) ? [{ id: v.id, updatedAt: Number(v.updatedAt) || 0, files: pickFiles(v.files) }] : [];
+      const v = p as { id?: unknown; updatedAt?: unknown; files?: unknown; folderId?: unknown; archivedAt?: unknown };
+      if (typeof v.id !== 'string' || !isFiles(v.files)) return [];
+      return [{ id: v.id, updatedAt: Number(v.updatedAt) || 0, files: pickFiles(v.files), folderId: typeof v.folderId === 'string' ? v.folderId : null, archivedAt: typeof v.archivedAt === 'number' ? v.archivedAt : null }];
     });
   }
 
-  async create(title: string, files: ProjectFiles, options: { assetsFrom?: string } = {}): Promise<string> {
+  private async libraryData(): Promise<{ folders: Folder[]; activity: Record<string, number>; profile: { name: string; username: string | null } }> {
+    const response = await fetch('/__plastic/library');
+    if (!response.ok) throw new Error(`Could not read the library: ${response.status}`);
+    return response.json() as never;
+  }
+
+  private async libraryOp(op: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const response = await fetch('/__plastic/library', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(op) });
+    const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : `Request failed (${response.status}).`);
+    return data;
+  }
+
+  async folders(): Promise<Folder[]> {
+    return [...(await this.libraryData()).folders].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async createFolder(name: string): Promise<Folder> {
+    return (await this.libraryOp({ op: 'createFolder', name })).folder as Folder;
+  }
+
+  async renameFolder(id: string, name: string): Promise<void> {
+    await this.libraryOp({ op: 'renameFolder', id, name });
+  }
+
+  async deleteFolder(id: string): Promise<void> {
+    await this.libraryOp({ op: 'deleteFolder', id });
+  }
+
+  async place(id: string, change: PlaceChange): Promise<void> {
+    await this.libraryOp({ op: 'place', id, ...change });
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    const response = await fetch(`/__plastic/project/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error(`Couldn’t delete the file (${response.status}).`);
+  }
+
+  async activity(): Promise<Activity> {
+    const [data, projects] = await Promise.all([this.libraryData(), this.list()]);
+    return { days: data.activity ?? {}, files: projects.filter((p) => !p.archivedAt).length };
+  }
+
+  async profile(): Promise<Profile> {
+    return (await this.libraryData()).profile ?? { name: '', username: null };
+  }
+
+  async updateProfile(profile: { name: string; username: string | null }): Promise<void> {
+    await this.libraryOp({ op: 'profile', ...profile });
+  }
+
+  async create(title: string, files: ProjectFiles, options: { assetsFrom?: string; folderId?: string | null } = {}): Promise<string> {
     const response = await fetch('/__plastic/workspace', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title, files, assetsFrom: options.assetsFrom }),
+      body: JSON.stringify({ title, files, assetsFrom: options.assetsFrom, folderId: options.folderId ?? undefined }),
     });
     if (!response.ok) throw new Error(`Could not create project: ${response.status}`);
     return ((await response.json()) as { id: string }).id;
@@ -194,17 +287,73 @@ class LocalStorageWorkspace implements Workspace {
   }
 
   async list(): Promise<ProjectSummary[]> {
+    const places = readLibrary().places;
     return Object.entries(this.read())
-      .map(([id, p]) => ({ id, updatedAt: p.updatedAt, files: p.files }))
+      .map(([id, p]) => ({ id, updatedAt: p.updatedAt, files: p.files, folderId: places[id]?.folderId ?? null, archivedAt: places[id]?.archivedAt ?? null }))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  async create(title: string, files: ProjectFiles): Promise<string> {
+  async folders(): Promise<Folder[]> {
+    return [...readLibrary().folders].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async createFolder(name: string): Promise<Folder> {
+    const folder = { id: randomClientId().slice(0, 10), name: name.trim().slice(0, 120) || 'Untitled folder', createdAt: Date.now() };
+    updateLibrary((l) => l.folders.push(folder));
+    this.listeners.forEach((fn) => fn());
+    return folder;
+  }
+
+  async renameFolder(id: string, name: string): Promise<void> {
+    updateLibrary((l) => (l.folders = l.folders.map((f) => (f.id === id ? { ...f, name: name.trim().slice(0, 120) || f.name } : f))));
+    this.listeners.forEach((fn) => fn());
+  }
+
+  async deleteFolder(id: string): Promise<void> {
+    updateLibrary((l) => {
+      l.folders = l.folders.filter((f) => f.id !== id);
+      for (const place of Object.values(l.places)) if (place.folderId === id) place.folderId = null;
+    });
+    this.listeners.forEach((fn) => fn());
+  }
+
+  async place(id: string, change: PlaceChange): Promise<void> {
+    updateLibrary((l) => {
+      const place = l.places[id] ?? { folderId: null, archivedAt: null };
+      if (change.folderId !== undefined) place.folderId = change.folderId;
+      if (change.archived !== undefined) place.archivedAt = change.archived ? Date.now() : null;
+      l.places[id] = place;
+    });
+    this.listeners.forEach((fn) => fn());
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    if (!readLibrary().places[id]?.archivedAt) throw new Error('Archive a file before deleting it.');
+    this.remove(id);
+    updateLibrary((l) => delete l.places[id]);
+  }
+
+  async activity(): Promise<Activity> {
+    const projects = await this.list();
+    return { days: readLibrary().activity, files: projects.filter((p) => !p.archivedAt).length };
+  }
+
+  async profile(): Promise<Profile> {
+    return readLibrary().profile;
+  }
+
+  async updateProfile(profile: { name: string; username: string | null }): Promise<void> {
+    if (profile.username && !/^[a-zA-Z0-9_.]{3,30}$/.test(profile.username)) throw new Error('Usernames are 3–30 letters, numbers, dots or underscores.');
+    updateLibrary((l) => (l.profile = { name: profile.name.trim().slice(0, 120), username: profile.username || null }));
+  }
+
+  async create(title: string, files: ProjectFiles, options: { folderId?: string | null } = {}): Promise<string> {
     const projects = this.read();
     const base = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled';
     let id = base;
     for (let n = 2; projects[id]; n++) id = `${base}-${n}`;
     this.write({ ...projects, [id]: { files, updatedAt: Date.now() } });
+    if (options.folderId) await this.place(id, { folderId: options.folderId });
     return id;
   }
 
@@ -220,7 +369,10 @@ class LocalStorageWorkspace implements Workspace {
       location: 'this browser',
       assetBase: null,
       load: async () => this.read()[id]?.files ?? null,
-      save: async (files) => this.write({ ...this.read(), [id]: { files, updatedAt: Date.now() } }),
+      save: async (files) => {
+        this.write({ ...this.read(), [id]: { files, updatedAt: Date.now() } });
+        recordLocalEdit();
+      },
       onExternalChange: () => () => {},
     };
   }
@@ -235,6 +387,44 @@ class LocalStorageWorkspace implements Workspace {
     delete projects[id];
     this.write(projects);
   }
+}
+
+// Folders, archive, activity and profile for browser-only storage.
+const LIBRARY_KEY = 'plastic:library';
+
+interface LocalLibrary {
+  folders: Folder[];
+  places: Record<string, { folderId: string | null; archivedAt: number | null }>;
+  activity: Record<string, number>;
+  profile: { name: string; username: string | null };
+}
+
+function readLibrary(): LocalLibrary {
+  const blank: LocalLibrary = { folders: [], places: {}, activity: {}, profile: { name: '', username: null } };
+  try {
+    return { ...blank, ...(JSON.parse(localStorage.getItem(LIBRARY_KEY) ?? '{}') as Partial<LocalLibrary>) };
+  } catch {
+    return blank;
+  }
+}
+
+function updateLibrary(fn: (library: LocalLibrary) => unknown): void {
+  const library = readLibrary();
+  fn(library);
+  try {
+    localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
+  } catch {
+    // storage full or unavailable; the change lasts for this page only
+  }
+}
+
+/** Local day, "YYYY-MM-DD". */
+export function dayKey(date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function recordLocalEdit(): void {
+  updateLibrary((l) => (l.activity[dayKey()] = (l.activity[dayKey()] ?? 0) + 1));
 }
 
 /**
@@ -324,18 +514,76 @@ class CloudWorkspace implements Workspace {
   async list(): Promise<ProjectSummary[]> {
     const response = await fetch('/api/projects');
     if (!response.ok) throw new Error(`Could not list files: ${response.status}`);
-    const data = (await response.json()) as { projects?: { id: string; updatedAt: number; files: Versions }[] };
+    const data = (await response.json()) as { projects?: { id: string; updatedAt: number; files: Versions; folderId?: string | null; archivedAt?: number | null }[] };
     const projects = await Promise.all(
-      (data.projects ?? []).map(async (p) => ({ id: p.id, updatedAt: Number(p.updatedAt) || 0, files: await this.files(p.id, p.files, THUMBNAIL_FILES) })),
+      (data.projects ?? []).map(async (p) => ({
+        id: p.id,
+        updatedAt: Number(p.updatedAt) || 0,
+        files: await this.files(p.id, p.files, THUMBNAIL_FILES),
+        folderId: p.folderId ?? null,
+        archivedAt: p.archivedAt ?? null,
+      })),
     );
     return projects.filter((p) => Object.keys(p.files).some(isPageFile));
   }
 
-  async create(title: string, files: ProjectFiles, options: { assetsFrom?: string } = {}): Promise<string> {
+  private async call(url: string, init: RequestInit = {}): Promise<Record<string, unknown>> {
+    const response = await fetch(url, { ...init, headers: init.body ? { 'content-type': 'application/json', ...init.headers } : init.headers });
+    const data = response.status === 204 ? {} : ((await response.json().catch(() => ({}))) as Record<string, unknown>);
+    if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : `Request failed (${response.status}).`);
+    this.listeners.forEach((fn) => fn());
+    return data;
+  }
+
+  async folders(): Promise<Folder[]> {
+    const response = await fetch('/api/folders');
+    if (!response.ok) throw new Error(`Could not list folders: ${response.status}`);
+    return ((await response.json()) as { folders: Folder[] }).folders;
+  }
+
+  async createFolder(name: string): Promise<Folder> {
+    return (await this.call('/api/folders', { method: 'POST', body: JSON.stringify({ name }) })).folder as Folder;
+  }
+
+  async renameFolder(id: string, name: string): Promise<void> {
+    await this.call(`/api/folders/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+  }
+
+  async deleteFolder(id: string): Promise<void> {
+    await this.call(`/api/folders/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  async place(id: string, change: PlaceChange): Promise<void> {
+    await this.call(`${this.endpoint(id)}/place`, { method: 'PATCH', body: JSON.stringify(change) });
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    await this.call(this.endpoint(id), { method: 'DELETE' });
+  }
+
+  async activity(): Promise<Activity> {
+    const response = await fetch('/api/activity');
+    if (!response.ok) throw new Error(`Could not load activity: ${response.status}`);
+    return (await response.json()) as Activity;
+  }
+
+  async profile(): Promise<Profile> {
+    const { data } = await authClient.getSession();
+    const user = data?.user as { name?: string; email?: string; username?: string | null; displayUsername?: string | null } | undefined;
+    return { name: user?.name ?? '', username: user?.displayUsername ?? user?.username ?? null, email: user?.email };
+  }
+
+  async updateProfile(profile: { name: string; username: string | null }): Promise<void> {
+    // Usernames are unique case-insensitively; displayUsername keeps the casing as typed.
+    const result = await authClient.updateUser({ name: profile.name.trim(), ...(profile.username ? { username: profile.username, displayUsername: profile.username } : {}) });
+    if (result.error) throw new Error(result.error.message ?? 'Couldn’t save your profile.');
+  }
+
+  async create(title: string, files: ProjectFiles, options: { assetsFrom?: string; folderId?: string | null } = {}): Promise<string> {
     const response = await fetch('/api/projects', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title, assetsFrom: options.assetsFrom }),
+      body: JSON.stringify({ title, assetsFrom: options.assetsFrom, folderId: options.folderId ?? undefined }),
     });
     if (!response.ok) throw new Error(`Could not create file: ${response.status}`);
     const { id } = (await response.json()) as { id: string };

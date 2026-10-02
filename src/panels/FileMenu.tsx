@@ -2,11 +2,12 @@
  * The file menu behind the Plastic mark (top left of the editor): back to the dashboard, view
  * toggles and file actions. Only things Plastic can actually do are listed.
  */
-import { Check, Layers3 } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { fileHref, navigate } from '../app/router.ts';
 import { duplicateOpenProject } from '../editor/persistence.ts';
 import { useEditor } from '../editor/store.ts';
+import { Logo } from '../app/Logo.tsx';
 
 export function FileMenu() {
   const [open, setOpen] = useState(false);
@@ -50,7 +51,7 @@ export function FileMenu() {
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        <Layers3 size={15} strokeWidth={1.75} />
+        <Logo size={20} />
       </button>
       {open && (
         <div className="file-menu" role="menu" aria-label="File">

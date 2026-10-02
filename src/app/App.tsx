@@ -5,5 +5,5 @@ import { parseRoute, usePathname } from './router.ts';
 
 export function App() {
   const route = parseRoute(usePathname());
-  return <AuthGate>{route.name === 'file' ? <Editor key={route.id} projectId={route.id} /> : <Home />}</AuthGate>;
+  return <AuthGate>{route.name === 'file' ? <Editor key={route.id} projectId={route.id} /> : <Home route={route} />}</AuthGate>;
 }

@@ -13,6 +13,9 @@
  *   PUT  /__plastic/project/<id>       { "index.html": "…", "styles.css": "…", … }
  *   GET  /__plastic/files/<id>/assets/<name>   a project's images (artboards use it as <base>)
  *   POST /__plastic/import/figma?name=<file.fig>  raw .fig bytes → { id, report }
+ *   GET  /__plastic/library            folders, archive, activity and profile (server/library.ts)
+ *   POST /__plastic/library            { op: "createFolder" | "renameFolder" | "deleteFolder" | "place" | "profile", … }
+ *   DELETE /__plastic/project/<id>     permanently delete an archived file
  *   POST /mcp                          MCP (Streamable HTTP) for agents — see server/mcp
  *   GET  /__plastic/agents             how to connect agents (command, URL, CLI status)
  *   POST /__plastic/agents/install     { agent: "claude" | "codex" } — runs the agent's CLI
@@ -22,6 +25,7 @@ import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin, ViteDevServer } from 'vite';
 import { importFigma } from './figma/import.ts';
+import { LibraryStore } from './library.ts';
 import { ASSET_TYPES, PROJECT_ID, ProjectStore, isProjectFiles, sameProjectFiles, type ProjectFiles } from './projectStore.ts';
 import { agentSetup, installWithCli } from './agents.ts';
 import { handleMcpRequest, isLocalRequest } from './mcp/http.ts';
@@ -36,6 +40,7 @@ export function plasticWorkspace(): Plugin {
   const known = new Map<string, ProjectFiles>();
 
   const store = new ProjectStore(root);
+  const library = new LibraryStore(root);
   const readFiles = (id: string) => store.read(id);
   const listProjects = () => store.list();
   const uniqueId = (title: string) => store.uniqueId(title);
@@ -71,6 +76,8 @@ export function plasticWorkspace(): Plugin {
 
   const json = (res: ServerResponse, status: number, body?: unknown): void => {
     res.statusCode = status;
+    // Workspace state changes all the time; never let the browser reuse an old answer.
+    res.setHeader('cache-control', 'no-store');
     if (body !== undefined) res.setHeader('content-type', 'application/json');
     res.end(body === undefined ? undefined : JSON.stringify(body));
   };
@@ -118,14 +125,32 @@ export function plasticWorkspace(): Plugin {
         return json(res, 422, { error: error instanceof Error ? error.message : String(error) });
       }
     }
-    if (url.pathname === '/__plastic/workspace') {
-      if (req.method === 'GET') return json(res, 200, { location, projects: await listProjects() });
+    if (url.pathname === '/__plastic/library') {
+      if (req.method === 'GET') return json(res, 200, await library.read());
       if (req.method === 'POST') {
-        const body = JSON.parse(await readBody(req)) as { title?: unknown; files?: unknown; assetsFrom?: unknown };
+        if (!isLocalRequest(req)) return json(res, 403, { error: 'Local requests only.' });
+        if (!String(req.headers['content-type']).startsWith('application/json')) return json(res, 415, { error: 'Expected JSON.' });
+        try {
+          return json(res, 200, await library.apply(JSON.parse(await readBody(req)) as Record<string, unknown>));
+        } catch (error) {
+          return json(res, 400, { error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+      return json(res, 405);
+    }
+    if (url.pathname === '/__plastic/workspace') {
+      if (req.method === 'GET') {
+        const [projects, data] = await Promise.all([listProjects(), library.read()]);
+        const placed = projects.map((p) => ({ ...p, folderId: data.places[p.id]?.folderId ?? null, archivedAt: data.places[p.id]?.archivedAt ?? null }));
+        return json(res, 200, { location, projects: placed });
+      }
+      if (req.method === 'POST') {
+        const body = JSON.parse(await readBody(req)) as { title?: unknown; files?: unknown; assetsFrom?: unknown; folderId?: unknown };
         if (!isProjectFiles(body.files)) return json(res, 400, { error: 'Expected files { "index.html": "…", … }' });
         const id = await uniqueId(typeof body.title === 'string' ? body.title : 'untitled');
         if (typeof body.assetsFrom === 'string' && PROJECT_ID.test(body.assetsFrom)) await store.copyAssets(body.assetsFrom, id);
         await writeFiles(id, body.files);
+        if (typeof body.folderId === 'string') await library.apply({ op: 'place', id, folderId: body.folderId }).catch(() => {});
         return json(res, 201, { id });
       }
       return json(res, 405);
@@ -142,6 +167,16 @@ export function plasticWorkspace(): Plugin {
       const files = JSON.parse(await readBody(req)) as unknown;
       if (!isProjectFiles(files)) return json(res, 400, { error: 'Expected { "<name>.html|css|json": "…" } with at least one page' });
       await writeFiles(id, files);
+      await library.recordEdit();
+      return json(res, 204);
+    }
+    if (req.method === 'DELETE') {
+      if (!isLocalRequest(req)) return json(res, 403, { error: 'Local requests only.' });
+      const data = await library.read();
+      if (!data.places[id]?.archivedAt) return json(res, 409, { error: 'Archive a file before deleting it.' });
+      await store.remove(id);
+      known.delete(id);
+      await library.apply({ op: 'forget', id });
       return json(res, 204);
     }
     return json(res, 405);

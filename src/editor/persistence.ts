@@ -115,10 +115,10 @@ export async function openProject(id: string): Promise<OpenedProject> {
 }
 
 /** Create a project with one empty artboard; resolves with its id. */
-export async function createProject(title = 'Untitled'): Promise<string> {
+export async function createProject(title = 'Untitled', folderId: string | null = null): Promise<string> {
   const workspace = await connectWorkspace();
   const files = serializeProject(setTitle(starterDocument(), title), { viewport: null, collapsed: [], activePage: null });
-  return workspace.create(title, files);
+  return workspace.create(title, files, { folderId });
 }
 
 /** Save the open project as a new file (with its assets); returns the new id. */
