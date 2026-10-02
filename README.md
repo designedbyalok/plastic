@@ -64,6 +64,23 @@ Claude, Codex, Cursor, GitHub Copilot and other local agents can read and write 
 and tokens through Plastic's MCP server; their edits show up live in the editor. Deselect
 everything and press **Connect more agents**, or see [docs/AGENTS.md](docs/AGENTS.md).
 
+## Deploy (Cloudflare)
+
+Plastic deploys to Cloudflare Workers only: the built app is served as static assets, and the
+Worker in `worker/` handles `/api/*` — accounts with [Better Auth](https://better-auth.com),
+stored in D1. Local `bun run dev` has no accounts; files stay in `workspace/`.
+
+```bash
+bun run cf:dev             # build and run the Worker locally (local D1; secrets in .dev.vars)
+bun run db:migrate:local   # apply migrations/ to the local D1
+bun run db:migrate:remote  # apply migrations/ to the production D1
+bun run deploy             # build and deploy
+```
+
+Set the auth secret once with `openssl rand -hex 32 | bunx wrangler secret put BETTER_AUTH_SECRET`,
+and `BETTER_AUTH_URL` in `wrangler.jsonc` to the deployed URL. GitHub/Google sign-in turn on when
+`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` (or the `GOOGLE_` pair) are set as secrets.
+
 ## Docs
 
 - [Agents (MCP)](docs/AGENTS.md) — connecting coding agents, and the tools they get.

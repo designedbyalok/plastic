@@ -762,3 +762,24 @@
 .import-button.is-primary:hover {
   background: #5b96ea;
 }
+
+.home-sign-out {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--home-text-muted);
+}
+
+.home-sign-out:hover {
+  background: var(--home-fill);
+  color: var(--home-text);
+}
+
+.home-account:has(.home-sign-out) {
+  width: auto;
+}

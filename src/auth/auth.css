@@ -1,0 +1,150 @@
+.auth {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px 16px;
+  background: #222222;
+  color: #ffffffe6;
+  font-size: 12px;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(360px, 100%);
+  padding: 28px 24px 22px;
+  border-radius: 16px;
+  background: #2a2a2a;
+  box-shadow: 0 0 0 1px #ffffff0d, 0 16px 48px #00000059;
+}
+
+.auth-mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #ffffff1a;
+  color: #ffffffe6;
+}
+
+.auth-title {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.auth-subtitle {
+  margin: -8px 0 0;
+  color: #ffffffa6;
+}
+
+.auth-social,
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffffff80;
+}
+
+.auth-or::before,
+.auth-or::after {
+  flex: 1;
+  height: 1px;
+  background: #373737;
+  content: '';
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #ffffffa6;
+}
+
+.auth-field input {
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff0f;
+  box-shadow: inset 0 0 0 1px #ffffff14;
+  color: #ffffffe6;
+  font: inherit;
+  font-size: 13px;
+}
+
+.auth-field input:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px #4d8ae4;
+}
+
+.auth-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff1a;
+  color: #ffffffe6;
+  font: inherit;
+  font-weight: 500;
+}
+
+.auth-button:hover:not(:disabled) {
+  background: #ffffff26;
+}
+
+.auth-button.is-primary {
+  margin-top: 4px;
+  background: #f2f2f2;
+  color: #222222;
+}
+
+.auth-button.is-primary:hover:not(:disabled) {
+  background: #ffffff;
+}
+
+.auth-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.auth-error {
+  margin: 0;
+  color: #f26b6b;
+  line-height: 1.4;
+}
+
+.auth-switch {
+  margin: 4px 0 0;
+  color: #ffffffa6;
+  text-align: center;
+}
+
+.auth-switch button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #8db4f0;
+  font: inherit;
+}
+
+.auth-spin {
+  animation: auth-spin 0.9s linear infinite;
+}
+
+@keyframes auth-spin {
+  to {
+    rotate: 360deg;
+  }
+}

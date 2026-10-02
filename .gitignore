@@ -3,3 +3,5 @@ dist
 workspace
 .DS_Store
 *.log
+.dev.vars
+.wrangler

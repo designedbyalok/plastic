@@ -2,7 +2,8 @@
  * Home: the workspace's files, most recently edited first. Each file is a folder on disk;
  * its name is the document's <title> and its thumbnail is the design itself.
  */
-import { Clock, FileUp, Folder, Layers3, LayoutGrid, List, Minus, Plus, Search } from 'lucide-react';
+import { Clock, FileUp, Folder, Layers3, LayoutGrid, List, LogOut, Minus, Plus, Search } from 'lucide-react';
+import { useAccount } from '../auth/AuthGate';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react';
 import { fileHref, linkClick, navigate } from '../app/router';
 import type { DesignDocument } from '../document/types';
@@ -269,6 +270,7 @@ export function Home() {
 
 function Sidebar({ location, query, onQuery, searchRef }: { location: string; query: string; onQuery(q: string): void; searchRef: React.RefObject<HTMLInputElement | null> }) {
   const [cardDismissed, setCardDismissed] = useState(() => readPref(CARD_KEY) === '1');
+  const account = useAccount();
   return (
     <aside className="home-sidebar">
       <div className="home-sidebar-top">
@@ -276,7 +278,14 @@ function Sidebar({ location, query, onQuery, searchRef }: { location: string; qu
           <span className="home-avatar" aria-hidden="true">
             <Layers3 size={13} strokeWidth={2} />
           </span>
-          <span className="home-account-name">Plastic</span>
+          <span className="home-account-name" title={account?.email}>
+            {account?.name || 'Plastic'}
+          </span>
+          {account && (
+            <button type="button" className="home-sign-out" title="Sign out" aria-label="Sign out" onClick={() => void account.signOut()}>
+              <LogOut size={13} strokeWidth={1.75} />
+            </button>
+          )}
         </div>
 
         <nav aria-label="Workspace">
