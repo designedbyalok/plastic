@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Canvas } from '../canvas/Canvas.tsx';
 import { zoomToFit } from '../editor/commands.ts';
 import { openProject } from '../editor/persistence.ts';
 import { useShortcuts } from '../editor/shortcuts.ts';
 import { useEditor } from '../editor/store.ts';
-import { CodePanel } from '../panels/CodePanel.tsx';
 import { Inspector } from '../panels/inspector/Inspector.tsx';
 import { LayersPanel } from '../panels/LayersPanel.tsx';
 import { ToolRail } from '../panels/ToolRail.tsx';
 import { ConnectAgents } from '../panels/ConnectAgents.tsx';
 import { linkClick } from './router.ts';
+
+// The code editor (CodeMirror) loads when the Code panel is first opened.
+const CodePanel = lazy(() => import('../panels/CodePanel.tsx').then((m) => ({ default: m.CodePanel })));
 
 type Status = 'opening' | 'open' | 'missing';
 
@@ -59,7 +61,11 @@ export function Editor({ projectId }: { projectId: string }) {
         <ToolRail />
         <main className="stage">
           {status === 'open' && <Canvas />}
-          {codeOpen && <CodePanel />}
+          {codeOpen && (
+            <Suspense fallback={<section className="code-panel" aria-label="Code" />}>
+              <CodePanel />
+            </Suspense>
+          )}
           {status === 'opening' && <div className="loading">Opening file…</div>}
         </main>
         <Inspector />

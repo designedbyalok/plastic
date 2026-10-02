@@ -38,3 +38,13 @@ describe('styles.css', () => {
     expect(slugifyClassName('!!!')).toBe('el');
   });
 });
+
+describe('formatted CSS values', () => {
+  it('collapses whitespace a formatter wraps into values, keeping strings', async () => {
+    const { parseDeclarations } = await import('../src/document/css.ts');
+    expect(parseDeclarations('font-family: Inter,\n    system-ui,\n    "Segoe  UI",\n    sans-serif; content: "a  b"')).toEqual({
+      'font-family': 'Inter, system-ui, "Segoe  UI", sans-serif',
+      content: '"a  b"',
+    });
+  });
+});

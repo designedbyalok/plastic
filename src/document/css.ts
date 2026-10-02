@@ -101,11 +101,36 @@ export function parseDeclarations(body: string): Record<string, string> {
     const colon = part.indexOf(':');
     if (colon <= 0) continue;
     const prop = part.slice(0, colon).trim();
-    const value = part.slice(colon + 1).trim();
+    const value = collapseWhitespace(part.slice(colon + 1).trim());
     if (!prop || !value) continue;
     out[prop.startsWith('--') ? prop : prop.toLowerCase()] = value;
   }
   return out;
+}
+
+/**
+ * Runs of whitespace in a value (e.g. a long font list a formatter wrapped over lines) become one
+ * space; quoted strings are kept exactly. Whitespace is insignificant elsewhere in CSS values.
+ */
+export function collapseWhitespace(value: string): string {
+  let out = '';
+  let quote: string | null = null;
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i]!;
+    if (quote) {
+      out += ch;
+      if (ch === '\\' && i + 1 < value.length) out += value[++i];
+      else if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      out += ch;
+    } else if (/\s/.test(ch)) {
+      if (!out.endsWith(' ')) out += ' ';
+    } else {
+      out += ch;
+    }
+  }
+  return out.trim();
 }
 
 export function serializeDeclarations(decls: Declarations, indent = '  '): string {
