@@ -11,27 +11,20 @@
  *   POST /__plastic/workspace          { title, files } → { id }
  *   GET  /__plastic/project/<id>       → { location, files | null }
  *   PUT  /__plastic/project/<id>       { "index.html": "…", "styles.css": "…", … }
+ *   POST /mcp                          MCP (Streamable HTTP) for agents — see server/mcp
+ *   GET  /__plastic/agents             how to connect agents (command, URL, CLI status)
+ *   POST /__plastic/agents/install     { agent: "claude" | "codex" } — runs the agent's CLI
  */
 import fs from 'node:fs';
-import fsp from 'node:fs/promises';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin, ViteDevServer } from 'vite';
-
-/** Project files: one .html per page, .css files and project.json — no folders. */
-const PROJECT_FILE_NAME = /^[a-z0-9][a-z0-9_.-]*\.(html|css|json)$/i;
-type ProjectFiles = Record<string, string>;
+import { PROJECT_ID, ProjectStore, isProjectFiles, sameProjectFiles, type ProjectFiles } from './projectStore.ts';
+import { agentSetup, installWithCli } from './agents.ts';
+import { handleMcpRequest, isLocalRequest } from './mcp/http.ts';
 
 export const PROJECT_CHANGED_EVENT = 'plastic:project-changed';
 export const WORKSPACE_CHANGED_EVENT = 'plastic:workspace-changed';
-
-/** Project ids are folder names. Restricting them keeps every path inside the workspace. */
-const PROJECT_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
-
-function slugify(title: string): string {
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
-  return slug || 'untitled';
-}
 
 export function plasticWorkspace(): Plugin {
   const root = path.resolve(process.env.PLASTIC_WORKSPACE ?? 'workspace');
@@ -39,58 +32,14 @@ export function plasticWorkspace(): Plugin {
   /** Last content written or announced per project, so our own saves are not echoed back. */
   const known = new Map<string, ProjectFiles>();
 
-  const dirOf = (id: string) => path.join(root, id);
-
-  async function readFiles(id: string): Promise<ProjectFiles | null> {
-    const names = await fsp.readdir(dirOf(id)).catch(() => [] as string[]);
-    const managed = names.filter((n) => PROJECT_FILE_NAME.test(n));
-    if (!managed.some((n) => n.endsWith('.html'))) return null;
-    const files: ProjectFiles = {};
-    for (const name of managed.sort()) files[name] = await fsp.readFile(path.join(dirOf(id), name), 'utf8').catch(() => '');
-    return files;
-  }
-
-  async function updatedAt(id: string): Promise<number> {
-    const names = (await fsp.readdir(dirOf(id)).catch(() => [] as string[])).filter((n) => PROJECT_FILE_NAME.test(n));
-    const times = await Promise.all(names.map((f) => fsp.stat(path.join(dirOf(id), f)).then((s) => s.mtimeMs, () => 0)));
-    return Math.max(0, ...times);
-  }
-
-  /** Write the project's files; pages that no longer exist (deleted .html files) are removed. */
+  const store = new ProjectStore(root);
+  const readFiles = (id: string) => store.read(id);
+  const listProjects = () => store.list();
+  const uniqueId = (title: string) => store.uniqueId(title);
+  /** Editor saves: remembered so the watcher doesn't echo them back as external edits. */
   async function writeFiles(id: string, files: ProjectFiles): Promise<void> {
-    await fsp.mkdir(dirOf(id), { recursive: true });
     known.set(id, files);
-    for (const [name, text] of Object.entries(files)) {
-      const target = path.join(dirOf(id), name);
-      const current = await fsp.readFile(target, 'utf8').catch(() => null);
-      if (current !== text) await fsp.writeFile(target, text, 'utf8');
-    }
-    const existing = await fsp.readdir(dirOf(id)).catch(() => [] as string[]);
-    for (const name of existing) {
-      if (name.endsWith('.html') && PROJECT_FILE_NAME.test(name) && !(name in files)) await fsp.rm(path.join(dirOf(id), name));
-    }
-  }
-
-  async function listProjects() {
-    const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
-    const projects = await Promise.all(
-      entries
-        .filter((e) => e.isDirectory() && PROJECT_ID.test(e.name))
-        .map(async (e) => {
-          const files = await readFiles(e.name);
-          return files ? { id: e.name, updatedAt: await updatedAt(e.name), files } : null;
-        }),
-    );
-    return projects.filter((p) => p !== null).sort((a, b) => b.updatedAt - a.updatedAt);
-  }
-
-  async function uniqueId(title: string): Promise<string> {
-    const base = slugify(title);
-    for (let n = 1; ; n++) {
-      const id = n === 1 ? base : `${base}-${n}`;
-      const exists = await fsp.stat(dirOf(id)).then(() => true, () => false);
-      if (!exists) return id;
-    }
+    await store.write(id, files);
   }
 
   function watch(server: ViteDevServer): void {
@@ -108,7 +57,7 @@ export function plasticWorkspace(): Plugin {
         setTimeout(async () => {
           const files = await readFiles(id);
           const prev = known.get(id);
-          if (!files || (prev && sameFiles(files, prev))) return;
+          if (!files || (prev && sameProjectFiles(files, prev))) return;
           known.set(id, files);
           server.ws.send({ type: 'custom', event: PROJECT_CHANGED_EVENT, data: { id, files } });
         }, 120),
@@ -125,11 +74,28 @@ export function plasticWorkspace(): Plugin {
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://local');
+    if (url.pathname === '/mcp') {
+      const raw = req.method === 'POST' ? await readBody(req) : '';
+      return handleMcpRequest(store, req, res, raw ? (JSON.parse(raw) as unknown) : undefined);
+    }
+    if (url.pathname.startsWith('/__plastic/agents')) {
+      if (!isLocalRequest(req)) return json(res, 403, { error: 'Local requests only.' });
+      const origin = `http://${req.headers.host}`;
+      if (url.pathname === '/__plastic/agents' && req.method === 'GET') return json(res, 200, await agentSetup(origin));
+      if (url.pathname === '/__plastic/agents/install' && req.method === 'POST') {
+        // A JSON body forces a CORS preflight, so other sites can't trigger installs.
+        if (!String(req.headers['content-type']).startsWith('application/json')) return json(res, 415, { error: 'Expected JSON.' });
+        const body = JSON.parse(await readBody(req)) as { agent?: unknown };
+        if (body.agent !== 'claude' && body.agent !== 'codex') return json(res, 400, { error: 'agent must be "claude" or "codex"' });
+        return json(res, 200, await installWithCli(body.agent));
+      }
+      return json(res, 404);
+    }
     if (url.pathname === '/__plastic/workspace') {
       if (req.method === 'GET') return json(res, 200, { location, projects: await listProjects() });
       if (req.method === 'POST') {
         const body = JSON.parse(await readBody(req)) as { title?: unknown; files?: unknown };
-        if (!isFiles(body.files)) return json(res, 400, { error: 'Expected files { "index.html": "…", … }' });
+        if (!isProjectFiles(body.files)) return json(res, 400, { error: 'Expected files { "index.html": "…", … }' });
         const id = await uniqueId(typeof body.title === 'string' ? body.title : 'untitled');
         await writeFiles(id, body.files);
         return json(res, 201, { id });
@@ -146,7 +112,7 @@ export function plasticWorkspace(): Plugin {
     }
     if (req.method === 'PUT') {
       const files = JSON.parse(await readBody(req)) as unknown;
-      if (!isFiles(files)) return json(res, 400, { error: 'Expected { "<name>.html|css|json": "…" } with at least one page' });
+      if (!isProjectFiles(files)) return json(res, 400, { error: 'Expected { "<name>.html|css|json": "…" } with at least one page' });
       await writeFiles(id, files);
       return json(res, 204);
     }
@@ -159,25 +125,11 @@ export function plasticWorkspace(): Plugin {
     configureServer(server) {
       watch(server);
       server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith('/__plastic/')) return next();
+        if (!req.url?.startsWith('/__plastic/') && !/^\/mcp(\?|$)/.test(req.url ?? '')) return next();
         handle(req, res).catch((error: unknown) => json(res, 500, { error: String(error) }));
       });
     },
   };
-}
-
-function isFiles(value: unknown): value is ProjectFiles {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const entries = Object.entries(value as Record<string, unknown>);
-  return (
-    entries.some(([name]) => name.endsWith('.html')) &&
-    entries.every(([name, text]) => PROJECT_FILE_NAME.test(name) && typeof text === 'string')
-  );
-}
-
-function sameFiles(a: ProjectFiles, b: ProjectFiles): boolean {
-  const keys = Object.keys(a);
-  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
 }
 
 function readBody(req: NodeJS.ReadableStream): Promise<string> {

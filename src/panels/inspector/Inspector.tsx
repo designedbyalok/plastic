@@ -1,8 +1,9 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Pipette } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { zoomBy, zoomTo, zoomToFit, zoomToSelection } from '../../editor/commands';
 import { activeRoots, useEditor } from '../../editor/store';
 import { getElement } from '../../document/tree';
+import { setPageCanvas } from '../../document/pages';
 import type { ElementNode } from '../../document/types';
 import { elementSpec } from '../../elements/registry';
 import { AttributesSection, BehaviorSection, ContentSection, ElementSection, TableSection } from './ElementSections';
@@ -143,33 +144,98 @@ function ZoomMenu() {
   );
 }
 
+const DEFAULT_CANVAS = '#282828';
+
+/** "#28282880" → { hex: "282828", alpha: 50 }. */
+function splitColor(color: string): { hex: string; alpha: number } {
+  const m = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(color);
+  if (!m) return { hex: DEFAULT_CANVAS.slice(1), alpha: 100 };
+  return { hex: m[1]!.toLowerCase(), alpha: m[2] ? Math.round((parseInt(m[2], 16) / 255) * 100) : 100 };
+}
+
+function joinColor(hex: string, alpha: number): string {
+  const a = Math.max(0, Math.min(100, Math.round(alpha)));
+  return a >= 100 ? `#${hex}` : `#${hex}${Math.round((a / 100) * 255).toString(16).padStart(2, '0')}`;
+}
+
+/** Nothing selected: settings for the page itself, and connecting agents. */
 function EmptyInspector() {
-  const doc = useEditor((s) => s.doc);
-  const elements = Object.values(doc.nodes).filter((n) => n.kind === 'element').length;
+  const page = useEditor((s) => s.doc.pages.find((p) => p.file === s.activePage) ?? s.doc.pages[0]!);
+  const { hex, alpha } = splitColor(page.canvas ?? DEFAULT_CANVAS);
+  const [hexDraft, setHexDraft] = useState<string | null>(null);
+  const set = (color: string) => {
+    const value = color.toLowerCase() === DEFAULT_CANVAS ? null : color;
+    useEditor.getState().apply('Canvas color', (d) => setPageCanvas(d, page.file, value), { coalesce: `canvas:${page.file}` });
+  };
+  const eyeDropper = (window as { EyeDropper?: new () => { open(): Promise<{ sRGBHex: string }> } }).EyeDropper;
+
   return (
-    <div className="insp-empty">
-      <p className="insp-empty-stats">
-        {doc.pages.length} page{doc.pages.length === 1 ? '' : 's'} · {elements} elements · {Object.keys(doc.styles.rules).length} classes · {Object.keys(doc.tokens.values).length} tokens
-      </p>
-      <dl className="insp-shortcuts">
-        {[
-          ['F', 'Draw a frame'],
-          ['T  H  B  I', 'Text, heading, button, input'],
-          ['Double-click', 'Edit text'],
-          ['⇧ A', 'Add flex / wrap selection'],
-          ['Enter  Esc', 'Into child, up to parent'],
-          ['Space', 'Hold to pan'],
-          ['⌘ Z  ⇧⌘ Z', 'Undo, redo'],
-          ['⌘ D  ⌫', 'Duplicate, delete'],
-        ].map(([k, v]) => (
-          <div key={k} className="insp-shortcut">
-            <dt>
-              <kbd>{k}</kbd>
-            </dt>
-            <dd>{v}</dd>
+    <>
+      <section className="insp-section">
+        <div className="insp-header">
+          <span className="insp-title">Page</span>
+        </div>
+        <div className="insp-body">
+          <div className="insp-row">
+            <span className="insp-field insp-color-row">
+              <input
+                className="insp-input has-prefix has-suffix is-mono"
+                aria-label="Canvas color"
+                value={hexDraft ?? hex.toUpperCase()}
+                spellCheck={false}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/^#/, '');
+                  setHexDraft(v);
+                  if (/^[0-9a-f]{6}$/i.test(v)) set(joinColor(v.toLowerCase(), alpha));
+                }}
+                onBlur={() => setHexDraft(null)}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
+              />
+              <span className="insp-prefix">
+                <input type="color" className="insp-swatch" aria-label="Pick canvas color" value={`#${hex}`} onChange={(e) => set(joinColor(e.target.value.slice(1), alpha))} />
+              </span>
+              <input
+                className="insp-alpha"
+                aria-label="Canvas opacity"
+                value={`${alpha}%`}
+                onChange={(e) => {
+                  const n = parseFloat(e.target.value);
+                  if (Number.isFinite(n)) set(joinColor(hex, n));
+                }}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
+              />
+            </span>
+            {eyeDropper && (
+              <button
+                type="button"
+                className="icon-button"
+                title="Pick a color from the screen"
+                aria-label="Pick a color from the screen"
+                onClick={() => {
+                  void new eyeDropper()
+                    .open()
+                    .then((r) => set(joinColor(r.sRGBHex.replace(/^#/, '').slice(0, 6), alpha)))
+                    .catch(() => {});
+                }}
+              >
+                <Pipette size={14} strokeWidth={1.5} />
+              </button>
+            )}
           </div>
-        ))}
-      </dl>
-    </div>
+        </div>
+      </section>
+      <section className="insp-section">
+        <div className="insp-header">
+          <span className="insp-title">MCP</span>
+        </div>
+        <div className="insp-body">
+          <div className="insp-row">
+            <button type="button" className="insp-button" onClick={() => useEditor.getState().setAgentsOpen(true)}>
+              Connect more agents
+            </button>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }

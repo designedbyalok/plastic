@@ -41,6 +41,18 @@ export function removePage(doc: DesignDocument, file: string): DesignDocument {
   return { ...cleared, pages: cleared.pages.filter((p) => p.file !== file) };
 }
 
+/** Canvas background for a page; null restores the default. */
+export function setPageCanvas(doc: DesignDocument, file: string, color: string | null): DesignDocument {
+  return {
+    ...doc,
+    pages: doc.pages.map((p) => {
+      if (p.file !== file || (p.canvas ?? null) === color) return p;
+      const { canvas: _old, ...rest } = p;
+      return color ? { ...rest, canvas: color } : rest;
+    }),
+  };
+}
+
 export function movePage(doc: DesignDocument, file: string, toIndex: number): DesignDocument {
   const from = doc.pages.findIndex((p) => p.file === file);
   if (from < 0) return doc;

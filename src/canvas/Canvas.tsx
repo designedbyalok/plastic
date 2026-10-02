@@ -15,6 +15,7 @@ import { finishTextEditing, useTextEditing } from './textEditing';
 export function Canvas() {
   const ref = useRef<HTMLDivElement>(null);
   const roots = useEditor(activeRoots);
+  const canvasColor = useEditor((s) => s.doc.pages.find((p) => p.file === s.activePage)?.canvas);
   const pageEmpty = roots.length === 0;
   const viewport = useEditor((s) => s.viewport);
   const tool = useEditor((s) => s.tool);
@@ -39,7 +40,20 @@ export function Canvas() {
       }
     };
     el.addEventListener('wheel', onWheel, { passive: false });
+
+    // Keep the design still on screen when the canvas's left edge moves (side panel shown,
+    // hidden or resized): shift the pan offset by the same amount.
+    let left = el.getBoundingClientRect().left;
+    const resize = new ResizeObserver(() => {
+      const next = el.getBoundingClientRect().left;
+      if (next === left) return;
+      const store = useEditor.getState();
+      store.setViewport({ ...store.viewport, x: store.viewport.x + (left - next) });
+      left = next;
+    });
+    resize.observe(el);
     return () => {
+      resize.disconnect();
       el.removeEventListener('wheel', onWheel);
       setViewportElement(null);
     };
@@ -83,6 +97,7 @@ export function Canvas() {
     <div
       ref={ref}
       className={`canvas tool-${tool.kind}${spacePressed || tool.kind === 'hand' ? ' is-panning' : ''}`}
+      style={canvasColor ? { background: canvasColor } : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerLeave={() => useEditor.getState().setHover(null)}

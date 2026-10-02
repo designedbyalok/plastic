@@ -54,6 +54,10 @@ export interface EditorState {
   readonly collapsed: Readonly<Record<NodeId, true>>;
   readonly codeOpen: boolean;
   readonly layersOpen: boolean;
+  /** Left panel width in px (a per-browser preference). */
+  readonly layersWidth: number;
+  /** The "Connect your agent" dialog. */
+  readonly agentsOpen: boolean;
   readonly spacePressed: boolean;
 
   apply(label: string, recipe: (doc: DesignDocument) => DesignDocument, options?: ApplyOptions): void;
@@ -77,6 +81,8 @@ export interface EditorState {
   setEditingText(id: NodeId | null): void;
   setCodeOpen(open: boolean): void;
   setLayersOpen(open: boolean): void;
+  setLayersWidth(width: number): void;
+  setAgentsOpen(open: boolean): void;
   setSpacePressed(pressed: boolean): void;
   setSaveState(status: SaveStatus, savedRevision?: number, location?: string): void;
 }
@@ -91,6 +97,28 @@ function validPage(doc: DesignDocument, file: string): string {
 }
 
 const initialDoc = starterDocument();
+
+export const PANEL_WIDTH = { min: 200, max: 420, default: 240 } as const;
+
+export function clampPanelWidth(width: number): number {
+  return Math.round(Math.min(PANEL_WIDTH.max, Math.max(PANEL_WIDTH.min, width)));
+}
+
+function readPref(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writePref(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // preferences are a convenience only
+  }
+}
 
 export const useEditor = create<EditorState>()((set, get) => ({
   doc: initialDoc,
@@ -109,7 +137,9 @@ export const useEditor = create<EditorState>()((set, get) => ({
   viewport: { x: 80, y: 80, zoom: 1 },
   collapsed: {},
   codeOpen: false,
-  layersOpen: true,
+  layersOpen: readPref('plastic:layers-open') !== '0',
+  layersWidth: clampPanelWidth(Number(readPref('plastic:layers-width')) || PANEL_WIDTH.default),
+  agentsOpen: false,
   spacePressed: false,
 
   apply(label, recipe, options = {}) {
@@ -234,6 +264,15 @@ export const useEditor = create<EditorState>()((set, get) => ({
   },
   setLayersOpen(open) {
     set({ layersOpen: open });
+    writePref('plastic:layers-open', open ? '1' : '0');
+  },
+  setLayersWidth(width) {
+    const next = clampPanelWidth(width);
+    set({ layersWidth: next });
+    writePref('plastic:layers-width', String(next));
+  },
+  setAgentsOpen(open) {
+    set({ agentsOpen: open });
   },
   setSpacePressed(pressed) {
     if (get().spacePressed !== pressed) set({ spacePressed: pressed });

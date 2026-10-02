@@ -52,7 +52,14 @@ field, select, checkbox, table…) are in its **Insert element** menu, or on the
 
 Shortcuts are listed in the inspector when nothing is selected.
 
+## Connect agents (MCP)
+
+Claude, Codex, Cursor, GitHub Copilot and other local agents can read and write your designs
+and tokens through Plastic's MCP server; their edits show up live in the editor. Deselect
+everything and press **Connect more agents**, or see [docs/AGENTS.md](docs/AGENTS.md).
+
 ## Docs
 
+- [Agents (MCP)](docs/AGENTS.md) — connecting coding agents, and the tools they get.
 - [Architecture](docs/ARCHITECTURE.md) — document model, rendering, coordinates, undo,
   serialization, and what comes next.

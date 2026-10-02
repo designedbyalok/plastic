@@ -61,6 +61,7 @@ kbd {
 }
 
 .workspace {
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -126,9 +127,61 @@ kbd {
 /* --- layers panel ------------------------------------------------------------------------- */
 
 .layers-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 240px;
+  /* The resize handle straddles the edge; the tree and theme lists scroll on their own. */
+  overflow: visible;
+}
+
+/* Resize handle: an invisible 8px strip straddling the panel's edge — only the cursor changes. */
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 15;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+/* While dragging, keep the resize cursor everywhere and don't select text. */
+html.is-resizing-panel,
+html.is-resizing-panel * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* Panel hidden: a floating pill with the file and the toggle, over the canvas. */
+.collapsed-header {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 7px 0 5px;
+  border-radius: 10px;
+  corner-shape: superellipse(1.3);
+  background: var(--ui-panel);
+  box-shadow: 0 0 0 1px #ffffff14, 0 4px 14px #00000059;
+}
+
+.collapsed-title {
+  max-width: 220px;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.collapsed-header .icon-button {
+  margin-left: 6px;
 }
 
 .file-header {
@@ -187,6 +240,7 @@ kbd {
 
 .layers-tree {
   flex: 1;
+  min-height: 0;
   padding: 2px 0 24px;
   overflow: auto;
 }
@@ -376,138 +430,166 @@ kbd {
 
 .theme {
   flex: 1;
+  min-height: 0;
   padding: 4px 0 24px;
   overflow: auto;
 }
 
-.theme-intro {
-  margin: 8px 12px 4px;
-  color: var(--ui-muted);
-  line-height: 16px;
+.theme-header {
+  margin-top: 8px;
+  padding: 0 8px 0 12px;
 }
 
-.theme-intro code {
+.theme-header-title {
+  font-weight: 500;
+}
+
+.theme-empty {
+  margin: 8px 12px;
+  color: var(--ui-muted);
+  line-height: 18px;
+}
+
+.theme-empty svg {
+  vertical-align: -1px;
+}
+
+.theme-empty code {
   color: var(--ui-accent-text);
   font-family: var(--ui-mono);
   font-size: 11px;
 }
 
-.theme-group-title {
-  display: inline-flex;
+.theme-group-header {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding-left: 8px;
-  font-weight: 500;
-}
-
-.theme-group-title.is-empty {
-  color: #ffffff80;
-}
-
-.token-row {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1.35fr) minmax(0, 1fr) 20px;
-  align-items: center;
-  gap: 6px;
+  justify-content: space-between;
   height: 28px;
-  padding: 0 8px 0 12px;
+  margin-top: 4px;
+  padding: 0 8px 0 4px;
+}
+
+.theme-group-add {
+  opacity: 0;
+}
+
+.theme-group-header:hover .theme-group-add,
+.theme-group-add:focus-visible {
+  opacity: 1;
+}
+
+/* A token row: icon · name · value (right-aligned, muted). Click to edit. */
+.token-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 12px 0 20px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text);
+  text-align: left;
+  cursor: default;
 }
 
 .token-row:hover {
   background: #ffffff08;
 }
 
-.token-name,
-.token-value {
-  width: 100%;
-  min-width: 0;
-  height: 22px;
-  padding: 0 4px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
+.token-row:focus-visible {
   outline: none;
-  text-overflow: ellipsis;
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
 }
 
-.token-name {
-  font-family: var(--ui-mono);
-  font-size: 11px;
-}
-
-.token-value {
+.token-icon {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
   color: var(--ui-secondary);
 }
 
-.token-name:hover,
-.token-value:hover {
-  background: var(--ui-hover);
+.token-swatch {
+  overflow: hidden;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px #ffffff1f;
 }
 
-.token-name:focus,
-.token-value:focus {
+.token-swatch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Opacity: a transparency checkerboard (CSS pattern). */
+.token-checker::before {
+  content: '';
+  width: 11px;
+  height: 11px;
+  border-radius: 1px;
+  background: repeating-conic-gradient(#ffffff59 0 25%, #ffffff17 0 50%) 0 0 / 5.5px 5.5px;
+}
+
+.token-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.token-value {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--ui-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.token-row.is-editing {
+  gap: 6px;
+  padding-right: 8px;
+  background: var(--ui-row-selected);
+}
+
+.token-input {
+  min-width: 0;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
   background: var(--ui-control);
-  box-shadow: 0 0 0 1px var(--ui-accent);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text);
+  outline: none;
 }
 
-.token-name.is-invalid {
+.token-input:focus {
+  box-shadow: 0 0 0 1px var(--ui-accent);
+}
+
+.token-input.is-invalid {
   box-shadow: 0 0 0 1px var(--ui-danger);
+}
+
+.token-input-name {
+  flex: 1.4;
+}
+
+.token-input-value {
+  flex: 1;
 }
 
 .token-delete {
   width: 20px;
   height: 20px;
   color: var(--ui-secondary);
-  opacity: 0;
-}
-
-.token-row:hover .token-delete,
-.token-delete:focus-visible {
-  opacity: 1;
-}
-
-.token-preview {
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  overflow: hidden;
-  border-radius: 4px;
-  color: var(--ui-text);
-  font-size: 11px;
-  line-height: 1;
-}
-
-.token-swatch {
-  box-shadow: inset 0 0 0 1px #ffffff26;
-}
-
-.token-swatch input {
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.token-preview-radius,
-.token-preview-shadow,
-.token-preview-opacity {
-  width: 14px;
-  height: 14px;
-  background: #ffffffcc;
-}
-
-.token-preview-radius {
-  background: transparent;
-  border-top: 1.5px solid var(--ui-secondary);
-  border-left: 1.5px solid var(--ui-secondary);
-}
-
-.token-preview-spacing {
-  height: 6px;
-  border-radius: 1px;
-  background: var(--ui-accent);
 }
 
 /* --- tool rail ---------------------------------------------------------------------------- */
@@ -527,6 +609,21 @@ kbd {
 .rail-group {
   display: flex;
   flex-direction: column;
+}
+
+/* Panel hidden: the rail floats, vertically centered on the canvas's left edge. */
+.rail.is-floating {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  z-index: 20;
+  justify-content: flex-start;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 12px;
+  corner-shape: superellipse(1.3);
+  box-shadow: 0 0 0 1px #ffffff14, 0 4px 14px #00000059;
+  transform: translateY(-50%);
 }
 
 .rail-button {
@@ -1144,46 +1241,15 @@ kbd {
   min-width: 0;
 }
 
+/* Icon buttons, chips and narrow fields keep their size; the other controls share the row. */
 .insp-row > .icon-button,
 .insp-row > .insp-chip,
-.insp-row > .insp-row-check {
-  min-height: 24px;
-  margin-top: 4px;
-}
-
-/* Three joined icon buttons (rotate 90°, flip horizontal, flip vertical). */
-.insp-iconbar {
-  display: flex;
-  height: 24px;
-  overflow: hidden;
-  border-radius: 6px;
-  corner-shape: superellipse(1.3);
-  background: var(--ui-control);
-  box-shadow: var(--ui-control-shadow);
-}
-
-.insp-iconbar button {
-  display: grid;
-  flex: 1;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ui-secondary);
-  cursor: pointer;
-}
-
-.insp-iconbar button + button {
-  box-shadow: inset 1px 0 0 #00000044, inset 1.5px 0 0 #ffffff14;
-}
-
-.insp-iconbar button:hover {
-  background: var(--ui-hover);
-  color: var(--ui-text);
+.insp-row > .insp-narrow {
+  flex: none;
 }
 
 .insp-narrow {
-  flex: none;
+  width: 64px;
 }
 
 .insp-row-check {
@@ -1220,10 +1286,6 @@ kbd {
 .insp-iconbar button:hover {
   background: var(--ui-hover);
   color: var(--ui-text);
-}
-
-.insp-narrow {
-  width: 64px;
 }
 
 .insp-labeled .insp-label {
@@ -1691,4 +1753,428 @@ textarea.insp-input {
   line-height: 1.6;
   white-space: pre;
   tab-size: 2;
+}
+
+/* --- page color (empty inspector) ------------------------------------------------------ */
+
+.insp-color-row .insp-input {
+  padding-right: 48px;
+  text-transform: uppercase;
+}
+
+.insp-alpha {
+  position: absolute;
+  right: 4px;
+  width: 42px;
+  height: 20px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-muted);
+  text-align: right;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.insp-alpha:focus {
+  color: var(--ui-text);
+}
+
+/* --- shortcuts popover --------------------------------------------------------------- */
+
+.shortcuts-popover {
+  position: absolute;
+  bottom: 0;
+  left: 44px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(2, 220px);
+  gap: 4px 24px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #1e1e1e;
+  box-shadow: 0 0 0 1px #ffffff14, 0 12px 32px #00000099;
+}
+
+.shortcuts-group h3 {
+  margin: 6px 0 6px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.shortcuts-group dl {
+  margin: 0 0 8px;
+}
+
+.shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+}
+
+.shortcuts-row dt {
+  color: var(--ui-text);
+}
+
+.shortcuts-row dd {
+  display: flex;
+  gap: 3px;
+  margin: 0;
+}
+
+.shortcuts-row kbd {
+  min-width: 20px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
+  color: var(--ui-secondary);
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+}
+
+/* --- dialogs: connect your agent ------------------------------------------------------- */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: #0000008c;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  max-height: min(640px, 100%);
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--ui-panel);
+  box-shadow: 0 0 0 1px #ffffff14, 0 24px 64px #000000b3;
+}
+
+.dialog-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 12px 24px;
+  border-top: 1px solid var(--ui-line);
+}
+
+.dialog-link {
+  color: var(--ui-secondary);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.dialog-link:hover {
+  color: var(--ui-text);
+}
+
+.dialog-primary {
+  height: 32px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 8px;
+  background: #f2f2f2;
+  color: #1e1e1e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dialog-primary:hover {
+  background: #ffffff;
+}
+
+.agents-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.agents-list {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  width: 168px;
+  padding: 4px;
+  border-right: 1px solid var(--ui-line);
+}
+
+.agents-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ui-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agents-item:hover {
+  background: #ffffff08;
+  color: var(--ui-text);
+}
+
+.agents-item.is-active {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+
+.agents-steps {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 24px 24px;
+  overflow: auto;
+}
+
+.agents-loading,
+.agents-error {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 13px;
+}
+
+.agents-steplist {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agents-step {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.agents-step-badge {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: -1px;
+  border-radius: 50%;
+  background: #d9d9d9;
+  color: #1e1e1e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.agents-step-badge.is-done {
+  background: var(--ui-accent);
+  color: #fff;
+}
+
+.agents-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.agents-step-content h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.agents-note {
+  margin: 0;
+  color: var(--ui-secondary);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.agents-oneclick {
+  border-radius: 10px;
+  background: #ffffff0a;
+}
+
+.agents-oneclick-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 10px 10px 16px;
+  font-size: 12.5px;
+}
+
+.agents-oneclick-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
+  color: var(--ui-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.agents-oneclick-button:hover:not(:disabled) {
+  background: #404040;
+}
+
+.agents-oneclick-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.agents-oneclick-error {
+  margin: 0;
+  padding: 8px 16px 12px;
+  color: #ffb4b4;
+  font-family: var(--ui-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.agents-manual {
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+}
+
+.agents-manual-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 44px;
+  padding: 0 14px 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.agents-manual-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px 14px;
+}
+
+.agents-manual-section h4 {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.agents-manual-section p {
+  margin: 0;
+  color: var(--ui-secondary);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.agents-code {
+  position: relative;
+  border-radius: 8px;
+  background: #ffffff0a;
+}
+
+.agents-code pre {
+  margin: 0;
+  padding: 10px 40px 10px 12px;
+  overflow-x: auto;
+  color: #e4e4e7;
+  font-family: var(--ui-mono);
+  font-size: 11.5px;
+  line-height: 17px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agents-code .icon-button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: var(--ui-secondary);
+}
+
+.agents-prompts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.agents-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 0 14px 0 12px;
+  border: 1px solid var(--ui-line);
+  border-radius: 15px;
+  background: transparent;
+  color: var(--ui-secondary);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agents-prompt:hover {
+  border-color: #4a4a4a;
+  color: var(--ui-text);
+}
+
+.agents-prompt svg {
+  flex: none;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

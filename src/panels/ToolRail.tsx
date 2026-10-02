@@ -2,11 +2,12 @@
  * Vertical tool rail. Primary tools are one click; the semantic elements (button, input,
  * field, select…) live in a single Insert menu so the rail stays short.
  */
-import { CirclePlus, Frame, Hand, Heading, Image, MousePointer2, PanelLeft, Square, Type } from 'lucide-react';
+import { CirclePlus, Frame, Hand, Heading, Image, MousePointer2, Square, Type } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { INSERTABLES, insertable } from '../elements/insertables';
 import { useEditor, type Tool } from '../editor/store';
 import { INSERT_ICONS } from './icons';
+import { ShortcutsMenu } from './ShortcutsMenu';
 
 /** Elements that get their own rail button; everything else is in the Insert menu. */
 const RAIL_ITEMS = new Set(['container', 'text', 'heading', 'image']);
@@ -100,7 +101,8 @@ function InsertMenu() {
 export function ToolRail() {
   const layersOpen = useEditor((s) => s.layersOpen);
   return (
-    <nav className="rail" aria-label="Tools">
+    // With the side panel hidden, the rail floats over the canvas.
+    <nav className={`rail${layersOpen ? '' : ' is-floating'}`} aria-label="Tools">
       <div className="rail-group">
         <RailButton tool={{ kind: 'select' }} label="Select" shortcut="V">
           <MousePointer2 size={18} strokeWidth={1.5} />
@@ -127,11 +129,10 @@ export function ToolRail() {
         </RailButton>
         <InsertMenu />
       </div>
-      {!layersOpen && (
-        <button type="button" className="rail-button" title="Show layers" aria-label="Show layers" onClick={() => useEditor.getState().setLayersOpen(true)}>
-          <PanelLeft size={16} strokeWidth={1.5} />
-        </button>
-      )}
+      <div className="rail-group">
+        {!layersOpen && <div className="rail-divider" />}
+        <ShortcutsMenu />
+      </div>
     </nav>
   );
 }

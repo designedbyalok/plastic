@@ -26,6 +26,8 @@ export function useShortcuts(): void {
         return;
       }
       if (isTyping(e)) return;
+      // A dialog owns the keyboard while open.
+      if (store.agentsOpen) return;
 
       if (e.code === 'Space') {
         e.preventDefault();
@@ -39,6 +41,7 @@ export function useShortcuts(): void {
         else if (key === '=' || key === '+') zoomBy(1.25);
         else if (key === '-') zoomBy(0.8);
         else if (key === '0') zoomTo(1);
+        else if (key === '\\') store.setLayersOpen(!store.layersOpen);
         else return;
         e.preventDefault();
         return;

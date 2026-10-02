@@ -8,12 +8,14 @@ import { CodePanel } from '../panels/CodePanel';
 import { Inspector } from '../panels/inspector/Inspector';
 import { LayersPanel } from '../panels/LayersPanel';
 import { ToolRail } from '../panels/ToolRail';
+import { ConnectAgents } from '../panels/ConnectAgents';
 import { linkClick } from './router';
 
 type Status = 'opening' | 'open' | 'missing';
 
 export function Editor({ projectId }: { projectId: string }) {
   const codeOpen = useEditor((s) => s.codeOpen);
+  const agentsOpen = useEditor((s) => s.agentsOpen);
   const title = useEditor((s) => s.doc.title);
   const [status, setStatus] = useState<Status>('opening');
   useShortcuts();
@@ -62,6 +64,7 @@ export function Editor({ projectId }: { projectId: string }) {
         </main>
         <Inspector />
       </div>
+      {agentsOpen && <ConnectAgents />}
     </div>
   );
 }

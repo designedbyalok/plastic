@@ -9,14 +9,17 @@ import { kindLabel, layerName } from '../elements/registry';
 import { activeRoots, useEditor } from '../editor/store';
 import { iconFor } from './icons';
 import { ThemePanel } from './ThemePanel';
+import { PanelResizer } from './PanelResizer';
 
 export function LayersPanel() {
   const title = useEditor((s) => s.doc.title);
   const layersOpen = useEditor((s) => s.layersOpen);
   const tab = useEditor((s) => s.leftTab);
-  if (!layersOpen) return null;
+  const width = useEditor((s) => s.layersWidth);
+  if (!layersOpen) return <CollapsedFileHeader />;
   return (
-    <aside className="panel layers-panel" aria-label="File">
+    <aside className="panel layers-panel" aria-label="File" style={{ width }}>
+      <PanelResizer />
       <header className="file-header">
         <a className="file-mark" href="/" onClick={linkClick} title="All files" aria-label="All files">
           <Layers3 size={15} strokeWidth={1.75} />
@@ -29,7 +32,7 @@ export function LayersPanel() {
           onChange={(e) => useEditor.getState().apply('Rename file', (d) => setTitle(d, e.target.value), { coalesce: 'title' })}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
         />
-        <button type="button" className="icon-button" title="Hide panel" aria-label="Hide panel" onClick={() => useEditor.getState().setLayersOpen(false)}>
+        <button type="button" className="icon-button" title="Hide panel  ⌘\\" aria-label="Hide panel" onClick={() => useEditor.getState().setLayersOpen(false)}>
           <PanelLeft size={15} strokeWidth={1.5} />
         </button>
       </header>
@@ -59,6 +62,24 @@ export function LayersPanel() {
         <ThemePanel />
       )}
     </aside>
+  );
+}
+
+/** With the panel hidden: a floating pill with the file, and the toggle to bring the panel back. */
+function CollapsedFileHeader() {
+  const title = useEditor((s) => s.doc.title);
+  return (
+    <div className="collapsed-header">
+      <a className="file-mark" href="/" onClick={linkClick} title="All files" aria-label="All files">
+        <Layers3 size={15} strokeWidth={1.75} />
+      </a>
+      <span className="collapsed-title" title={title}>
+        {title}
+      </span>
+      <button type="button" className="icon-button" title="Show panel  ⌘\\" aria-label="Show panel" onClick={() => useEditor.getState().setLayersOpen(true)}>
+        <PanelLeft size={15} strokeWidth={1.5} />
+      </button>
+    </div>
   );
 }
 

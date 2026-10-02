@@ -62,6 +62,8 @@ export interface Page {
   readonly name: string;
   /** Children of this page's <body>; each is shown as an artboard on the page's canvas. */
   readonly roots: readonly NodeId[];
+  /** Canvas background behind the artboards (editor metadata, project.json). */
+  readonly canvas?: string;
 }
 
 export interface Point {

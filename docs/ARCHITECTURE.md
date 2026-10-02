@@ -51,7 +51,10 @@ src/
   home/            Home screen: the workspace's files, with live thumbnails
   app/             Routes (/ and /file/<id>), editor screen, editor chrome CSS
 server/
-  workspace.ts     Vite plugin: list/create/read/write/watch workspace/<id>/
+  workspace.ts     Vite plugin: list/create/read/write/watch workspace/<id>/, /mcp, agent setup
+  projectStore.ts  Projects on disk, shared by the dev server and the MCP server
+  agents.ts        Agent setup info and one-click install through agent CLIs
+  mcp/             MCP server for agents: tools over the document model (stdio + HTTP)
 tests/             Model, serialization, history and routing tests
 workspace/         Your projects, one folder each (gitignored here; it is user data)
 ```
@@ -334,8 +337,8 @@ Implemented:
 3. **Token modes and aliases**: light/dark (and brand) modes as override blocks in tokens.css
    (`[data-theme=dark] { --color-surface: … }`) with a mode switcher per artboard; token-to-token
    aliases in the Theme tab (already valid CSS: `--color-accent: var(--color-primary)`).
-4. **Agent API (MCP)**: expose `src/document/ops.ts` + queries over MCP. The document already
-   has stable ids, semantic tags and pure operations; the API is mostly a thin transport.
+4. **Live agent context**: let agents see the current selection and request screenshots of the
+   live canvas (today they read and write files; see docs/AGENTS.md).
 5. **Components**: a class + markup template with slots, saved under `components/`, mapping to
    a React component later.
 6. Accessibility checks built on the semantic model (inputs without labels, buttons without

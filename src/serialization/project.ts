@@ -16,6 +16,7 @@ export interface ViewportMeta {
 export interface PageMeta {
   readonly file: string;
   readonly name: string;
+  readonly canvas?: string;
 }
 
 export interface ProjectJson {
@@ -77,7 +78,11 @@ export function readProjectJson(text: string): ProjectJson {
     for (const [id, name] of Object.entries(layers.names)) if (typeof name === 'string') names[id] = name;
   }
   const pages: PageMeta[] = Array.isArray(raw.pages)
-    ? raw.pages.flatMap((p) => (isRecord(p) && typeof p.file === 'string' && typeof p.name === 'string' ? [{ file: p.file, name: p.name }] : []))
+    ? raw.pages.flatMap((p) =>
+        isRecord(p) && typeof p.file === 'string' && typeof p.name === 'string'
+          ? [{ file: p.file, name: p.name, ...(typeof p.canvas === 'string' ? { canvas: p.canvas } : {}) }]
+          : [],
+      )
     : [];
   const v = canvas.viewport;
   const viewport = isRecord(v) && typeof v.x === 'number' && typeof v.y === 'number' && typeof v.zoom === 'number' ? { x: v.x, y: v.y, zoom: v.zoom } : null;
