@@ -3,6 +3,7 @@ import { setTitle } from '../document/ops';
 import { INSERTABLES } from '../elements/insertables';
 import { wrapSelectionInStack, zoomBy, zoomTo } from '../editor/commands';
 import { useEditor, type Tool } from '../editor/store';
+import { linkClick } from '../app/router';
 import { INSERT_ICONS, TOOL_ICONS } from './icons';
 
 function sameTool(a: Tool, b: Tool): boolean {
@@ -38,9 +39,9 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar-group">
-        <span className="brand">
+        <a className="brand" href="/" onClick={linkClick} title="All files">
           <Layers3 size={16} strokeWidth={2} /> Plastic
-        </span>
+        </a>
         {toolButton({ kind: 'select' }, 'Select', 'v', TOOL_ICONS.select)}
         {toolButton({ kind: 'frame' }, 'Frame', 'f', TOOL_ICONS.frame)}
         <span className="toolbar-divider" />

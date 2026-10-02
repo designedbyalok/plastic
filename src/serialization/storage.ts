@@ -1,20 +1,41 @@
 /**
- * Where project files live. The dev server exposes a folder on disk; when it is not available
- * (a static build) the browser's localStorage is used. Tauri will add a native implementation.
+ * Where projects live. In development the dev server exposes a folder of project folders on
+ * disk; without it (a static build) the browser's localStorage is used. Tauri will add a
+ * native implementation behind the same interfaces.
  */
 import type { ProjectFiles } from './index';
 
+export interface ProjectSummary {
+  readonly id: string;
+  /** Last modification time (ms since epoch). */
+  readonly updatedAt: number;
+  readonly files: ProjectFiles;
+}
+
 export interface ProjectStorage {
+  readonly id: string;
   /** Human-readable location, e.g. "workspace/demo". */
   readonly location: string;
   load(): Promise<ProjectFiles | null>;
   save(files: ProjectFiles): Promise<void>;
-  /** Called when files change outside the editor (text editor, git, coding agent). */
+  /** Called when the files change outside the editor (text editor, git, coding agent). */
   onExternalChange(listener: (files: ProjectFiles) => void): () => void;
 }
 
-const ENDPOINT = '/__plastic/project';
-const FILES_CHANGED_EVENT = 'plastic:files-changed';
+export interface Workspace {
+  /** Human-readable location of the workspace, e.g. "workspace". */
+  readonly location: string;
+  /** Projects, most recently edited first. */
+  list(): Promise<ProjectSummary[]>;
+  /** Create a project; returns its id. */
+  create(title: string, files: ProjectFiles): Promise<string>;
+  open(id: string): ProjectStorage;
+  /** Called when projects are added, removed or edited anywhere. */
+  onChange(listener: () => void): () => void;
+}
+
+const PROJECT_CHANGED_EVENT = 'plastic:project-changed';
+const WORKSPACE_CHANGED_EVENT = 'plastic:workspace-changed';
 
 function isFiles(value: unknown): value is ProjectFiles {
   if (typeof value !== 'object' || value === null) return false;
@@ -22,66 +43,144 @@ function isFiles(value: unknown): value is ProjectFiles {
   return typeof v.html === 'string' && typeof v.css === 'string' && typeof v.project === 'string';
 }
 
-class DevServerStorage implements ProjectStorage {
-  constructor(public readonly location: string, private readonly initial: ProjectFiles | null) {}
+function pickFiles(v: ProjectFiles): ProjectFiles {
+  return { html: v.html, css: v.css, project: v.project };
+}
 
-  async load(): Promise<ProjectFiles | null> {
-    return this.initial;
+function onHot(event: string, handler: (data: unknown) => void): () => void {
+  const hot = import.meta.hot;
+  if (!hot) return () => {};
+  hot.on(event, handler);
+  return () => hot.off(event, handler);
+}
+
+// --- dev server (files on disk) ----------------------------------------------------------------
+
+class DevServerWorkspace implements Workspace {
+  constructor(public readonly location: string) {}
+
+  async list(): Promise<ProjectSummary[]> {
+    const response = await fetch('/__plastic/workspace');
+    const data = (await response.json()) as { projects?: unknown[] };
+    return (data.projects ?? []).flatMap((p) => {
+      const v = p as { id?: unknown; updatedAt?: unknown; files?: unknown };
+      return typeof v.id === 'string' && isFiles(v.files) ? [{ id: v.id, updatedAt: Number(v.updatedAt) || 0, files: pickFiles(v.files) }] : [];
+    });
   }
 
-  async save(files: ProjectFiles): Promise<void> {
-    const response = await fetch(ENDPOINT, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(files) });
-    if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+  async create(title: string, files: ProjectFiles): Promise<string> {
+    const response = await fetch('/__plastic/workspace', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title, files }),
+    });
+    if (!response.ok) throw new Error(`Could not create project: ${response.status}`);
+    return ((await response.json()) as { id: string }).id;
   }
 
-  onExternalChange(listener: (files: ProjectFiles) => void): () => void {
-    const hot = import.meta.hot;
-    if (!hot) return () => {};
-    const handler = (data: unknown) => {
-      if (isFiles(data)) listener({ html: data.html, css: data.css, project: data.project });
+  open(id: string): ProjectStorage {
+    const endpoint = `/__plastic/project/${encodeURIComponent(id)}`;
+    return {
+      id,
+      location: `${this.location}/${id}`,
+      async load() {
+        const response = await fetch(endpoint);
+        if (!response.ok) return null;
+        const data = (await response.json()) as { files?: unknown };
+        return isFiles(data.files) ? pickFiles(data.files) : null;
+      },
+      async save(files) {
+        const response = await fetch(endpoint, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(files) });
+        if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+      },
+      onExternalChange(listener) {
+        return onHot(PROJECT_CHANGED_EVENT, (data) => {
+          const v = data as { id?: unknown; files?: unknown };
+          if (v.id === id && isFiles(v.files)) listener(pickFiles(v.files));
+        });
+      },
     };
-    hot.on(FILES_CHANGED_EVENT, handler);
-    return () => hot.off(FILES_CHANGED_EVENT, handler);
+  }
+
+  onChange(listener: () => void): () => void {
+    return onHot(WORKSPACE_CHANGED_EVENT, () => listener());
   }
 }
 
-const LOCAL_KEY = 'plastic:project';
+// --- browser fallback ------------------------------------------------------------------------
 
-class LocalStorageStorage implements ProjectStorage {
+const LOCAL_KEY = 'plastic:projects';
+const LEGACY_KEY = 'plastic:project';
+
+type LocalProjects = Record<string, { files: ProjectFiles; updatedAt: number }>;
+
+class LocalStorageWorkspace implements Workspace {
   readonly location = 'this browser';
+  private readonly listeners = new Set<() => void>();
 
-  async load(): Promise<ProjectFiles | null> {
+  private read(): LocalProjects {
     try {
-      const raw = localStorage.getItem(LOCAL_KEY);
-      const parsed: unknown = raw ? JSON.parse(raw) : null;
-      return isFiles(parsed) ? parsed : null;
+      const parsed = JSON.parse(localStorage.getItem(LOCAL_KEY) ?? '{}') as LocalProjects;
+      const legacy: unknown = JSON.parse(localStorage.getItem(LEGACY_KEY) ?? 'null');
+      if (isFiles(legacy) && !parsed.untitled) parsed.untitled = { files: pickFiles(legacy), updatedAt: Date.now() };
+      return parsed;
     } catch {
-      return null;
+      return {};
     }
   }
 
-  async save(files: ProjectFiles): Promise<void> {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(files));
+  private write(projects: LocalProjects): void {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(projects));
+    this.listeners.forEach((fn) => fn());
   }
 
-  onExternalChange(): () => void {
-    return () => {};
+  async list(): Promise<ProjectSummary[]> {
+    return Object.entries(this.read())
+      .map(([id, p]) => ({ id, updatedAt: p.updatedAt, files: p.files }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  async create(title: string, files: ProjectFiles): Promise<string> {
+    const projects = this.read();
+    const base = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled';
+    let id = base;
+    for (let n = 2; projects[id]; n++) id = `${base}-${n}`;
+    this.write({ ...projects, [id]: { files, updatedAt: Date.now() } });
+    return id;
+  }
+
+  open(id: string): ProjectStorage {
+    return {
+      id,
+      location: 'this browser',
+      load: async () => this.read()[id]?.files ?? null,
+      save: async (files) => this.write({ ...this.read(), [id]: { files, updatedAt: Date.now() } }),
+      onExternalChange: () => () => {},
+    };
+  }
+
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 }
 
-export async function connectStorage(): Promise<ProjectStorage> {
-  if (import.meta.env.DEV) {
-    try {
-      const response = await fetch(ENDPOINT);
-      if (response.ok) {
-        const data = (await response.json()) as { files: unknown; location?: unknown };
-        const location = typeof data.location === 'string' ? data.location : 'workspace';
-        const files = isFiles(data.files) ? { html: data.files.html, css: data.files.css, project: data.files.project } : null;
-        return new DevServerStorage(location, files);
+let workspace: Promise<Workspace> | null = null;
+
+export function connectWorkspace(): Promise<Workspace> {
+  workspace ??= (async () => {
+    if (import.meta.env.DEV) {
+      try {
+        const response = await fetch('/__plastic/workspace');
+        if (response.ok) {
+          const data = (await response.json()) as { location?: unknown };
+          return new DevServerWorkspace(typeof data.location === 'string' ? data.location : 'workspace');
+        }
+      } catch {
+        // fall through to browser storage
       }
-    } catch {
-      // fall through to browser storage
     }
-  }
-  return new LocalStorageStorage();
+    return new LocalStorageWorkspace();
+  })();
+  return workspace;
 }

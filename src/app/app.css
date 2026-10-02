@@ -74,6 +74,10 @@ textarea {
 }
 
 .brand {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 6px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -81,6 +85,10 @@ textarea {
   font-weight: 650;
   font-size: 13px;
   letter-spacing: -0.01em;
+}
+
+.brand:hover {
+  background: var(--ui-hover);
 }
 
 .toolbar-divider {
@@ -828,4 +836,17 @@ kbd {
   line-height: 1.55;
   white-space: pre;
   tab-size: 2;
+}
+
+/* --- editor: missing file -------------------------------------------------------------- */
+
+.missing-file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+  color: var(--ui-muted);
+  font-size: 13px;
 }

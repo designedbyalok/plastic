@@ -1,0 +1,461 @@
+/* Home screen. Values follow the Paper design (dark file browser). */
+
+.home {
+  --home-bg: #2a2a2a;
+  --home-main-bg: #222222;
+  --home-line: #373737;
+  --home-text: #ffffffe6;
+  --home-text-secondary: #ffffffa6;
+  --home-text-muted: #ffffff93;
+  --home-text-placeholder: #ffffff80;
+  --home-fill: #ffffff0f;
+  --home-fill-strong: #ffffff1a;
+  --home-hairline: #ffffff0d;
+
+  display: flex;
+  height: 100%;
+  background: var(--home-bg);
+  color: var(--home-text);
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+
+.home a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.home button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* --- sidebar ---------------------------------------------------------------------------- */
+
+.home-sidebar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 240px;
+  overflow: auto;
+}
+
+.home-sidebar-top {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 12px;
+}
+
+.home-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 4px 8px 4px 4px;
+}
+
+.home-avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 100%;
+  background: var(--home-fill-strong);
+  outline: 1px solid var(--home-hairline);
+  outline-offset: -1px;
+}
+
+.home-account-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.home-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  margin-bottom: 12px;
+  border-radius: 7.5px;
+  corner-shape: superellipse(1.3);
+  background: var(--home-fill);
+}
+
+.home-search input {
+  width: 100%;
+  height: 100%;
+  padding: 0 40px 0 28px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--home-text);
+  font: inherit;
+  outline: none;
+}
+
+.home-search input::placeholder {
+  color: var(--home-text-placeholder);
+}
+
+.home-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.home-search:focus-within {
+  box-shadow: inset 0 0 0 1px #ffffff26;
+}
+
+.home-search-icon {
+  position: absolute;
+  left: 10px;
+  color: #ffffff93;
+  pointer-events: none;
+}
+
+.home-search-kbd {
+  position: absolute;
+  right: 10px;
+  color: var(--home-text-placeholder);
+  font: inherit;
+  pointer-events: none;
+}
+
+.home-nav-item,
+.home-nav-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin-bottom: 2px;
+  padding: 0 8px;
+  border-radius: 7.5px;
+  corner-shape: superellipse(1.3);
+  color: var(--home-text-secondary);
+  font-size: 13px;
+}
+
+.home-nav-item svg,
+.home-nav-heading svg {
+  flex: none;
+  opacity: 0.72;
+}
+
+.home-nav-item.is-active {
+  background: var(--home-fill);
+  color: var(--home-text);
+}
+
+.home-nav-item.is-active svg {
+  opacity: 1;
+}
+
+.home-nav-item:not(.is-active):hover {
+  background: #ffffff08;
+}
+
+.home-nav-heading {
+  color: var(--home-text);
+  font-weight: 500;
+}
+
+.home-nav-path {
+  padding: 0 8px 0 31px;
+  overflow: hidden;
+  color: var(--home-text-secondary);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.home-divider {
+  margin: 16px -12px;
+  border-bottom: 1px solid var(--home-line);
+}
+
+.home-card-note {
+  position: relative;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--home-line);
+  border-radius: 8px;
+}
+
+.home-card-note-title {
+  margin-bottom: 4px;
+  padding-right: 24px;
+  font-weight: 500;
+}
+
+.home-card-note-body {
+  color: var(--home-text-secondary);
+}
+
+.home-card-note-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #ffffff80 !important;
+}
+
+.home-card-note-dismiss:hover {
+  background: var(--home-fill);
+}
+
+/* --- main ------------------------------------------------------------------------------- */
+
+.home-main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: none;
+  border-left: 1px solid var(--home-line);
+  background: var(--home-main-bg);
+}
+
+.home-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 20px 80px 12px;
+  background: var(--home-main-bg);
+}
+
+.home-header-inner,
+.home-files-inner {
+  max-width: 1376px;
+  margin: 0 auto;
+}
+
+.home-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 48px;
+}
+
+.home-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 32px;
+  letter-spacing: 0.12px;
+}
+
+.home-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  height: 28px;
+}
+
+.home-new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7.5px;
+  corner-shape: superellipse(1.3);
+  background: #f2f2f2;
+  color: #373737 !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.home-new:hover {
+  background: #ffffff;
+}
+
+.home-new:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.home-view-toggle {
+  display: flex;
+  height: 28px;
+  border-radius: 8.5px;
+  corner-shape: superellipse(1.3);
+  background: var(--home-hairline);
+}
+
+.home-view-option {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 7.5px;
+  corner-shape: superellipse(1.3);
+  background: transparent;
+  color: #ffffff66 !important;
+}
+
+.home-view-option.is-active {
+  background: var(--home-hairline);
+  box-shadow: inset 0 1px 0 #ffffff08, inset 0 0 1px 0.5px #ffffff22, 0 1px 0.5px #00000018, 0 0 3px -1px #000000aa;
+  color: #ffffffe6 !important;
+}
+
+.home-files {
+  padding: 32px 80px;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
+  gap: 24px;
+}
+
+.home-card {
+  display: block;
+  padding: 4px;
+  overflow: clip;
+  border-radius: 10px;
+  corner-shape: superellipse(1.3);
+  background: var(--home-bg);
+  outline: 1px solid var(--home-hairline);
+  outline-offset: -1px;
+  isolation: isolate;
+}
+
+.home-card:hover {
+  outline-color: #ffffff1f;
+}
+
+.home-card:focus-visible {
+  outline: 2px solid #4d8ae4;
+}
+
+.home-card-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  padding: 6px 8px 8px;
+}
+
+.home-card-title {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  max-width: 100%;
+  overflow: hidden;
+  line-height: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.home-card-subtitle {
+  color: var(--home-text-muted);
+  line-height: 18px;
+}
+
+.home-thumb {
+  position: relative;
+  aspect-ratio: 256 / 168;
+  overflow: clip;
+  border-radius: 4px;
+  background: var(--home-fill-strong);
+}
+
+/* Designs render in a light scheme; matching it keeps the iframe's backdrop transparent
+   (browsers paint an opaque canvas behind iframes whose color scheme differs). */
+.home-thumb-frame {
+  color-scheme: light;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 1000px;
+  border: 0;
+  background: transparent;
+  transform-origin: 0 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* list view */
+
+.home-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 2fr) minmax(0, 2fr) 140px;
+  align-items: center;
+  gap: 16px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.home-row + .home-row {
+  margin-top: 2px;
+}
+
+.home-row:hover {
+  background: #ffffff08;
+}
+
+.home-row:focus-visible {
+  outline: 2px solid #4d8ae4;
+}
+
+.home-row-thumb .home-thumb {
+  width: 64px;
+}
+
+.home-row-title {
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.home-row-path {
+  overflow: hidden;
+  color: var(--home-text-muted);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.home-row-time {
+  color: var(--home-text-muted);
+  text-align: right;
+}
+
+.home-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 96px 0;
+  color: var(--home-text-secondary);
+  font-size: 13px;
+}
+
+.home-empty p {
+  margin: 0;
+}

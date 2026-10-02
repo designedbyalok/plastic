@@ -1,0 +1,262 @@
+/**
+ * Home: the workspace's files, most recently edited first. Each file is a folder on disk;
+ * its name is the document's <title> and its thumbnail is the design itself.
+ */
+import { Layers3 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { fileHref, linkClick, navigate } from '../app/router';
+import type { DesignDocument } from '../document/types';
+import { createProject } from '../editor/persistence';
+import { parseProject } from '../serialization';
+import { connectWorkspace, type ProjectSummary } from '../serialization/storage';
+import { ClockIcon, FolderIcon, GridIcon, ListIcon, MinusIcon, PlusIcon, SearchIcon } from './icons';
+import { Thumbnail } from './Thumbnail';
+import { editedAgo } from './time';
+import './home.css';
+
+type View = 'grid' | 'list';
+
+interface FileEntry {
+  readonly id: string;
+  readonly title: string;
+  readonly updatedAt: number;
+  readonly doc: DesignDocument;
+  readonly css: string;
+}
+
+const VIEW_KEY = 'plastic:home-view';
+const CARD_KEY = 'plastic:home-local-card-dismissed';
+
+function readPref(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writePref(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // preferences are a convenience only
+  }
+}
+
+function toEntry(summary: ProjectSummary): FileEntry | null {
+  try {
+    const { doc } = parseProject(summary.files);
+    return { id: summary.id, title: doc.title || summary.id, updatedAt: summary.updatedAt, doc, css: summary.files.css };
+  } catch {
+    return null;
+  }
+}
+
+function useNow(intervalMs = 60_000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(timer);
+  }, [intervalMs]);
+  return now;
+}
+
+export function Home() {
+  const [files, setFiles] = useState<FileEntry[] | null>(null);
+  const [location, setLocation] = useState('workspace');
+  const [query, setQuery] = useState('');
+  const [view, setView] = useState<View>(() => (readPref(VIEW_KEY) === 'list' ? 'list' : 'grid'));
+  const [creating, setCreating] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const now = useNow();
+
+  const refresh = useCallback(async () => {
+    const workspace = await connectWorkspace();
+    setLocation(workspace.location);
+    const list = await workspace.list();
+    setFiles(list.map(toEntry).filter((f): f is FileEntry => f !== null));
+  }, []);
+
+  useEffect(() => {
+    document.title = 'Plastic';
+    void refresh();
+    let off = () => {};
+    void connectWorkspace().then((workspace) => {
+      off = workspace.onChange(() => void refresh());
+    });
+    return () => off();
+  }, [refresh]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (files ?? []).filter((f) => !q || f.title.toLowerCase().includes(q) || f.id.includes(q));
+  }, [files, query]);
+
+  const newFile = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      navigate(fileHref(await createProject()));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const changeView = (next: View) => {
+    setView(next);
+    writePref(VIEW_KEY, next);
+  };
+
+  return (
+    <div className="home">
+      <Sidebar location={location} query={query} onQuery={setQuery} searchRef={searchRef} />
+      <main className="home-main">
+        <header className="home-header">
+          <div className="home-header-inner">
+            <h1 className="home-title">{query.trim() ? 'Search' : 'Recents'}</h1>
+            <div className="home-actions">
+              <button type="button" className="home-new" onClick={() => void newFile()} disabled={creating}>
+                <PlusIcon />
+                New file
+              </button>
+              <div className="home-view-toggle" role="radiogroup" aria-label="View">
+                {(['grid', 'list'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="radio"
+                    aria-checked={view === v}
+                    aria-label={v === 'grid' ? 'Grid view' : 'List view'}
+                    className={`home-view-option${view === v ? ' is-active' : ''}`}
+                    onClick={() => changeView(v)}
+                  >
+                    {v === 'grid' ? <GridIcon /> : <ListIcon />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section className="home-files" aria-label="Files">
+          <div className="home-files-inner">
+            {files === null ? null : visible.length === 0 ? (
+              <EmptyState searching={!!query.trim()} onNew={() => void newFile()} />
+            ) : view === 'grid' ? (
+              <div className="home-grid">
+                {visible.map((f) => (
+                  <a key={f.id} className="home-card" href={fileHref(f.id)} onClick={linkClick}>
+                    <div className="home-card-meta">
+                      <span className="home-card-title">{f.title}</span>
+                      <span className="home-card-subtitle">{editedAgo(f.updatedAt, now)}</span>
+                    </div>
+                    <Thumbnail doc={f.doc} css={f.css} />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="home-list" role="list">
+                {visible.map((f) => (
+                  <a key={f.id} role="listitem" className="home-row" href={fileHref(f.id)} onClick={linkClick}>
+                    <span className="home-row-thumb">
+                      <Thumbnail doc={f.doc} css={f.css} />
+                    </span>
+                    <span className="home-row-title">{f.title}</span>
+                    <span className="home-row-path">{`${location}/${f.id}`}</span>
+                    <span className="home-row-time">{editedAgo(f.updatedAt, now)}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function Sidebar({ location, query, onQuery, searchRef }: { location: string; query: string; onQuery(q: string): void; searchRef: React.RefObject<HTMLInputElement | null> }) {
+  const [cardDismissed, setCardDismissed] = useState(() => readPref(CARD_KEY) === '1');
+  return (
+    <aside className="home-sidebar">
+      <div className="home-sidebar-top">
+        <div className="home-account">
+          <span className="home-avatar" aria-hidden="true">
+            <Layers3 size={13} strokeWidth={2} />
+          </span>
+          <span className="home-account-name">Plastic</span>
+        </div>
+
+        <nav aria-label="Workspace">
+          <label className="home-search">
+            <SearchIcon className="home-search-icon" />
+            <input ref={searchRef} type="search" placeholder="Search" aria-label="Search files" value={query} onChange={(e) => onQuery(e.target.value)} />
+            <kbd className="home-search-kbd">⌘F</kbd>
+          </label>
+          <a className="home-nav-item is-active" href="/" aria-current="page" onClick={linkClick}>
+            <ClockIcon />
+            Recents
+          </a>
+
+          <div className="home-divider" />
+
+          <div className="home-nav-heading" title={`Files are folders in ${location}/`}>
+            <FolderIcon />
+            Local workspace
+          </div>
+          <div className="home-nav-path">{location}/</div>
+
+          {!cardDismissed && (
+            <div className="home-card-note">
+              <div className="home-card-note-title">Your files are plain HTML</div>
+              <div className="home-card-note-body">
+                Each file is a folder of index.html and styles.css. Open it in any editor, or commit it to Git.
+              </div>
+              <button
+                type="button"
+                className="home-card-note-dismiss"
+                aria-label="Dismiss"
+                onClick={() => {
+                  setCardDismissed(true);
+                  writePref(CARD_KEY, '1');
+                }}
+              >
+                <MinusIcon />
+              </button>
+            </div>
+          )}
+        </nav>
+      </div>
+    </aside>
+  );
+}
+
+function EmptyState({ searching, onNew }: { searching: boolean; onNew(): void }) {
+  return (
+    <div className="home-empty">
+      {searching ? (
+        <p>No files match your search.</p>
+      ) : (
+        <>
+          <p>No files yet.</p>
+          <button type="button" className="home-new" onClick={onNew}>
+            <PlusIcon />
+            New file
+          </button>
+        </>
+      )}
+    </div>
+  );
+}

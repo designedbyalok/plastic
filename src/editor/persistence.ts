@@ -4,7 +4,9 @@
  * (an editor, git checkout, a coding agent) are loaded in as an undoable change.
  */
 import { parseProject, serializeProject, type ProjectFiles } from '../serialization';
-import { connectStorage, type ProjectStorage } from '../serialization/storage';
+import { connectWorkspace, type ProjectStorage } from '../serialization/storage';
+import { setTitle } from '../document/ops';
+import { starterDocument } from '../elements/insertables';
 import { editorMeta, useEditor } from './store';
 
 const AUTOSAVE_MS = 400;
@@ -56,33 +58,46 @@ function applyExternal(files: ProjectFiles): void {
   }
 }
 
-/** Open the project and keep it in sync. Resolves with whether a saved viewport was restored. */
-export async function startPersistence(): Promise<{ stop: () => void; restoredViewport: boolean }> {
-  storage = await connectStorage();
-  const files = await storage.load();
-  const store = useEditor.getState();
-  let restoredViewport = false;
-  if (files) {
-    try {
-      const { doc, meta } = parseProject(files);
-      store.load(doc, { viewport: meta.viewport, collapsed: meta.collapsed });
-      restoredViewport = !!meta.viewport;
-      lastWritten = files;
-    } catch (error) {
-      console.error('Could not open project, starting fresh', error);
-    }
-  }
-  useEditor.getState().setSaveState(files ? 'saved' : 'idle', useEditor.getState().revision, storage.location);
-  if (!files) schedule(0);
+export interface OpenedProject {
+  readonly found: boolean;
+  /** Whether a saved viewport was restored (otherwise the caller should frame the artboards). */
+  readonly restoredViewport: boolean;
+  /** Stop syncing. Pending edits are flushed first. */
+  stop(): void;
+}
+
+/** Open a project into the editor and keep it in sync with its files. */
+export async function openProject(id: string): Promise<OpenedProject> {
+  const workspace = await connectWorkspace();
+  const project = workspace.open(id);
+  const files = await project.load();
+  if (!files) return { found: false, restoredViewport: false, stop: () => {} };
+
+  const { doc, meta } = parseProject(files);
+  useEditor.getState().load(doc, { viewport: meta.viewport, collapsed: meta.collapsed });
+  storage = project;
+  lastWritten = files;
+  useEditor.getState().setSaveState('saved', useEditor.getState().revision, project.location);
 
   const unsubscribe = useEditor.subscribe((s, prev) => {
     if (s.revision !== prev.revision || (prev.tx && !s.tx)) schedule();
   });
-  const offExternal = storage.onExternalChange(applyExternal);
+  const offExternal = project.onExternalChange(applyExternal);
   const stop = () => {
     unsubscribe();
     offExternal();
     clearTimeout(timer);
+    // Serializes synchronously, so the flushed content is this project's even if another opens next.
+    void saveNow().finally(() => {
+      if (storage === project) storage = null;
+    });
   };
-  return { stop, restoredViewport };
+  return { found: true, restoredViewport: !!meta.viewport, stop };
+}
+
+/** Create a project with one empty artboard; resolves with its id. */
+export async function createProject(title = 'Untitled'): Promise<string> {
+  const workspace = await connectWorkspace();
+  const files = serializeProject(setTitle(starterDocument(), title), { viewport: null, collapsed: [] });
+  return workspace.create(title, files);
 }

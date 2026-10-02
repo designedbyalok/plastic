@@ -20,11 +20,12 @@ npm install
 npm run dev
 ```
 
-Open the printed URL. The project is saved continuously to `workspace/demo/`
-(`index.html`, `styles.css`, `project.json`). Edit those files with anything — a text editor,
-git, a coding agent — and the open editor updates (as an undoable change).
+Open the printed URL. The home screen lists the files in `workspace/`. Each file is a folder
+(`workspace/<id>/index.html`, `styles.css`, `project.json`) saved continuously while you edit,
+and opened at `/file/<id>`. Edit those files with anything — a text editor, git, a coding
+agent — and the open editor and the home screen update (in the editor, as an undoable change).
 
-Use a different folder with `PLASTIC_PROJECT=path/to/project npm run dev`.
+Use a different workspace folder with `PLASTIC_WORKSPACE=path/to/folder npm run dev`.
 
 ```bash
 npm test           # model, serialization, history

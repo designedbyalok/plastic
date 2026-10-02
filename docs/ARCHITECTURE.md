@@ -29,7 +29,7 @@ src/
     html.ts          index.html
     project.ts       project.json (editor metadata only)
     index.ts         serializeProject / parseProject
-    storage.ts       Where files live (dev-server folder, or localStorage fallback)
+    storage.ts       Workspace (list/create/open projects) and per-project storage
   editor/          Editor state and intents
     store.ts         Zustand store: document + history + editor state
     history.ts       Snapshot undo/redo with coalescing
@@ -46,10 +46,12 @@ src/
     Overlay.tsx      Screen-space selection, handles, guides
     textEditing.ts   Inline contenteditable text editing
   panels/          Toolbar, layers, inspector, code view
+  home/            Home screen: the workspace's files, with live thumbnails
+  app/             Routes (/ and /file/<id>), editor screen, editor chrome CSS
 server/
-  workspace.ts     Vite plugin: read/write/watch workspace/<project>/
-tests/             Model, serialization and history tests
-workspace/demo/    The project you are editing (gitignored here; it is user data)
+  workspace.ts     Vite plugin: list/create/read/write/watch workspace/<id>/
+tests/             Model, serialization, history and routing tests
+workspace/         Your projects, one folder each (gitignored here; it is user data)
 ```
 
 Dependency direction: `document` ← `elements` ← `serialization` ← `editor` ↔ `canvas` ← `panels`.
@@ -187,7 +189,7 @@ convert pointer deltas with `delta / zoom` at the boundary; sizes come from
 
 ## 8. Serialization strategy
 
-A project is a plain folder:
+A workspace is a folder of projects; a project is a plain folder:
 
 ```
 workspace/demo/
@@ -208,10 +210,17 @@ workspace/demo/
   them, so saving never changes the cascade. Comments are not yet preserved.
 - **project.json is optional.** Deleting it loses only canvas placement and names; artboards
   without a stored position are laid out left to right.
-- **Storage** is an interface (`serialization/storage.ts`). In development the Vite plugin reads,
-  writes and *watches* the folder, so files edited by anything else stream back into the open
-  editor. A localStorage implementation is the fallback for static builds; Tauri will add a
-  native one.
+- **Storage** is an interface (`serialization/storage.ts`): a `Workspace` lists, creates and
+  opens projects; a `ProjectStorage` loads, saves and reports external edits for one project.
+  In development the Vite plugin reads, writes and *watches* the workspace folder, so files
+  edited by anything else stream back into the open editor and the home screen. Project ids
+  are folder names restricted to `[a-z0-9_-]`, which keeps every path inside the workspace.
+  A localStorage implementation is the fallback for static builds; Tauri will add a native one.
+- **The file's name is its `<title>`.** The folder name is only an id (from the title at
+  creation), so renaming a file never moves files on disk.
+- **Thumbnails are the design.** The home screen renders each project's own HTML and CSS in a
+  sandboxed iframe (no scripts), with artboards placed as on the canvas and the iframe viewport
+  as wide as the artboards, so media queries apply. There are no image files to keep in sync.
 
 ## 9. How native HTML elements are represented
 
@@ -292,7 +301,8 @@ Implemented:
 - Inline text editing (double-click), undo/redo with transactions and coalescing,
   duplicate, delete, nudge.
 - Code view (index.html / styles.css / project.json, with or without editor ids).
-- Autosave to `workspace/demo/`, reload from disk, live sync of external edits.
+- Autosave to `workspace/<id>/`, reload from disk, live sync of external edits.
+- Home screen: recent files with live thumbnails, search (⌘F), grid/list views, New file.
 
 ## Next steps (in priority order)
 
