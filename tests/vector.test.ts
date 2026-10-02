@@ -132,3 +132,44 @@ describe('vector inspector', () => {
     expect(vectorShapes(made.doc, [made.id], shapes[0]!)).toEqual([shapes[0]]);
   });
 });
+
+describe('corner radius', () => {
+  it('rounds straight corners and keeps the source points', async () => {
+    const { applyRadii, roundCorners, serializeRadii, setRadius, parsePath: parse, serializePath: serialize } = await import('../src/vector/path.ts');
+    const square = parse('M0 0L100 0L100 100L0 100Z');
+    const rounded = setRadius(square, [{ sub: 0, index: 1, part: 'anchor' }], 10);
+    expect(serializeRadii(rounded)).toBe('0:1:10');
+    const drawn = roundCorners(rounded)[0]!;
+    // The corner at (100, 0) becomes two points 10px back along each side.
+    expect(drawn.anchors).toHaveLength(5);
+    expect(drawn.anchors[1]!.x).toBeCloseTo(90);
+    expect(drawn.anchors[1]!.y).toBeCloseTo(0);
+    expect(drawn.anchors[2]!.x).toBeCloseTo(100);
+    expect(drawn.anchors[2]!.y).toBeCloseTo(10);
+    expect(drawn.anchors[1]!.out!.x).toBeCloseTo(90 + 10 * 0.5523, 2);
+    // Radii survive a round trip through their attribute.
+    expect(applyRadii(parse(serialize(rounded)), '0:1:10')[0]!.anchors[1]!.radius).toBe(10);
+  });
+
+  it('caps the radius at half of the shorter side', async () => {
+    const { roundCorners, setRadius, parsePath: parse } = await import('../src/vector/path.ts');
+    const drawn = roundCorners(setRadius(parse('M0 0L20 0L20 100Z'), [{ sub: 0, index: 1, part: 'anchor' }], 999))[0]!;
+    expect(drawn.anchors[1]!.x).toBeCloseTo(10);
+  });
+
+  it('writes the drawn path to d and the source beside it', async () => {
+    const { emptyDocument, instantiate } = await import('../src/document/factory.ts');
+    const { readPath, writePath } = await import('../src/vector/edit.ts');
+    const { setRadius, parsePath: parse } = await import('../src/vector/path.ts');
+    const made = instantiate(emptyDocument(), { tag: 'svg', children: [{ tag: 'path', attrs: { d: 'M0 0L100 0L100 100Z' } }] });
+    const pathId = (made.doc.nodes[made.id] as unknown as { children: string[] }).children[0]!;
+    const doc = writePath(made.doc, pathId, setRadius(parse('M0 0L100 0L100 100Z'), [{ sub: 0, index: 1, part: 'anchor' }], 8));
+    const attrs = (doc.nodes[pathId] as unknown as { attrs: Record<string, string> }).attrs;
+    expect(attrs['data-pl-d']).toBe('M0 0L100 0L100 100Z');
+    expect(attrs['data-pl-radius']).toBe('0:1:8');
+    expect(attrs.d).toContain('C');
+    expect(readPath(doc, pathId)[0]!.anchors[1]!.radius).toBe(8);
+    const flat = writePath(doc, pathId, setRadius(readPath(doc, pathId), [{ sub: 0, index: 1, part: 'anchor' }], 0));
+    expect((flat.nodes[pathId] as unknown as { attrs: Record<string, string> }).attrs).toEqual({ d: 'M0 0L100 0L100 100Z' });
+  });
+});

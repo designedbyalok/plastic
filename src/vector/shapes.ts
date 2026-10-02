@@ -12,7 +12,8 @@ import { insertChild, insertRoot, setFrame, setStyleOnNodes } from '../document/
 import type { DesignDocument, NodeId, Point } from '../document/types.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
 import { rectFromPoints, screenToWorld, type Rect } from '../canvas/coords.ts';
-import { clientRectOf, domElement, styleOf, toScreen } from '../canvas/dom.ts';
+import { clientRectOf, domElement, nodeIdAt, styleOf, toScreen } from '../canvas/dom.ts';
+import { clearGuides, collectTargets, snapPoint, toClient } from '../canvas/snap.ts';
 import { trackPointer, transactional } from '../canvas/gestures.ts';
 import { containerAt } from '../canvas/layout.ts';
 
@@ -191,8 +192,11 @@ function place(doc: DesignDocument, kind: ShapeKind, where: ReturnType<typeof ta
 
 /** Drag (or click) with a shape tool. The whole draw is one undo step; then back to Move. */
 export function startShapeDraw(e: PointerEvent, kind: ShapeKind): void {
-  const where = target(e.clientX, e.clientY);
-  const start = where.toLocal(e.clientX, e.clientY);
+  const targets = collectTargets(nodeIdAt(e.clientX, e.clientY), []);
+  const snapClient = (cx: number, cy: number, show: boolean) => toClient(snapPoint(toScreen(cx, cy), targets, show));
+  const first = snapClient(e.clientX, e.clientY, false);
+  const where = target(first.x, first.y);
+  const start = where.toLocal(first.x, first.y);
   const tx = transactional();
   let created: NodeId | null = null;
   const draw = (rect: Rect, from: Point, to: Point) =>
@@ -208,11 +212,13 @@ export function startShapeDraw(e: PointerEvent, kind: ShapeKind): void {
   trackPointer(e, {
     threshold: 2,
     move(ev) {
-      const { rect, from, to } = dragRect(kind, start, where.toLocal(ev.clientX, ev.clientY), ev.shiftKey, ev.altKey);
+      const at = snapClient(ev.clientX, ev.clientY, true);
+      const { rect, from, to } = dragRect(kind, start, where.toLocal(at.x, at.y), ev.shiftKey, ev.altKey);
       draw(rect, from, to);
       if (created) editor().select([created]);
     },
     end(ev, moved) {
+      clearGuides();
       const label = `Add ${SHAPES.find((s) => s.kind === kind)!.label.toLowerCase()}`;
       if (!moved) {
         // A click places the default size there (lines run left to right).
@@ -220,12 +226,14 @@ export function startShapeDraw(e: PointerEvent, kind: ShapeKind): void {
         const rect = { x: start.x, y: start.y, width: DEFAULT_SIZE, height: line ? 0 : DEFAULT_SIZE };
         draw(rect, start, { x: start.x + DEFAULT_SIZE, y: start.y });
       } else {
-        const { rect, from, to } = dragRect(kind, start, where.toLocal(ev.clientX, ev.clientY), ev.shiftKey, ev.altKey);
+        const at = snapClient(ev.clientX, ev.clientY, false);
+        const { rect, from, to } = dragRect(kind, start, where.toLocal(at.x, at.y), ev.shiftKey, ev.altKey);
         draw(rect, from, to);
       }
       finish(label);
     },
     cancel: () => {
+      clearGuides();
       tx.cancel();
       editor().setTool({ kind: 'select' });
     },

@@ -5,12 +5,16 @@
  * stays plain SVG. A shape's value may be inherited from the svg (new vectors have fill="none"
  * on the svg); the effective value is shown and editing sets it on the shapes themselves.
  */
-import { setAttribute } from '../../document/ops.ts';
+import { insertChild, removeNodes, setAttribute } from '../../document/ops.ts';
+import { instantiate } from '../../document/factory.ts';
+import { gradientFrom, parseColor, readSvgGradient, svgGradientSpec, type Gradient } from '../../paint/gradient.ts';
+import { GradientEditor } from './GradientEditor.tsx';
 import { getElement, getParentId } from '../../document/tree.ts';
 import type { DesignDocument, ElementNode, NodeId } from '../../document/types.ts';
 import { useEditor } from '../../editor/store.ts';
 import { EDITABLE_SHAPES, readPath, vectorRootOf, writePath } from '../../vector/edit.ts';
-import { moveRefs } from '../../vector/path.ts';
+import { moveRefs, setRadius } from '../../vector/path.ts';
+import { Radius } from 'lucide-react';
 import { DEFAULT_STAR_RATIO, polygonPoints, starPoints } from '../../vector/shapes.ts';
 import { cssColorToHex } from '../../vector/pathOps.ts';
 import { Checkbox, MIXED, Row, Section, Segmented, Select, TextInput } from './fields.tsx';
@@ -128,9 +132,88 @@ function PaintRow({ shapes, attr, opacityAttr, label }: { shapes: readonly NodeI
   );
 }
 
+/** The gradient element a `url(#id)` fill points to, inside the shape's svg. */
+function gradientElement(doc: DesignDocument, shape: NodeId, fill: string): ElementNode | null {
+  const id = /^url\(\s*#([^)\s]+)\s*\)$/i.exec(fill)?.[1];
+  const root = vectorRootOf(doc, shape);
+  if (!id || !root) return null;
+  let found: ElementNode | null = null;
+  const walk = (nodeId: NodeId) => {
+    const el = getElement(doc, nodeId);
+    if (!el || found) return;
+    if (el.attrs.id === id && (el.tag === 'linearGradient' || el.tag === 'radialGradient')) found = el;
+    else el.children.forEach(walk);
+  };
+  walk(root);
+  return found;
+}
+
+function gradientOf(doc: DesignDocument, shape: NodeId, fill: string): Gradient | null {
+  const el = gradientElement(doc, shape, fill);
+  if (!el) return null;
+  const stops = el.children.map((c) => getElement(doc, c)).filter((c): c is ElementNode => !!c && c.tag === 'stop');
+  return readSvgGradient(el, stops);
+}
+
+/** Put a gradient in the vector's <defs> (replacing the shapes' current one) and point the shapes at it. */
+function writeGradient(doc: DesignDocument, shapes: readonly NodeId[], g: Gradient): DesignDocument {
+  const root = vectorRootOf(doc, shapes[0]!);
+  if (!root) return doc;
+  const current = gradientElement(doc, shapes[0]!, effective(doc, shapes[0]!, 'fill'));
+  const id = current?.attrs.id ?? `pl-gradient-${Math.random().toString(36).slice(2, 8)}`;
+  let next = doc;
+  let defsId = getElement(next, root)!.children.find((c) => getElement(next, c)?.tag === 'defs') ?? null;
+  let index = 0;
+  if (current) {
+    const parentId = getParentId(next, current.id)!;
+    index = getElement(next, parentId)!.children.indexOf(current.id);
+    defsId = parentId;
+    next = removeNodes(next, [current.id]);
+  } else if (!defsId) {
+    const made = instantiate(next, { tag: 'defs' });
+    next = insertChild(made.doc, root, 0, made.id);
+    defsId = made.id;
+  }
+  const made = instantiate(next, svgGradientSpec(g, id));
+  next = insertChild(made.doc, defsId!, index, made.id);
+  return shapes.reduce((acc, s) => setAttribute(setAttribute(acc, s, 'fill', `url(#${id})`), s, 'fill-opacity', null), next);
+}
+
+/** Remove a gradient no shape of its svg uses anymore. */
+function dropUnusedGradient(doc: DesignDocument, root: NodeId, gradient: ElementNode | null): DesignDocument {
+  if (!gradient) return doc;
+  const ref = `url(#${gradient.attrs.id})`;
+  const used = vectorShapes(doc, [root], null).some((s) => getElement(doc, s)?.attrs.fill === ref);
+  if (used) return doc;
+  const defs = getParentId(doc, gradient.id);
+  let next = removeNodes(doc, [gradient.id]);
+  // An empty <defs> left behind goes too.
+  if (defs && getElement(next, defs)?.tag === 'defs' && !getElement(next, defs)!.children.length) next = removeNodes(next, [defs]);
+  return next;
+}
+
 export function VectorFillSection({ shapes }: { shapes: readonly NodeId[] }) {
   const fill = useShared(shapes, 'fill');
+  const doc = useEditor((s) => s.doc);
   const empty = fill !== MIXED && isNone(fill);
+  const gradient = fill !== MIXED ? gradientOf(doc, shapes[0]!, fill) : null;
+  const setType = (type: string) => {
+    if (type === 'solid') {
+      const first = gradient?.stops[0];
+      editor().apply('Solid fill', (d) => {
+        const old = gradientElement(d, shapes[0]!, effective(d, shapes[0]!, 'fill'));
+        const root = vectorRootOf(d, shapes[0]!)!;
+        let next = shapes.reduce((acc, s) => setAttribute(setAttribute(acc, s, 'fill', first?.color ?? '#000000'), s, 'fill-opacity', first && first.alpha < 1 ? String(first.alpha) : null), d);
+        next = dropUnusedGradient(next, root, old);
+        return next;
+      });
+      return;
+    }
+    const kind = type as Gradient['type'];
+    const base = gradient?.stops[0] ?? parseColor(fill !== MIXED ? fill : '') ?? { color: '#d9d9d9', alpha: 1 };
+    const next = gradient ? { ...gradient, type: kind } : gradientFrom(base.color, base.alpha || 1, kind);
+    editor().apply(kind === 'linear' ? 'Linear gradient' : 'Radial gradient', (d) => writeGradient(d, shapes, next));
+  };
   return (
     <Section
       title="Fill"
@@ -138,7 +221,25 @@ export function VectorFillSection({ shapes }: { shapes: readonly NodeId[] }) {
       onAdd={() => setAll(shapes, { fill: '#d9d9d9', 'fill-opacity': null }, 'Add fill')}
       onRemove={() => setAll(shapes, { fill: 'none', 'fill-opacity': null }, 'Remove fill')}
     >
-      <PaintRow shapes={shapes} attr="fill" opacityAttr="fill-opacity" label="Fill" />
+      {fill !== MIXED && (
+        <Row>
+          <Segmented
+            ariaLabel="Fill type"
+            value={gradient ? gradient.type : 'solid'}
+            choices={[
+              { value: 'solid', label: 'Solid' },
+              { value: 'linear', label: 'Linear' },
+              { value: 'radial', label: 'Radial' },
+            ]}
+            onChange={setType}
+          />
+        </Row>
+      )}
+      {gradient ? (
+        <GradientEditor gradient={gradient} onChange={(g, coalesce) => editor().apply('Edit gradient', (d) => writeGradient(d, shapes, g), coalesce ? { coalesce } : {})} />
+      ) : (
+        <PaintRow shapes={shapes} attr="fill" opacityAttr="fill-opacity" label="Fill" />
+      )}
     </Section>
   );
 }
@@ -313,6 +414,13 @@ export function PointSection() {
     const delta = axis === 'x' ? { x: n - anchor.x, y: 0 } : { x: 0, y: n - anchor.y };
     editor().apply('Move point', (d) => writePath(d, edit.id, moveRefs(readPath(d, edit.id), anchors, delta)), { coalesce: `point-${axis}` });
   };
+  const radii = new Set(anchors.map((r) => path[r.sub]?.anchors[r.index]?.radius ?? 0));
+  const radius = radii.size === 1 ? [...radii][0]! : null;
+  const setCorner = (v: string) => {
+    const n = parseFloat(v || '0');
+    if (!Number.isFinite(n) || n < 0) return;
+    editor().apply('Corner radius', (d) => writePath(d, edit.id, setRadius(readPath(d, edit.id), anchors, n)), { coalesce: 'point-radius' });
+  };
   return (
     <Section title={anchors.length > 1 ? `${anchors.length} points` : 'Point'}>
       {anchor ? (
@@ -322,6 +430,18 @@ export function PointSection() {
         </Row>
       ) : (
         <p className="insp-hint">{anchors.length ? 'Move several points by dragging or with the arrow keys.' : 'Select a point to see its position.'}</p>
+      )}
+      {anchors.length > 0 && (
+        <Row>
+          <TextInput
+            ariaLabel="Corner radius"
+            prefix={<Radius size={13} strokeWidth={1.5} />}
+            value={radius === null ? '' : fmt(radius)}
+            placeholder={radius === null ? 'Mixed' : '0'}
+            onChange={setCorner}
+          />
+          <span className="insp-hint insp-hint-inline">Rounds corners between straight segments</span>
+        </Row>
       )}
     </Section>
   );

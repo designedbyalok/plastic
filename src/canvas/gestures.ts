@@ -10,7 +10,8 @@ import { getElement, getParentId, isRoot, topmostIds } from '../document/tree.ts
 import type { DesignDocument, NodeId, Point } from '../document/types.ts';
 import { FRAME_SIZE, insertable } from '../elements/insertables.ts';
 import { elementSpec } from '../elements/registry.ts';
-import { rectFromPoints, rectsIntersect, screenToWorld, type Rect } from './coords.ts';
+import { rectFromPoints, rectsIntersect, screenToWorld, unionRects, type Rect } from './coords.ts';
+import { clearGuides, collectTargets, snapRect } from './snap.ts';
 import { clientRectOf, domElement, isOutOfFlow, nodeIdAt, screenRectOf, styleOf, toScreen } from './dom.ts';
 import { useGesture } from './gestureStore.ts';
 import { vectorRootOf } from '../vector/edit.ts';
@@ -128,17 +129,30 @@ function startFreeMove(e: PointerEvent, ids: readonly NodeId[]): void {
     const cs = styleOf(domElement(id)!);
     return { id, left: parseFloat(cs.left) || 0, top: parseFloat(cs.top) || 0 };
   });
+  // The moving group's box snaps its edges and center to the other objects in the artboard.
+  const box = unionRects(ids.map((id) => screenRectOf(id)).filter((r): r is Rect => !!r));
+  const targets = collectTargets(ids[0]!, ids);
   const tx = transactional();
   trackPointer(e, {
-    move: (_, d) =>
+    move: (_, d) => {
+      const fix = box ? snapRect({ ...box, x: box.x + d.x, y: box.y + d.y }, targets) : { x: 0, y: 0 };
+      const dx = d.x + fix.x;
+      const dy = d.y + fix.y;
       tx.preview((base) =>
         starts.reduce((doc, s) => {
-          const moved = setStyleOnNodes(doc, [s.id], 'left', px(s.left + d.x / zoom));
-          return setStyleOnNodes(moved, [s.id], 'top', px(s.top + d.y / zoom));
+          const moved = setStyleOnNodes(doc, [s.id], 'left', px(s.left + dx / zoom));
+          return setStyleOnNodes(moved, [s.id], 'top', px(s.top + dy / zoom));
         }, base),
-      ),
-    end: () => tx.commit('Move'),
-    cancel: () => tx.cancel(),
+      );
+    },
+    end: () => {
+      clearGuides();
+      tx.commit('Move');
+    },
+    cancel: () => {
+      clearGuides();
+      tx.cancel();
+    },
   });
 }
 

@@ -10,7 +10,7 @@ import { useGesture } from '../canvas/gestureStore.ts';
 import { apply, exitVectorEdit, readPath, userToScreenMatrix, validRefs, vectorRootOf, writePath } from './edit.ts';
 import { domElement } from '../canvas/dom.ts';
 import { HIT_RADIUS, hitTest, startAnchorDrag, startHandleDrag, startSegmentGesture } from './gestures.ts';
-import { segmentCount, segmentCurve, setMirror, toggleSmooth, type Mirror, type PointRef, type VectorPath } from './path.ts';
+import { roundCorners, segmentCount, segmentCurve, setMirror, toggleSmooth, type Mirror, type PointRef, type VectorPath } from './path.ts';
 
 interface Frame {
   readonly matrix: DOMMatrix;
@@ -146,7 +146,8 @@ export function VectorOverlay() {
   return (
     <>
       <svg className="vec-overlay" aria-hidden="true">
-        <path className="vec-outline" d={screenPath(path, m)} />
+        {/* The drawn (rounded) outline; points stay at the true corners, like Figma. */}
+        <path className="vec-outline" d={screenPath(roundCorners(path), m)} />
         {path.map((s, sub) =>
           Array.from({ length: segmentCount(s) }, (_, index) => {
             const c = segmentCurve(s, index)!.map((p) => apply(m, p));

@@ -13,7 +13,7 @@ import { Overlay } from './Overlay.tsx';
 import { finishTextEditing, useTextEditing } from './textEditing.ts';
 import { useGesture } from './gestureStore.ts';
 import { enterVectorEdit, exitVectorEdit, vectorRootOf, vectorTargetFor } from '../vector/edit.ts';
-import { penDown, startPointMarquee } from '../vector/gestures.ts';
+import { penDown, penPoint, startPointMarquee } from '../vector/gestures.ts';
 import { startShapeDraw } from '../vector/shapes.ts';
 
 export function Canvas() {
@@ -105,7 +105,11 @@ export function Canvas() {
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const store = useEditor.getState();
-    if (store.tool.kind === 'pen') useGesture.getState().set({ pen: { ...toScreen(e.clientX, e.clientY), shift: e.shiftKey } });
+    if (store.tool.kind === 'pen' && !e.buttons) {
+      // The preview follows the snapped position, with guides, like where a click would land.
+      const at = penPoint(e.clientX, e.clientY, true);
+      useGesture.getState().set({ pen: { ...toScreen(at.x, at.y), shift: e.shiftKey } });
+    }
     if (e.buttons) return;
     const hit = nodeIdAt(e.clientX, e.clientY);
     // Shapes inside an svg hover (and select) as the whole vector, like Figma's groups.
@@ -140,7 +144,7 @@ export function Canvas() {
       onPointerMove={onPointerMove}
       onPointerLeave={() => {
         useEditor.getState().setHover(null);
-        useGesture.getState().set({ pen: null });
+        useGesture.getState().set({ pen: null, guides: [] });
       }}
       onDoubleClick={onDoubleClick}
     >

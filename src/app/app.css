@@ -2597,3 +2597,66 @@ textarea.insp-input {
   font-size: 12px;
   transform: translateX(-50%);
 }
+
+.insp-hint-inline {
+  flex: 1;
+  align-self: center;
+}
+
+.ov-guides {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.ov-guides line {
+  stroke: #f24822;
+  stroke-width: 1;
+}
+
+/* Gradient editor */
+.grad {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grad-bar {
+  position: relative;
+  height: 24px;
+  margin: 2px 9px 4px;
+  border-radius: 5px;
+  background-color: #ffffff;
+  background-image: linear-gradient(45deg, #cccccc 25%, transparent 25%), linear-gradient(-45deg, #cccccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #cccccc 75%), linear-gradient(-45deg, transparent 75%, #cccccc 75%);
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  background-size: 8px 8px;
+  box-shadow: inset 0 0 0 1px rgb(var(--ink) / 0.12);
+  cursor: copy;
+}
+
+.grad-bar-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.grad-stop {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  padding: 0;
+  border: 2px solid #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.3);
+  cursor: ew-resize;
+}
+
+.grad-stop.is-selected {
+  box-shadow: 0 0 0 2px var(--ui-accent), 0 1px 3px rgb(0 0 0 / 0.3);
+}

@@ -53,7 +53,7 @@ export function Overlay() {
   const selection = useEditor((s) => s.selection);
   const toolIsSelect = useEditor((s) => s.tool.kind === 'select');
   const editingVector = useEditor((s) => !!s.vectorEdit);
-  const { marquee, draft, ghost, dropLine, dropTarget, notice } = useGesture();
+  const { marquee, draft, ghost, dropLine, dropTarget, notice, guides } = useGesture();
 
   useEffect(() => {
     let raf = 0;
@@ -133,6 +133,13 @@ export function Overlay() {
       <VectorOverlay />
       {marquee && <div className="ov-marquee" style={box(marquee)} />}
       {draft && <div className="ov-draft" style={box(draft)} />}
+      {guides.length > 0 && (
+        <svg className="ov-guides" aria-hidden="true">
+          {guides.map((g, i) => (
+            <line key={i} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} />
+          ))}
+        </svg>
+      )}
       {notice && (
         <div className="ov-notice" role="status">
           {notice}

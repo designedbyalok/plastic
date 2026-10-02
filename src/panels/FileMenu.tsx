@@ -3,7 +3,8 @@
  * toggles and file actions. Only things Plastic can actually do are listed.
  */
 import { Check } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { onSnapPrefs, setSnapPref, snapPrefs } from '../canvas/snap.ts';
 import { fileHref, navigate } from '../app/router.ts';
 import { duplicateOpenProject } from '../editor/persistence.ts';
 import { useEditor } from '../editor/store.ts';
@@ -14,6 +15,7 @@ export function FileMenu() {
   const ref = useRef<HTMLDivElement>(null);
   const layersOpen = useEditor((s) => s.layersOpen);
   const codeOpen = useEditor((s) => s.codeOpen);
+  const snap = useSyncExternalStore(onSnapPrefs, snapPrefs);
   const store = useEditor.getState;
 
   useEffect(() => {
@@ -64,6 +66,13 @@ export function FileMenu() {
           </Item>
           <Item checked={codeOpen} onClick={run(() => store().setCodeOpen(!codeOpen))}>
             Show code
+          </Item>
+          <div className="file-menu-divider" role="separator" />
+          <Item checked={snap.pixel} onClick={run(() => setSnapPref('pixel', !snap.pixel))} keys="⇧⌘'">
+            Snap to pixel grid
+          </Item>
+          <Item checked={snap.objects} onClick={run(() => setSnapPref('objects', !snap.objects))}>
+            Snap to objects
           </Item>
           <div className="file-menu-divider" role="separator" />
           <Item onClick={run(() => store().setAgentsOpen(true))}>Connect agents…</Item>

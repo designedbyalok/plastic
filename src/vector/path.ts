@@ -22,6 +22,8 @@ export interface Anchor {
   /** Handle shaping the curve leaving this anchor; null = straight. */
   readonly out: Point | null;
   readonly mirror: Mirror;
+  /** Corner radius (Figma's per-point radius); only rounds corners between straight segments. */
+  readonly radius?: number;
 }
 
 export interface SubPath {
@@ -481,3 +483,85 @@ export const SHAPE_GEOMETRY_ATTRS: Readonly<Record<string, readonly string[]>> =
   polyline: ['points'],
   polygon: ['points'],
 };
+
+// --- corner radius -----------------------------------------------------------------------------
+
+/**
+ * Per-point radii are kept beside the path: `data-pl-radius="sub:index:r,…"` on the element, with
+ * the un-rounded points in `data-pl-d`; `d` holds the rounded result the browser draws.
+ */
+export function serializeRadii(path: VectorPath): string {
+  const parts: string[] = [];
+  path.forEach((s, sub) => s.anchors.forEach((a, i) => a.radius && a.radius > 0 && parts.push(`${sub}:${i}:${num(a.radius)}`)));
+  return parts.join(',');
+}
+
+export function applyRadii(path: VectorPath, radii: string | undefined): VectorPath {
+  if (!radii) return path;
+  const map = new Map<string, number>();
+  for (const part of radii.split(',')) {
+    const [sub, index, r] = part.split(':').map(Number);
+    if (Number.isFinite(sub) && Number.isFinite(index) && Number.isFinite(r) && r! > 0) map.set(`${sub}:${index}`, r!);
+  }
+  return path.map((s, sub) => ({ ...s, anchors: s.anchors.map((a, i) => (map.has(`${sub}:${i}`) ? { ...a, radius: map.get(`${sub}:${i}`) } : a)) }));
+}
+
+export const hasRadii = (path: VectorPath) => path.some((s) => s.anchors.some((a) => (a.radius ?? 0) > 0));
+
+/**
+ * The drawn path: each rounded corner becomes two points joined by a circular arc (as a cubic),
+ * cut back along both straight segments — at most half of either, like Figma.
+ */
+export function roundCorners(path: VectorPath): VectorPath {
+  return path.map((s) => {
+    const n = s.anchors.length;
+    if (n < 3 && !s.closed) return s;
+    const out: Anchor[] = [];
+    s.anchors.forEach((a, i) => {
+      const r = a.radius ?? 0;
+      const hasPrev = i > 0 || s.closed;
+      const hasNext = i < n - 1 || s.closed;
+      const prev = s.anchors[(i - 1 + n) % n]!;
+      const next = s.anchors[(i + 1) % n]!;
+      // Only corners between straight segments are rounded.
+      const straight = !a.in && !a.out && !prev.out && !next.in;
+      if (!r || !hasPrev || !hasNext || !straight) {
+        out.push({ ...a, radius: undefined });
+        return;
+      }
+      const toPrev = { x: prev.x - a.x, y: prev.y - a.y };
+      const toNext = { x: next.x - a.x, y: next.y - a.y };
+      const lp = Math.hypot(toPrev.x, toPrev.y);
+      const ln = Math.hypot(toNext.x, toNext.y);
+      if (lp < EPS || ln < EPS) {
+        out.push({ ...a, radius: undefined });
+        return;
+      }
+      const up = { x: toPrev.x / lp, y: toPrev.y / lp };
+      const un = { x: toNext.x / ln, y: toNext.y / ln };
+      const cos = Math.max(-1, Math.min(1, up.x * un.x + up.y * un.y));
+      const angle = Math.acos(cos); // interior angle at the corner
+      if (angle < 1e-3 || Math.PI - angle < 1e-3) {
+        out.push({ ...a, radius: undefined });
+        return;
+      }
+      // Distance from the corner to where the arc starts, capped at half of each segment.
+      const maxCut = Math.min(lp, ln) / 2;
+      let cut = r / Math.tan(angle / 2);
+      const radius = cut > maxCut ? maxCut * Math.tan(angle / 2) : r;
+      cut = Math.min(cut, maxCut);
+      const turn = Math.PI - angle;
+      const k = (4 / 3) * Math.tan(turn / 4) * radius;
+      const p1 = { x: a.x + up.x * cut, y: a.y + up.y * cut };
+      const p2 = { x: a.x + un.x * cut, y: a.y + un.y * cut };
+      out.push({ x: p1.x, y: p1.y, in: null, out: { x: p1.x - up.x * k, y: p1.y - up.y * k }, mirror: 'none' });
+      out.push({ x: p2.x, y: p2.y, in: { x: p2.x - un.x * k, y: p2.y - un.y * k }, out: null, mirror: 'none' });
+    });
+    return { ...s, anchors: out };
+  });
+}
+
+export function setRadius(path: VectorPath, refs: readonly PointRef[], radius: number): VectorPath {
+  const keys = new Set(refs.filter((r) => r.part === 'anchor').map((r) => `${r.sub}:${r.index}`));
+  return path.map((s, sub) => ({ ...s, anchors: s.anchors.map((a, i) => (keys.has(`${sub}:${i}`) ? { ...a, radius: radius > 0 ? radius : undefined } : a)) }));
+}

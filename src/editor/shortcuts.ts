@@ -10,6 +10,8 @@ import { useEditor } from './store.ts';
 import { exitVectorEdit, readPath, screenDeltaToUser, writePath } from '../vector/edit.ts';
 import { deleteAnchors, moveRefs } from '../vector/path.ts';
 import { runOutlineStroke, runPathOp } from '../vector/pathOps.ts';
+import { setSnapPref, snapPrefs } from '../canvas/snap.ts';
+import { notify } from '../canvas/gestureStore.ts';
 
 /** Keys in vector edit mode. Returns whether the key was handled. */
 function handleVectorKey(e: KeyboardEvent, key: string, mod: boolean): boolean {
@@ -103,6 +105,12 @@ export function useShortcuts(): void {
       if (mod && e.altKey && e.code === 'KeyO') {
         e.preventDefault();
         void runOutlineStroke();
+        return;
+      }
+      if (mod && e.shiftKey && e.code === 'Quote') {
+        e.preventDefault();
+        setSnapPref('pixel', !snapPrefs().pixel);
+        notify(snapPrefs().pixel ? 'Snap to pixel grid on' : 'Snap to pixel grid off');
         return;
       }
       if (mod && !e.shiftKey && key === 'e') {

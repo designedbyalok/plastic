@@ -8,7 +8,9 @@ import { trackPointer, transactional } from '../canvas/gestures.ts';
 import { useGesture } from '../canvas/gestureStore.ts';
 import { rectFromPoints, type Rect } from '../canvas/coords.ts';
 import { toScreen } from '../canvas/dom.ts';
+import { clearGuides, collectTargets, snapPoint, toClient, type SnapTargets } from '../canvas/snap.ts';
 import { apply, clientToUser, createVectorAt, readPath, screenDeltaToUser, userToScreenMatrix, vectorRootOf, writePath } from './edit.ts';
+import { nodeIdAt } from '../canvas/dom.ts';
 import {
   anchorRefs,
   bendSegment,
@@ -24,6 +26,14 @@ import {
 } from './path.ts';
 
 const editor = () => useEditor.getState();
+
+/** Snap targets for editing a path: other objects in the artboard, and the path's other points. */
+function vectorTargets(id: NodeId, m: DOMMatrix, skip: (sub: number, index: number) => boolean = () => false): SnapTargets {
+  const path = readPath(editor().doc, id);
+  const points = path.flatMap((s, sub) => s.anchors.flatMap((a, index) => (skip(sub, index) ? [] : [apply(m, a)])));
+  const root = vectorRootOf(editor().doc, id);
+  return collectTargets(id, root ? [root] : [id], points);
+}
 const sameRef = (a: PointRef, b: PointRef) => a.sub === b.sub && a.index === b.index && a.part === b.part;
 /** How close (screen px) the pointer must be to a point or segment to hit it. */
 export const HIT_RADIUS = 7;
@@ -56,16 +66,32 @@ export function startAnchorDrag(e: PointerEvent, ref: PointRef): void {
     setEdit({ points: [ref] });
   }
   const refs = anchorRefs(editor().vectorEdit!.points.filter((p) => p.part === 'anchor'));
+  const m = userToScreenMatrix(edit.id);
+  const grabbed = readPath(editor().doc, edit.id)[ref.sub]?.anchors[ref.index];
+  if (!m || !grabbed) return;
+  // The grabbed point snaps; the others move with it.
+  const start = apply(m, grabbed);
+  const moving = new Set(refs.map((r) => `${r.sub}:${r.index}`));
+  const targets = vectorTargets(edit.id, m, (sub, index) => moving.has(`${sub}:${index}`));
   const tx = transactional();
   trackPointer(e, {
     move(ev, d) {
-      const screen = ev.shiftKey ? (Math.abs(d.x) > Math.abs(d.y) ? { x: d.x, y: 0 } : { x: 0, y: d.y }) : d;
+      const locked = ev.shiftKey ? (Math.abs(d.x) > Math.abs(d.y) ? 'y' : 'x') : null;
+      const raw = { x: start.x + (locked === 'x' ? 0 : d.x), y: start.y + (locked === 'y' ? 0 : d.y) };
+      const at = snapPoint(raw, targets);
+      const screen = { x: locked === 'x' ? 0 : at.x - start.x, y: locked === 'y' ? 0 : at.y - start.y };
       const delta = screenDeltaToUser(edit.id, screen);
       if (!delta) return;
       tx.preview((base) => writePath(base, edit.id, moveRefs(readPath(base, edit.id), refs, delta)));
     },
-    end: () => tx.commit('Move points'),
-    cancel: () => tx.cancel(),
+    end: () => {
+      clearGuides();
+      tx.commit('Move points');
+    },
+    cancel: () => {
+      clearGuides();
+      tx.cancel();
+    },
   });
 }
 
@@ -76,11 +102,12 @@ export function startHandleDrag(e: PointerEvent, ref: PointRef): void {
   const m = userToScreenMatrix(edit.id);
   if (!m) return;
   const inv = m.inverse();
+  const targets = vectorTargets(edit.id, m);
   const tx = transactional();
   trackPointer(e, {
     threshold: 0,
     move(ev) {
-      const to = apply(inv, toScreen(ev.clientX, ev.clientY));
+      const to = apply(inv, snapPoint(toScreen(ev.clientX, ev.clientY), targets));
       tx.preview((base) => {
         const path = readPath(base, edit.id);
         const anchor = path[ref.sub]?.anchors[ref.index];
@@ -89,8 +116,14 @@ export function startHandleDrag(e: PointerEvent, ref: PointRef): void {
         return writePath(base, edit.id, setHandle(path, ref, target, ev.altKey ? 'none' : undefined));
       });
     },
-    end: () => tx.commit('Move handle'),
-    cancel: () => tx.cancel(),
+    end: () => {
+      clearGuides();
+      tx.commit('Move handle');
+    },
+    cancel: () => {
+      clearGuides();
+      tx.cancel();
+    },
   });
 }
 
@@ -238,10 +271,13 @@ function dragNewHandles(e: PointerEvent, id: NodeId, sub: number, index: number,
   const start = anchorAt();
   if (!start) return;
   const startIn = role === 'start' ? (editor().vectorEdit?.drawing?.startIn ?? null) : start.in;
+  const m = userToScreenMatrix(id);
+  const targets = m ? vectorTargets(id, m) : undefined;
   trackPointer(e, {
     threshold: 2,
     move(ev) {
-      const to0 = clientToUser(id, ev.clientX, ev.clientY);
+      const snapped = toClient(snapPoint(toScreen(ev.clientX, ev.clientY), targets));
+      const to0 = clientToUser(id, snapped.x, snapped.y);
       if (!to0) return;
       const to = ev.shiftKey ? constrain45(start, to0) : to0;
       const handles = penHandles(start, to);
@@ -263,20 +299,35 @@ function dragNewHandles(e: PointerEvent, id: NodeId, sub: number, index: number,
       );
     },
     end(_, moved) {
+      clearGuides();
       if (moved) tx.commit(label);
       else tx.cancel();
     },
-    cancel: () => tx.cancel(),
+    cancel: () => {
+      clearGuides();
+      tx.cancel();
+    },
   });
+}
+
+/** Where a pen click lands: snapped to points, objects and the pixel grid (client coords). */
+export function penPoint(clientX: number, clientY: number, show = false): { x: number; y: number } {
+  const edit = editor().vectorEdit;
+  const screen = toScreen(clientX, clientY);
+  const m = edit ? userToScreenMatrix(edit.id) : null;
+  const targets = edit && m ? vectorTargets(edit.id, m) : collectTargets(nodeIdAt(clientX, clientY), []);
+  return toClient(snapPoint(screen, targets, show));
 }
 
 /** One press of the pen tool on the canvas. */
 export function penDown(e: PointerEvent): void {
   const edit = editor().vectorEdit;
 
+  const snapped = penPoint(e.clientX, e.clientY);
+  clearGuides();
   // Not editing a vector yet: start a new one here.
   if (!edit) {
-    const id = createVectorAt(e.clientX, e.clientY);
+    const id = createVectorAt(snapped.x, snapped.y);
     if (!id) return;
     const svg = vectorRootOf(editor().doc, id);
     if (svg) editor().select([svg]);
@@ -287,7 +338,7 @@ export function penDown(e: PointerEvent): void {
 
   const id = edit.id;
   const m = userToScreenMatrix(id);
-  const user = clientToUser(id, e.clientX, e.clientY);
+  const user = clientToUser(id, snapped.x, snapped.y);
   if (!m || !user) return;
   const path = readPath(editor().doc, id);
   const screen = toScreen(e.clientX, e.clientY);

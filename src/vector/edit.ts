@@ -11,7 +11,7 @@ import { activeRoots, useEditor, type VectorEdit } from '../editor/store.ts';
 import { screenToWorld } from '../canvas/coords.ts';
 import { clientRectOf, domElement, styleOf, toScreen } from '../canvas/dom.ts';
 import { containerAt } from '../canvas/layout.ts';
-import { SHAPE_GEOMETRY_ATTRS, parsePath, serializePath, shapeToPathData, type PointRef, type VectorPath } from './path.ts';
+import { SHAPE_GEOMETRY_ATTRS, applyRadii, hasRadii, parsePath, roundCorners, serializePath, serializeRadii, shapeToPathData, type PointRef, type VectorPath } from './path.ts';
 
 const editor = () => useEditor.getState();
 const px = (n: number) => `${Math.round(n * 100) / 100}px`;
@@ -52,13 +52,23 @@ export function vectorTargetFor(doc: DesignDocument, hit: NodeId): NodeId | null
   return shapes.length === 1 ? shapes[0]! : null;
 }
 
+/** The editable path: the un-rounded points (data-pl-d) with their radii, or `d` itself. */
 export function readPath(doc: DesignDocument, id: NodeId): VectorPath {
   const el = getElement(doc, id);
-  return el?.tag === 'path' ? parsePath(el.attrs.d ?? '') : [];
+  if (el?.tag !== 'path') return [];
+  return applyRadii(parsePath(el.attrs['data-pl-d'] ?? el.attrs.d ?? ''), el.attrs['data-pl-radius']);
 }
 
+/** Write points back; rounded corners keep their source in data-pl-d and draw the result in d. */
 export function writePath(doc: DesignDocument, id: NodeId, path: VectorPath): DesignDocument {
-  return setAttribute(doc, id, 'd', serializePath(path));
+  if (!hasRadii(path)) {
+    let next = setAttribute(doc, id, 'd', serializePath(path));
+    next = setAttribute(next, id, 'data-pl-d', null);
+    return setAttribute(next, id, 'data-pl-radius', null);
+  }
+  let next = setAttribute(doc, id, 'd', serializePath(roundCorners(path)));
+  next = setAttribute(next, id, 'data-pl-d', serializePath(path));
+  return setAttribute(next, id, 'data-pl-radius', serializeRadii(path));
 }
 
 /** Turn a basic shape into an equivalent <path> (editing needs points). */
