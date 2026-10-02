@@ -2,7 +2,7 @@
  * Vertical tool rail. Primary tools are one click; the semantic elements (button, input,
  * field, select…) live in a single Insert menu so the rail stays short.
  */
-import { CirclePlus, Frame, Hand, Heading, Image, MousePointer2, Square, Type } from 'lucide-react';
+import { CirclePlus, Frame, Hand, Heading, Image, MousePointer2, PenTool, Square, Type } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { INSERTABLES, insertable } from '../elements/insertables.ts';
 import { useEditor, type Tool } from '../editor/store.ts';
@@ -113,6 +113,9 @@ export function ToolRail() {
         <div className="rail-divider" />
         <RailButton tool={{ kind: 'frame' }} label="Frame" shortcut="F">
           <Frame size={18} strokeWidth={1.5} />
+        </RailButton>
+        <RailButton tool={{ kind: 'pen' }} label="Pen" shortcut="P">
+          <PenTool size={18} strokeWidth={1.5} />
         </RailButton>
         <RailButton tool={insertTool('container')} label="Container" shortcut="C">
           <Square size={16} strokeWidth={1.5} />

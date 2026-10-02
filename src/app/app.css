@@ -2366,3 +2366,149 @@ textarea.insp-input {
 .collapsed-header:has(.file-menu) {
   z-index: 45;
 }
+
+/* --- vector editing ------------------------------------------------------------------------ */
+
+.vec-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.vec-outline {
+  fill: none;
+  stroke: var(--ui-accent);
+  stroke-width: 1.5;
+}
+
+.vec-segment-hit {
+  fill: none;
+  stroke: transparent;
+  cursor: pointer;
+}
+
+.vec-segment-hover {
+  fill: none;
+  stroke: var(--ui-accent);
+  stroke-width: 3;
+}
+
+.vec-preview {
+  fill: none;
+  stroke: var(--ui-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.vec-handle-line {
+  stroke: var(--ui-accent);
+  stroke-width: 1;
+}
+
+.vec-handle {
+  fill: #ffffff;
+  stroke: var(--ui-accent);
+  stroke-width: 1.25;
+  cursor: move;
+}
+
+.vec-handle.is-selected {
+  fill: var(--ui-accent);
+}
+
+.vec-anchor {
+  fill: #ffffff;
+  stroke: var(--ui-accent);
+  stroke-width: 1.5;
+  cursor: move;
+}
+
+.vec-anchor.is-selected {
+  fill: var(--ui-accent);
+  stroke: #ffffff;
+}
+
+.vec-anchor-ring {
+  fill: none;
+  stroke: var(--ui-accent);
+  stroke-width: 1.5;
+}
+
+.canvas.tool-pen {
+  cursor: crosshair;
+}
+
+.vec-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 10px;
+  background: var(--ui-popover);
+  box-shadow: var(--ui-popover-shadow);
+  color: var(--ui-text);
+  font-size: 12px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.vec-toolbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.vec-toolbar-meta,
+.vec-toolbar-label {
+  color: var(--ui-muted);
+  font-weight: 400;
+}
+
+.vec-segmented {
+  display: flex;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--ui-hover);
+}
+
+.vec-segment {
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ui-muted);
+  font: inherit;
+}
+
+.vec-segment.is-active {
+  background: var(--ui-panel);
+  box-shadow: 0 1px 2px #00000033;
+  color: var(--ui-text);
+}
+
+.vec-segment:disabled {
+  opacity: 0.5;
+}
+
+.vec-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--ui-accent);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 500;
+}

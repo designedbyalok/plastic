@@ -2,6 +2,7 @@
  * Editor commands: user intents that may need live layout measurements before producing a
  * pure document edit. Shortcuts, the tool rail, the inspector and (later) an agent API all call these.
  */
+import { enterVectorEdit, vectorTargetFor } from '../vector/edit.ts';
 import { fitRect, screenToWorld, unionRects, zoomAround, type Rect } from '../canvas/coords.ts';
 import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf, styleOf } from '../canvas/dom.ts';
 import { instantiate } from '../document/factory.ts';
@@ -185,6 +186,11 @@ export function enterSelection(): void {
   if (!id || !el) return;
   if (canEditText(doc, id)) {
     state().setEditingText(id);
+    return;
+  }
+  const vector = vectorTargetFor(doc, id);
+  if (vector) {
+    enterVectorEdit(vector);
     return;
   }
   const child = el.children.find((c) => doc.nodes[c]?.kind === 'element');

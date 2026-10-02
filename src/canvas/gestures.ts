@@ -13,6 +13,7 @@ import { elementSpec } from '../elements/registry.ts';
 import { rectFromPoints, rectsIntersect, screenToWorld, type Rect } from './coords.ts';
 import { clientRectOf, domElement, isOutOfFlow, nodeIdAt, screenRectOf, styleOf, toScreen } from './dom.ts';
 import { useGesture } from './gestureStore.ts';
+import { vectorRootOf } from '../vector/edit.ts';
 import { containerAt, findDropTarget, flowInsertion, insertsInFlow, type DropTarget } from './layout.ts';
 
 const px = (n: number) => `${Math.round(n)}px`;
@@ -58,7 +59,7 @@ export function trackPointer(start: PointerEvent, handlers: TrackHandlers): void
 }
 
 /** Run `recipe` against the gesture's starting document; opens the transaction lazily. */
-function transactional() {
+export function transactional() {
   let open = false;
   return {
     preview(recipe: (base: DesignDocument) => DesignDocument) {
@@ -88,7 +89,9 @@ export function startPan(e: PointerEvent): void {
 
 export function startSelectGesture(e: PointerEvent): void {
   const { doc, selection } = editor();
-  const hit = nodeIdAt(e.clientX, e.clientY);
+  const deepest = nodeIdAt(e.clientX, e.clientY);
+  // A click inside an svg selects the whole vector (double-click edits its points).
+  const hit = vectorRootOf(doc, deepest) ?? deepest;
   if (!hit) {
     const base = e.shiftKey ? [...selection] : [];
     if (!e.shiftKey) editor().select([]);

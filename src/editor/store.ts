@@ -11,14 +11,30 @@ import type { DesignDocument, NodeId } from '../document/types.ts';
 import { starterDocument } from '../elements/insertables.ts';
 import type { Viewport } from '../canvas/coords.ts';
 import { EMPTY_HISTORY, record, redo, undo, type History } from './history.ts';
+import type { PointRef } from '../vector/path.ts';
 
 export type Tool =
   | { readonly kind: 'select' }
   | { readonly kind: 'hand' }
   | { readonly kind: 'frame' }
+  | { readonly kind: 'pen' }
   | { readonly kind: 'insert'; readonly itemId: string };
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+/** Editing the points of one vector path (Figma's vector edit mode). Editor state, not design. */
+export interface VectorEdit {
+  /** The <path> being edited. */
+  readonly id: NodeId;
+  /** Selected anchors and handles. */
+  readonly points: readonly PointRef[];
+  /**
+   * The pen is adding points to the end of this open subpath. An open path's last anchor has no
+   * outgoing segment yet (and its first no incoming one), so their handles can't be in `d` yet:
+   * they wait here until the next point or the close.
+   */
+  readonly drawing: { readonly sub: number; readonly out?: { x: number; y: number } | null; readonly startIn?: { x: number; y: number } | null } | null;
+}
 
 interface Transaction {
   readonly base: DesignDocument;
@@ -51,6 +67,7 @@ export interface EditorState {
   readonly selection: readonly NodeId[];
   readonly hoverId: NodeId | null;
   readonly editingTextId: NodeId | null;
+  readonly vectorEdit: VectorEdit | null;
   readonly tool: Tool;
   readonly viewport: Viewport;
   readonly collapsed: Readonly<Record<NodeId, true>>;
@@ -83,6 +100,7 @@ export interface EditorState {
   setViewport(viewport: Viewport): void;
   setCollapsed(id: NodeId, collapsed: boolean): void;
   setEditingText(id: NodeId | null): void;
+  setVectorEdit(edit: VectorEdit | null): void;
   setCodeOpen(open: boolean): void;
   setLayersOpen(open: boolean): void;
   setLayersWidth(width: number): void;
@@ -139,6 +157,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   selection: [],
   hoverId: null,
   editingTextId: null,
+  vectorEdit: null,
   tool: { kind: 'select' },
   viewport: { x: 80, y: 80, zoom: 1 },
   collapsed: {},
@@ -226,6 +245,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
       selection: [],
       hoverId: null,
       editingTextId: null,
+      vectorEdit: null,
       collapsed,
       activePage: validPage(doc, view.activePage ?? doc.pages[0]!.file),
       ...(view.viewport ? { viewport: view.viewport } : {}),
@@ -235,7 +255,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   setActivePage(file) {
     const { doc, activePage } = get();
     const next = validPage(doc, file);
-    if (next !== activePage) set({ activePage: next, selection: [], hoverId: null, editingTextId: null });
+    if (next !== activePage) set({ activePage: next, selection: [], hoverId: null, editingTextId: null, vectorEdit: null });
   },
   setLeftTab(tab) {
     set({ leftTab: tab });
@@ -265,6 +285,9 @@ export const useEditor = create<EditorState>()((set, get) => ({
   },
   setEditingText(id) {
     set({ editingTextId: id });
+  },
+  setVectorEdit(edit) {
+    set({ vectorEdit: edit });
   },
   setCodeOpen(open) {
     set({ codeOpen: open });

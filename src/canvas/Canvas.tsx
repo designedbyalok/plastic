@@ -11,6 +11,9 @@ import { nodeIdAt, setViewportElement, toScreen } from './dom.ts';
 import { insertAt, startFrameDraw, startPan, startSelectGesture } from './gestures.ts';
 import { Overlay } from './Overlay.tsx';
 import { finishTextEditing, useTextEditing } from './textEditing.ts';
+import { useGesture } from './gestureStore.ts';
+import { enterVectorEdit, exitVectorEdit, vectorRootOf, vectorTargetFor } from '../vector/edit.ts';
+import { penDown, startPointMarquee } from '../vector/gestures.ts';
 
 export function Canvas() {
   const ref = useRef<HTMLDivElement>(null);
@@ -73,20 +76,50 @@ export function Canvas() {
     }
     if (e.button !== 0) return;
     e.preventDefault();
+    if (store.tool.kind === 'pen') return penDown(native);
+    if (store.vectorEdit && store.tool.kind === 'select') {
+      // In vector edit mode, empty space box-selects points; a click on another element leaves.
+      const edited = vectorRootOf(store.doc, store.vectorEdit.id);
+      startPointMarquee(native, () => {
+        const hit = nodeIdAt(native.clientX, native.clientY);
+        if (hit && vectorRootOf(store.doc, hit) !== edited) {
+          exitVectorEdit();
+          useEditor.getState().select([vectorRootOf(useEditor.getState().doc, hit) ?? hit]);
+        } else {
+          const edit = useEditor.getState().vectorEdit;
+          if (edit) useEditor.getState().setVectorEdit({ ...edit, points: [] });
+        }
+      });
+      return;
+    }
+    if (store.vectorEdit) exitVectorEdit();
     if (store.tool.kind === 'frame') startFrameDraw(native);
     else if (store.tool.kind === 'insert') insertAt(native, store.tool.itemId);
     else startSelectGesture(native);
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const store = useEditor.getState();
+    if (store.tool.kind === 'pen') useGesture.getState().set({ pen: { ...toScreen(e.clientX, e.clientY), shift: e.shiftKey } });
     if (e.buttons) return;
-    useEditor.getState().setHover(nodeIdAt(e.clientX, e.clientY));
+    const hit = nodeIdAt(e.clientX, e.clientY);
+    // Shapes inside an svg hover (and select) as the whole vector, like Figma's groups.
+    store.setHover(store.vectorEdit ? null : (vectorRootOf(store.doc, hit) ?? hit));
   };
 
   const onDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const store = useEditor.getState();
     if (store.tool.kind !== 'select') return;
     const hit = nodeIdAt(e.clientX, e.clientY);
+    if (store.vectorEdit) {
+      if (!hit || vectorRootOf(store.doc, hit) !== vectorRootOf(store.doc, store.vectorEdit.id)) exitVectorEdit();
+      return;
+    }
+    const vector = hit ? vectorTargetFor(store.doc, hit) : null;
+    if (vector) {
+      enterVectorEdit(vector);
+      return;
+    }
     if (hit && canEditText(store.doc, hit)) {
       store.select([hit]);
       store.setEditingText(hit);
@@ -100,7 +133,10 @@ export function Canvas() {
       style={canvasColor ? { background: canvasColor } : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerLeave={() => useEditor.getState().setHover(null)}
+      onPointerLeave={() => {
+        useEditor.getState().setHover(null);
+        useGesture.getState().set({ pen: null });
+      }}
       onDoubleClick={onDoubleClick}
     >
       <div className="world" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>

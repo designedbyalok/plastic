@@ -7,6 +7,57 @@ import {
 import { navigate } from '../app/router.ts';
 import { saveNow } from './persistence.ts';
 import { useEditor } from './store.ts';
+import { exitVectorEdit, readPath, screenDeltaToUser, writePath } from '../vector/edit.ts';
+import { deleteAnchors, moveRefs } from '../vector/path.ts';
+
+/** Keys in vector edit mode. Returns whether the key was handled. */
+function handleVectorKey(e: KeyboardEvent, key: string, mod: boolean): boolean {
+  const store = useEditor.getState();
+  const edit = store.vectorEdit!;
+  if (mod && key === 'a') {
+    const path = readPath(store.doc, edit.id);
+    store.setVectorEdit({ ...edit, points: path.flatMap((s, sub) => s.anchors.map((_, index) => ({ sub, index, part: 'anchor' as const }))) });
+    return true;
+  }
+  if (mod) return false;
+  switch (key) {
+    case 'escape':
+    case 'enter':
+      // First finish the path being drawn, then leave edit mode.
+      if (edit.drawing) store.setVectorEdit({ ...edit, drawing: null });
+      else exitVectorEdit();
+      return true;
+    case 'backspace':
+    case 'delete': {
+      if (!edit.points.length) return true;
+      store.apply('Delete points', (d) => writePath(d, edit.id, deleteAnchors(readPath(d, edit.id), edit.points)));
+      store.setVectorEdit({ ...edit, points: [], drawing: null });
+      if (!readPath(useEditor.getState().doc, edit.id).length) exitVectorEdit();
+      return true;
+    }
+    case 'arrowleft':
+    case 'arrowright':
+    case 'arrowup':
+    case 'arrowdown': {
+      const step = (e.shiftKey ? 10 : 1) * store.viewport.zoom;
+      const screen = { x: key === 'arrowleft' ? -step : key === 'arrowright' ? step : 0, y: key === 'arrowup' ? -step : key === 'arrowdown' ? step : 0 };
+      const delta = screenDeltaToUser(edit.id, screen);
+      const anchors = edit.points.filter((p) => p.part === 'anchor');
+      if (delta && anchors.length) store.apply('Nudge points', (d) => writePath(d, edit.id, moveRefs(readPath(d, edit.id), anchors, delta)), { coalesce: 'nudge-points' });
+      return true;
+    }
+    case 'p':
+      store.setTool({ kind: 'pen' });
+      return true;
+    case 'v':
+      store.setTool({ kind: 'select' });
+      store.setVectorEdit({ ...edit, drawing: null });
+      return true;
+    default:
+      // Other tools don't apply while editing points.
+      return !e.shiftKey && /^[a-z]$/.test(key);
+  }
+}
 
 function isTyping(e: KeyboardEvent): boolean {
   const target = e.composedPath()[0] as HTMLElement | undefined;
@@ -33,6 +84,10 @@ export function useShortcuts(): void {
       if (e.code === 'Space') {
         e.preventDefault();
         store.setSpacePressed(true);
+        return;
+      }
+      if (store.vectorEdit && handleVectorKey(e, key, mod)) {
+        e.preventDefault();
         return;
       }
       if (mod) {
@@ -94,6 +149,9 @@ export function useShortcuts(): void {
           break;
         case 'f':
           store.setTool({ kind: 'frame' });
+          break;
+        case 'p':
+          store.setTool({ kind: 'pen' });
           break;
         default: {
           if (e.shiftKey) return;

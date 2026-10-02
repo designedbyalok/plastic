@@ -12,6 +12,7 @@ import type { Rect } from './coords.ts';
 import { domElement, hostOf, screenRectOf, styleOf, toScreenRect } from './dom.ts';
 import { startFrameMove, startResize, type Handle } from './gestures.ts';
 import { useGesture } from './gestureStore.ts';
+import { VectorOverlay } from '../vector/VectorOverlay.tsx';
 
 interface Measured {
   readonly selection: { id: NodeId; rect: Rect }[];
@@ -51,6 +52,7 @@ export function Overlay() {
   const zoom = useEditor((s) => s.viewport.zoom);
   const selection = useEditor((s) => s.selection);
   const toolIsSelect = useEditor((s) => s.tool.kind === 'select');
+  const editingVector = useEditor((s) => !!s.vectorEdit);
   const { marquee, draft, ghost, dropLine, dropTarget } = useGesture();
 
   useEffect(() => {
@@ -97,10 +99,10 @@ export function Overlay() {
       ))}
       {m.parent && <div className="ov-parent" style={box(m.parent)} />}
       {m.hover && <div className="ov-hover" style={box(m.hover)} />}
-      {m.selection.map((s) => (
+      {!editingVector && m.selection.map((s) => (
         <div key={s.id} className="ov-selection" style={box(s.rect)} />
       ))}
-      {single && !editing && toolIsSelect && (
+      {single && !editing && !editingVector && toolIsSelect && (
         <>
           {HANDLES.map((h) => (
             <div
@@ -128,6 +130,7 @@ export function Overlay() {
           style={{ left: Math.min(dropLine.x1, dropLine.x2), top: Math.min(dropLine.y1, dropLine.y2), width: Math.max(2, Math.abs(dropLine.x2 - dropLine.x1)), height: Math.max(2, Math.abs(dropLine.y2 - dropLine.y1)) }}
         />
       )}
+      <VectorOverlay />
       {marquee && <div className="ov-marquee" style={box(marquee)} />}
       {draft && <div className="ov-draft" style={box(draft)} />}
     </div>

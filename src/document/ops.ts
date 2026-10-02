@@ -105,7 +105,8 @@ export function setTag(doc: DesignDocument, id: NodeId, tag: string): DesignDocu
 
 /** Set or remove (`null`) an attribute. Boolean attributes use "". */
 export function setAttribute(doc: DesignDocument, id: NodeId, name: string, value: string | null): DesignDocument {
-  const key = name.trim().toLowerCase();
+  // HTML attribute names are case-insensitive (stored lowercase); SVG's are not (viewBox).
+  const key = inSvg(doc, id) ? name.trim() : name.trim().toLowerCase();
   if (!key || key === 'class' || key === 'data-pl-id') return doc;
   return updateElement(doc, id, (el) => {
     if (value === null) {
@@ -116,6 +117,13 @@ export function setAttribute(doc: DesignDocument, id: NodeId, name: string, valu
     }
     return el.attrs[key] === value ? el : { ...el, attrs: { ...el.attrs, [key]: value } };
   });
+}
+
+function inSvg(doc: DesignDocument, id: NodeId): boolean {
+  for (let current: NodeId | null = id; current; current = getParentId(doc, current)) {
+    if (getElement(doc, current)?.tag === 'svg') return true;
+  }
+  return false;
 }
 
 /** Replace the element's first text child (adding one if missing). */

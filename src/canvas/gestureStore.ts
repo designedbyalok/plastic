@@ -15,6 +15,8 @@ interface GestureVisuals {
   readonly ghost: Rect | null;
   readonly dropLine: Line | null;
   readonly dropTarget: Rect | null;
+  /** Pointer position (screen space) for the pen's preview segment; null when off the canvas. */
+  readonly pen: { readonly x: number; readonly y: number; readonly shift: boolean } | null;
   set(patch: Partial<Omit<GestureVisuals, 'set' | 'clear'>>): void;
   clear(): void;
 }
@@ -25,6 +27,7 @@ export const useGesture = create<GestureVisuals>()((set) => ({
   ghost: null,
   dropLine: null,
   dropTarget: null,
+  pen: null,
   set: (patch) => set(patch),
   clear: () => set({ marquee: null, draft: null, ghost: null, dropLine: null, dropTarget: null }),
 }));

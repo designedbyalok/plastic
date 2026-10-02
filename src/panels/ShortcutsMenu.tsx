@@ -9,6 +9,7 @@ const GROUPS: readonly { title: string; items: readonly [string, readonly string
     items: [
       ['Select', ['V']],
       ['Frame', ['F']],
+      ['Pen', ['P']],
       ['Container', ['C']],
       ['Text', ['T']],
       ['Heading', ['H']],
@@ -38,6 +39,18 @@ const GROUPS: readonly { title: string; items: readonly [string, readonly string
       ['Add to selection', ['⇧', 'Click']],
       ['Select child', ['Enter']],
       ['Select parent', ['Esc']],
+    ],
+  },
+  {
+    title: 'Vectors',
+    items: [
+      ['Edit points', ['Double-click']],
+      ['Corner ↔ smooth', ['Double-click point']],
+      ['Add point', ['Click segment']],
+      ['Bend segment', ['⌘', 'Drag']],
+      ['Break handle', ['⌥', 'Drag']],
+      ['Snap to 45°', ['⇧', 'Drag']],
+      ['Finish / done', ['Esc']],
     ],
   },
   {
