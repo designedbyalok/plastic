@@ -6,9 +6,6 @@
  * Editor ids (`data-pl-id`) can be hidden: they stay in the text, so edits keep elements tied to
  * the canvas, but they're drawn as nothing and the cursor steps over them.
  */
-import { css } from '@codemirror/lang-css';
-import { html } from '@codemirror/lang-html';
-import { json } from '@codemirror/lang-json';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Annotation, Compartment, EditorState, type Extension } from '@codemirror/state';
 import { Decoration, EditorView, MatchDecorator, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
@@ -21,7 +18,12 @@ export type CodeLanguage = 'html' | 'css' | 'json';
 /** Marks changes made by the Format button (they should reach the design like typing). */
 const formatted = Annotation.define<boolean>();
 
-const LANGUAGES: Record<CodeLanguage, () => Extension> = { html: () => html({ autoCloseTags: true }), css: () => css(), json: () => json() };
+/** Language support is loaded per language when a file needs it (HTML brings CSS and JavaScript). */
+const LANGUAGES: Record<CodeLanguage, () => Promise<Extension>> = {
+  html: () => import('@codemirror/lang-html').then((m) => m.html({ autoCloseTags: true })),
+  css: () => import('@codemirror/lang-css').then((m) => m.css()),
+  json: () => import('@codemirror/lang-json').then((m) => m.json()),
+};
 
 /** Token colors as theme variables (defined in app.css for light and dark). */
 const highlight = HighlightStyle.define([
@@ -120,7 +122,7 @@ export function CodeEditor({ value, language, hideIds: hidden = false, readOnly 
           basicSetup,
           theme,
           syntaxHighlighting(highlight),
-          languageSlot.current.of(LANGUAGES[language]()),
+          languageSlot.current.of([]),
           idSlot.current.of(hidden ? hideIds : []),
           readOnlySlot.current.of(EditorState.readOnly.of(readOnly)),
           EditorView.updateListener.of((update) => {
@@ -156,7 +158,14 @@ export function CodeEditor({ value, language, hideIds: hidden = false, readOnly 
   }, []);
 
   useEffect(() => {
-    view.current?.dispatch({ effects: languageSlot.current.reconfigure(LANGUAGES[language]()) });
+    let current = true;
+    void LANGUAGES[language]().then((extension) => {
+      if (current) view.current?.dispatch({ effects: languageSlot.current.reconfigure(extension) });
+    });
+    // A newer language (or unmount) wins over a load still in flight.
+    return () => {
+      current = false;
+    };
   }, [language]);
 
   useEffect(() => {
