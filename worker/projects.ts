@@ -1,17 +1,26 @@
 /**
- * Cloud projects: the same folder of files as a local workspace project, stored in R2 under the
- * signed-in user's prefix, with a D1 row per project for listing. Every route is scoped to the
- * session's user, so ownership is the key itself — no cross-user path can be formed.
+ * Cloud projects, designed to stay inside Cloudflare's free allowances:
  *
- *   GET    /api/projects                        → { location, projects: [{ id, updatedAt, files }] }
- *                                                  (files: the parts thumbnails need)
- *   POST   /api/projects                        { title, files, assetsFrom? } → { id }
- *   GET    /api/projects/<id>                   → { location, files }
- *   PUT    /api/projects/<id>                   { files: changed, names: all } → 204
- *   GET    /api/projects/<id>/assets/<name>     → the image
- *   PUT    /api/projects/<id>/assets/<name>     raw bytes → 204
+ * - The project row in D1 holds a version (R2 etag) per file, so listing and opening never list
+ *   R2 (a "Class A" operation) — they're one indexed D1 query.
+ * - File contents move as raw bodies streamed to/from R2. The Worker never parses or builds big
+ *   JSON, which keeps every request far below the free plan's CPU limit.
+ * - File URLs carry their version (?v=), so browsers cache them forever: thumbnails and unchanged
+ *   files are downloaded once.
+ * - A save uploads only changed files, then one small commit.
+ *
+ *   GET    /api/projects                         → { location, projects: [{ id, title, updatedAt, files }] }
+ *   POST   /api/projects                         { title, assetsFrom? } → { id }
+ *   GET    /api/projects/<id>                    → { files: { name: version } } (files: null if missing)
+ *   GET    /api/projects/<id>/files/<name>?v=…   → the file (immutable when ?v is given)
+ *   PUT    /api/projects/<id>/files/<name>       raw text → { version }
+ *   POST   /api/projects/<id>/commit             { files: { name: version }, title?, notify? } → 204
+ *   GET    /api/projects/<id>/assets/<name>      → the image (names are content hashes: immutable)
+ *   PUT    /api/projects/<id>/assets/<name>      raw bytes → 204
+ *   GET    /api/projects/<id>/live?client=<id>   WebSocket for live sync (see live.ts)
  */
 import type { Env } from './env.ts';
+import { CLIENT_ID, room } from './live.ts';
 
 /** Same rules as the local workspace (server/projectStore.ts). */
 const PROJECT_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -20,12 +29,18 @@ const ASSET_NAME = /^[a-z0-9][a-z0-9_.-]*\.(png|jpe?g|gif|webp|avif|svg)$/i;
 const ASSET_TYPES: Record<string, string> = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif', svg: 'image/svg+xml',
 };
+const FILE_TYPES: Record<string, string> = { html: 'text/html; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json; charset=utf-8' };
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_FILES = 500;
 const LOCATION = 'Your account';
+const IMMUTABLE = 'private, max-age=31536000, immutable';
+
+type Versions = Record<string, string>;
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const empty = (status: number) => new Response(null, { status, headers: { 'cache-control': 'no-store' } });
 const error = (status: number, message: string) => json({ error: message }, status);
+const extension = (name: string) => name.split('.').pop()!.toLowerCase();
 
 const projectPrefix = (owner: string, id: string) => `users/${owner}/projects/${id}/`;
 
@@ -33,50 +48,64 @@ function slugify(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'untitled';
 }
 
-function titleOf(files: Record<string, string>): string | null {
-  const html = files['index.html'] ?? Object.entries(files).find(([n]) => n.endsWith('.html'))?.[1];
-  const match = html ? /<title>([^<]*)<\/title>/i.exec(html) : null;
-  return match ? match[1]!.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim() : null;
+function parseVersions(text: string | null | undefined): Versions {
+  try {
+    const value = JSON.parse(text ?? '{}') as unknown;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter(([n, v]) => FILE_NAME.test(n) && typeof v === 'string')) as Versions;
+  } catch {
+    return {};
+  }
 }
 
-function isFiles(value: unknown): value is Record<string, string> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  return Object.entries(value).every(([name, text]) => FILE_NAME.test(name) && typeof text === 'string' && text.length <= MAX_FILE_BYTES);
+function isVersions(value: unknown): value is Versions {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entries = Object.entries(value);
+  return entries.length <= MAX_FILES && entries.every(([n, v]) => FILE_NAME.test(n) && typeof v === 'string' && v.length <= 64);
 }
 
-/** The text files of a project (no assets). */
-async function readFiles(env: Env, owner: string, id: string, only?: (name: string) => boolean): Promise<Record<string, string>> {
-  const prefix = projectPrefix(owner, id);
-  const names: string[] = [];
+interface Row {
+  id: string;
+  title: string;
+  updated_at: number;
+  files: string;
+}
+
+/**
+ * Projects saved before versions were recorded have files = '{}'. List their R2 folder once and
+ * store the versions; after that they never need a list again.
+ */
+async function backfill(env: Env, owner: string, row: Row): Promise<Versions> {
+  const known = parseVersions(row.files);
+  if (Object.keys(known).length) return known;
+  const prefix = projectPrefix(owner, row.id);
+  const versions: Versions = {};
   let cursor: string | undefined;
   do {
     const page = await env.FILES.list({ prefix, cursor, delimiter: '/' });
     for (const o of page.objects) {
       const name = o.key.slice(prefix.length);
-      if (FILE_NAME.test(name) && (!only || only(name))) names.push(name);
+      if (FILE_NAME.test(name)) versions[name] = o.etag;
     }
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
-  const files: Record<string, string> = {};
-  await Promise.all(
-    names.map(async (name) => {
-      const object = await env.FILES.get(prefix + name);
-      if (object) files[name] = await object.text();
-    }),
-  );
-  return files;
+  if (Object.keys(versions).length) await env.DB.prepare('update project set files = ? where owner_id = ? and id = ?').bind(JSON.stringify(versions), owner, row.id).run();
+  return versions;
 }
 
-async function exists(env: Env, owner: string, id: string): Promise<boolean> {
-  const row = await env.DB.prepare('select 1 from project where owner_id = ? and id = ?').bind(owner, id).first();
-  return row !== null;
+async function getRow(env: Env, owner: string, id: string): Promise<Row | null> {
+  return env.DB.prepare('select id, title, updated_at, files from project where owner_id = ? and id = ?').bind(owner, id).first<Row>();
 }
 
 async function uniqueId(env: Env, owner: string, title: string): Promise<string> {
   const base = slugify(title);
+  const { results } = await env.DB.prepare("select id from project where owner_id = ? and (id = ? or id like ? escape '\\')")
+    .bind(owner, base, `${base.replace(/[\\%_]/g, (c) => `\\${c}`)}-%`)
+    .all<{ id: string }>();
+  const taken = new Set(results.map((r) => r.id));
   for (let n = 1; ; n++) {
     const id = n === 1 ? base : `${base}-${n}`;
-    if (!(await exists(env, owner, id))) return id;
+    if (!taken.has(id)) return id;
   }
 }
 
@@ -94,9 +123,9 @@ async function copyAssets(env: Env, owner: string, from: string, to: string): Pr
   } while (cursor);
 }
 
-/** Thumbnails render the first page with the shared CSS; send just those parts in listings. */
-function thumbnailFiles(name: string): boolean {
-  return name === 'index.html' || name === 'project.json' || name === 'styles.css' || name === 'tokens.css';
+async function readBody<T>(request: Request, limit = 256 * 1024): Promise<T | null> {
+  if (Number(request.headers.get('content-length') ?? 0) > limit) return null;
+  return (await request.json().catch(() => null)) as T | null;
 }
 
 export async function handleProjects(request: Request, env: Env, owner: string, path: string[]): Promise<Response> {
@@ -104,20 +133,18 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
 
   if (path.length === 0) {
     if (method === 'GET') {
-      const { results } = await env.DB.prepare('select id, updated_at from project where owner_id = ? order by updated_at desc').bind(owner).all<{ id: string; updated_at: number }>();
-      const projects = await Promise.all(results.map(async (p) => ({ id: p.id, updatedAt: p.updated_at, files: await readFiles(env, owner, p.id, thumbnailFiles) })));
+      const { results } = await env.DB.prepare('select id, title, updated_at, files from project where owner_id = ? order by updated_at desc').bind(owner).all<Row>();
+      const projects = await Promise.all(results.map(async (row) => ({ id: row.id, title: row.title, updatedAt: row.updated_at, files: await backfill(env, owner, row) })));
       return json({ location: LOCATION, projects: projects.filter((p) => Object.keys(p.files).some((n) => n.endsWith('.html'))) });
     }
     if (method === 'POST') {
-      const body = (await request.json().catch(() => null)) as { title?: unknown; files?: unknown; assetsFrom?: unknown } | null;
-      if (!body || !isFiles(body.files) || !Object.keys(body.files).some((n) => n.endsWith('.html'))) return error(400, 'Expected { title, files: { "index.html": "…", … } }.');
-      const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'Untitled';
+      const body = await readBody<{ title?: unknown; assetsFrom?: unknown }>(request);
+      if (!body) return error(400, 'Expected { title }.');
+      const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : 'Untitled';
       const id = await uniqueId(env, owner, title);
-      if (typeof body.assetsFrom === 'string' && PROJECT_ID.test(body.assetsFrom) && (await exists(env, owner, body.assetsFrom))) await copyAssets(env, owner, body.assetsFrom, id);
-      const prefix = projectPrefix(owner, id);
-      await Promise.all(Object.entries(body.files).map(([name, text]) => env.FILES.put(prefix + name, text)));
       const now = Date.now();
-      await env.DB.prepare('insert into project (owner_id, id, title, created_at, updated_at) values (?, ?, ?, ?, ?)').bind(owner, id, title, now, now).run();
+      await env.DB.prepare("insert into project (owner_id, id, title, created_at, updated_at, files) values (?, ?, ?, ?, ?, '{}')").bind(owner, id, title, now, now).run();
+      if (typeof body.assetsFrom === 'string' && PROJECT_ID.test(body.assetsFrom) && (await getRow(env, owner, body.assetsFrom))) await copyAssets(env, owner, body.assetsFrom, id);
       return json({ id }, 201);
     }
     return error(405, 'Method not allowed.');
@@ -128,32 +155,61 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
   const prefix = projectPrefix(owner, id);
 
   if (path.length === 1) {
+    if (method !== 'GET') return error(405, 'Method not allowed.');
+    const row = await getRow(env, owner, id);
+    return json({ location: LOCATION, files: row ? await backfill(env, owner, row) : null });
+  }
+
+  if (path.length === 3 && path[1] === 'files') {
+    const name = path[2]!;
+    if (!FILE_NAME.test(name)) return error(404, 'Not found.');
     if (method === 'GET') {
-      if (!(await exists(env, owner, id))) return json({ location: LOCATION, files: null });
-      return json({ location: LOCATION, files: await readFiles(env, owner, id) });
+      const object = await env.FILES.get(prefix + name);
+      if (!object) return error(404, 'Not found.');
+      const versioned = new URL(request.url).searchParams.has('v');
+      return new Response(object.body, {
+        headers: { 'content-type': FILE_TYPES[extension(name)]!, 'cache-control': versioned ? IMMUTABLE : 'no-store', etag: object.httpEtag, 'x-content-type-options': 'nosniff' },
+      });
     }
     if (method === 'PUT') {
-      if (!(await exists(env, owner, id))) return error(404, 'No such file.');
-      const body = (await request.json().catch(() => null)) as { files?: unknown; names?: unknown } | null;
-      if (!body || !isFiles(body.files) || !Array.isArray(body.names) || !body.names.every((n) => typeof n === 'string')) {
-        return error(400, 'Expected { files: { changed… }, names: [every file name] }.');
-      }
-      const names = new Set(body.names as string[]);
-      if (![...names].some((n) => n.endsWith('.html'))) return error(400, 'A project needs at least one page.');
-      await Promise.all(Object.entries(body.files).map(([name, text]) => env.FILES.put(prefix + name, text)));
-      // Pages that no longer exist (deleted in the editor) are removed.
-      const current = await env.FILES.list({ prefix, delimiter: '/' });
-      const stale = current.objects.map((o) => o.key.slice(prefix.length)).filter((n) => n.endsWith('.html') && FILE_NAME.test(n) && !names.has(n));
-      if (stale.length) await env.FILES.delete(stale.map((n) => prefix + n));
-      const title = titleOf(body.files);
-      const now = Date.now();
-      await (title
-        ? env.DB.prepare('update project set updated_at = ?, title = ? where owner_id = ? and id = ?').bind(now, title, owner, id)
-        : env.DB.prepare('update project set updated_at = ? where owner_id = ? and id = ?').bind(now, owner, id)
-      ).run();
-      return empty(204);
+      const size = Number(request.headers.get('content-length') ?? NaN);
+      if (!Number.isFinite(size)) return error(411, 'Content-Length is required.');
+      if (size > MAX_FILE_BYTES) return error(413, 'Files can be up to 25 MB.');
+      if (!(await getRow(env, owner, id))) return error(404, 'No such file.');
+      // Streamed straight into R2: no parsing, almost no CPU.
+      const object = await env.FILES.put(prefix + name, request.body, { httpMetadata: { contentType: FILE_TYPES[extension(name)] } });
+      return json({ version: object.etag });
     }
     return error(405, 'Method not allowed.');
+  }
+
+  if (path.length === 2 && path[1] === 'commit') {
+    if (method !== 'POST') return error(405, 'Method not allowed.');
+    const body = await readBody<{ files?: unknown; title?: unknown; notify?: unknown }>(request);
+    if (!body || !isVersions(body.files) || !Object.keys(body.files).some((n) => n.endsWith('.html'))) return error(400, 'Expected { files: { name: version }, title? } with at least one page.');
+    const row = await getRow(env, owner, id);
+    if (!row) return error(404, 'No such file.');
+    const before = parseVersions(row.files);
+    const files = body.files;
+    const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : row.title;
+    const now = Date.now();
+    await env.DB.prepare('update project set files = ?, title = ?, updated_at = ? where owner_id = ? and id = ?').bind(JSON.stringify(files), title, now, owner, id).run();
+    // Files that are gone (e.g. a deleted page) are removed from R2.
+    const removed = Object.keys(before).filter((n) => !(n in files));
+    if (removed.length) await env.FILES.delete(removed.map((n) => prefix + n));
+    // Editors with a live connection announce their own saves over it (much cheaper); the
+    // server only notifies the room for saves made without one.
+    if (body.notify === true) {
+      const from = request.headers.get('x-plastic-client') ?? '';
+      await room(env, owner, id).changed({ files, from: CLIENT_ID.test(from) ? from : '' });
+    }
+    return empty(204);
+  }
+
+  if (path.length === 2 && path[1] === 'live') {
+    if (method !== 'GET' || request.headers.get('upgrade')?.toLowerCase() !== 'websocket') return error(426, 'Expected a WebSocket.');
+    if (!(await getRow(env, owner, id))) return error(404, 'No such file.');
+    return room(env, owner, id).fetch(request);
   }
 
   if (path.length === 3 && path[1] === 'assets') {
@@ -165,8 +221,9 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
       if (!object) return error(404, 'Not found.');
       return new Response(object.body, {
         headers: {
-          'content-type': ASSET_TYPES[name.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream',
-          'cache-control': 'private, max-age=3600',
+          'content-type': ASSET_TYPES[extension(name)] ?? 'application/octet-stream',
+          // Asset names are content hashes, so an image never changes under its URL.
+          'cache-control': IMMUTABLE,
           etag: object.httpEtag,
           // SVGs are images here, never documents that run script.
           'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'",
@@ -175,10 +232,11 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
       });
     }
     if (method === 'PUT') {
-      if (!(await exists(env, owner, id))) return error(404, 'No such file.');
-      const size = Number(request.headers.get('content-length') ?? 0);
+      const size = Number(request.headers.get('content-length') ?? NaN);
+      if (!Number.isFinite(size)) return error(411, 'Content-Length is required.');
       if (size > MAX_FILE_BYTES) return error(413, 'Images can be up to 25 MB.');
-      await env.FILES.put(key, request.body, { httpMetadata: { contentType: ASSET_TYPES[name.split('.').pop()!.toLowerCase()] } });
+      if (!(await getRow(env, owner, id))) return error(404, 'No such file.');
+      await env.FILES.put(key, request.body, { httpMetadata: { contentType: ASSET_TYPES[extension(name)] } });
       return empty(204);
     }
     return error(405, 'Method not allowed.');

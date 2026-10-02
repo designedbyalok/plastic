@@ -31,6 +31,11 @@
       "bucket_name": "plastic-files"
     }
   ],
+  "durable_objects": {
+    // Live sync: one room per (user, project); see worker/live.ts.
+    "bindings": [{ "name": "ROOMS", "class_name": "ProjectRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ProjectRoom"] }],
   "vars": {
     // Public URL of the app. `wrangler dev` overrides it from .dev.vars.
     "BETTER_AUTH_URL": "https://useplastic.app"

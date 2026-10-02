@@ -10,6 +10,8 @@ import { starterDocument } from '../elements/insertables.ts';
 import { editorMeta, useEditor } from './store.ts';
 
 const AUTOSAVE_MS = 400;
+/** However long the storage waits, a long editing session still saves at least this often. */
+const MAX_SAVE_WAIT_MS = 10_000;
 
 let storage: ProjectStorage | null = null;
 let lastWritten: ProjectFiles | null = null;
@@ -17,9 +19,17 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 
 const same = sameFiles;
 
-function schedule(delay = AUTOSAVE_MS): void {
+let firstPending = 0;
+
+function schedule(delay = storage?.saveDelayMs ?? AUTOSAVE_MS): void {
   clearTimeout(timer);
-  timer = setTimeout(() => void saveNow(), delay);
+  const now = Date.now();
+  if (!firstPending) firstPending = now;
+  const wait = Math.max(0, Math.min(delay, firstPending + MAX_SAVE_WAIT_MS - now));
+  timer = setTimeout(() => {
+    firstPending = 0;
+    void saveNow();
+  }, wait);
 }
 
 export async function saveNow(): Promise<void> {
@@ -82,9 +92,19 @@ export async function openProject(id: string): Promise<OpenedProject> {
     if (s.revision !== prev.revision || (prev.tx && !s.tx)) schedule();
   });
   const offExternal = project.onExternalChange(applyExternal);
+  // Leaving the tab saves right away instead of waiting out the autosave delay.
+  const onHide = () => {
+    if (document.visibilityState === 'hidden' && timer !== undefined) {
+      clearTimeout(timer);
+      firstPending = 0;
+      void saveNow();
+    }
+  };
+  document.addEventListener('visibilitychange', onHide);
   const stop = () => {
     unsubscribe();
     offExternal();
+    document.removeEventListener('visibilitychange', onHide);
     clearTimeout(timer);
     // Serializes synchronously, so the flushed content is this project's even if another opens next.
     void saveNow().finally(() => {

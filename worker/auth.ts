@@ -33,8 +33,9 @@ export function createAuth(env: Env) {
       ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } } : {}),
     },
     session: {
-      // Re-validate against D1 at most every 5 minutes; the signed cookie covers the rest.
-      cookieCache: { enabled: true, maxAge: 5 * 60 },
+      // Re-validate against D1 at most every 15 minutes; the signed cookie covers the rest, so
+      // most API calls need no database read for auth.
+      cookieCache: { enabled: true, maxAge: 15 * 60 },
     },
     advanced: {
       // Workers see the client IP in this header.

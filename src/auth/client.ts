@@ -4,7 +4,11 @@
  */
 import { createAuthClient } from 'better-auth/react';
 
-export const authClient = createAuthClient({ basePath: '/api/auth' });
+export const authClient = createAuthClient({
+  basePath: '/api/auth',
+  // The session cookie is long-lived; re-checking it on every window focus is a request for nothing.
+  sessionOptions: { refetchOnWindowFocus: false },
+});
 
 export interface Backend {
   /** Whether this deployment has accounts. */

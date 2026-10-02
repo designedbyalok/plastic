@@ -20,6 +20,8 @@ export interface ProjectStorage {
   readonly location: string;
   /** URL the project folder is served from (for assets/…), or null. */
   readonly assetBase: string | null;
+  /** How long autosave waits after the last edit (cloud storage waits longer to save requests). */
+  readonly saveDelayMs?: number;
   load(): Promise<ProjectFiles | null>;
   save(files: ProjectFiles): Promise<void>;
   /** Called when the files change outside the editor (text editor, git, coding agent). */
@@ -245,35 +247,105 @@ export const browserFiles = {
 };
 
 // --- cloud (useplastic.app) --------------------------------------------------------------------
+//
+// Built to stay inside Cloudflare's free allowances (see worker/projects.ts): listing and opening
+// read one D1 row of file versions; file contents are fetched by version, so the browser caches
+// them for good and only changed files ever download again; saves upload only changed files and
+// then commit; live-sync announcements go over the editor's own WebSocket.
+
+type Versions = Record<string, string>;
+
+/** Files the home screen's thumbnails need. */
+const THUMBNAIL_FILES = ['index.html', 'project.json', 'styles.css', 'tokens.css'];
+/** How long a hidden tab keeps its live connection before closing it (reopened on return). */
+const HIDDEN_DISCONNECT_MS = 5 * 60_000;
+/** Home re-checks the file list at most this often when you come back to the tab. */
+const LIST_REFRESH_MS = 30_000;
 
 class CloudWorkspace implements Workspace {
   readonly kind = 'cloud';
   readonly location = 'Your account';
   private readonly listeners = new Set<() => void>();
+  /** File text by project/name@version (also cached by the browser, by URL). */
+  private readonly texts = new Map<string, string>();
+
+  private endpoint(id: string): string {
+    return `/api/projects/${encodeURIComponent(id)}`;
+  }
+
+  /** One file at a version: from memory, then the browser cache, then the network. */
+  private async text(id: string, name: string, version: string): Promise<string | null> {
+    const key = `${id}/${name}@${version}`;
+    const known = this.texts.get(key);
+    if (known !== undefined) return known;
+    const response = await fetch(`${this.endpoint(id)}/files/${encodeURIComponent(name)}?v=${encodeURIComponent(version)}`);
+    if (!response.ok) return null;
+    const text = await response.text();
+    this.texts.set(key, text);
+    return text;
+  }
+
+  private async files(id: string, versions: Versions, only?: readonly string[]): Promise<ProjectFiles> {
+    const names = Object.keys(versions).filter((n) => !only || only.includes(n));
+    const entries = await Promise.all(names.map(async (n) => [n, await this.text(id, n, versions[n]!)] as const));
+    return Object.fromEntries(entries.filter((e): e is readonly [string, string] => e[1] !== null));
+  }
+
+  /** Upload the files that differ from `saved`, then commit the full version map. */
+  async write(id: string, files: ProjectFiles, saved: { files: ProjectFiles; versions: Versions } | null, options: { client?: string; notify?: boolean } = {}): Promise<Versions> {
+    const versions: Versions = {};
+    const changed = Object.keys(files).filter((n) => !saved || saved.files[n] !== files[n] || !saved.versions[n]);
+    for (const name of Object.keys(files)) if (!changed.includes(name)) versions[name] = saved!.versions[name]!;
+    // A few uploads at a time; each is a raw body streamed into storage.
+    for (let i = 0; i < changed.length; i += 6) {
+      await Promise.all(
+        changed.slice(i, i + 6).map(async (name) => {
+          const response = await fetch(`${this.endpoint(id)}/files/${encodeURIComponent(name)}`, {
+            method: 'PUT',
+            headers: { 'content-type': 'text/plain; charset=utf-8' },
+            body: files[name],
+          });
+          if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+          versions[name] = ((await response.json()) as { version: string }).version;
+          this.texts.set(`${id}/${name}@${versions[name]}`, files[name]!);
+        }),
+      );
+    }
+    const title = titleOf(files);
+    const response = await fetch(`${this.endpoint(id)}/commit`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(options.client ? { 'x-plastic-client': options.client } : {}) },
+      body: JSON.stringify({ files: versions, title, notify: options.notify ?? true }),
+    });
+    if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+    return versions;
+  }
 
   async list(): Promise<ProjectSummary[]> {
     const response = await fetch('/api/projects');
     if (!response.ok) throw new Error(`Could not list files: ${response.status}`);
-    const data = (await response.json()) as { projects?: unknown[] };
-    return (data.projects ?? []).flatMap((p) => {
-      const v = p as { id?: unknown; updatedAt?: unknown; files?: unknown };
-      return typeof v.id === 'string' && isFiles(v.files) ? [{ id: v.id, updatedAt: Number(v.updatedAt) || 0, files: pickFiles(v.files) }] : [];
-    });
+    const data = (await response.json()) as { projects?: { id: string; updatedAt: number; files: Versions }[] };
+    const projects = await Promise.all(
+      (data.projects ?? []).map(async (p) => ({ id: p.id, updatedAt: Number(p.updatedAt) || 0, files: await this.files(p.id, p.files, THUMBNAIL_FILES) })),
+    );
+    return projects.filter((p) => Object.keys(p.files).some(isPageFile));
   }
 
   async create(title: string, files: ProjectFiles, options: { assetsFrom?: string } = {}): Promise<string> {
     const response = await fetch('/api/projects', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title, files, assetsFrom: options.assetsFrom }),
+      body: JSON.stringify({ title, assetsFrom: options.assetsFrom }),
     });
     if (!response.ok) throw new Error(`Could not create file: ${response.status}`);
+    const { id } = (await response.json()) as { id: string };
+    await this.write(id, files, null, { notify: false });
     this.listeners.forEach((fn) => fn());
-    return ((await response.json()) as { id: string }).id;
+    return id;
   }
 
   assetBase(id: string): string {
-    return `/api/projects/${encodeURIComponent(id)}/`;
+    return `${this.endpoint(id)}/`;
   }
 
   /**
@@ -304,7 +376,6 @@ class CloudWorkspace implements Workspace {
       }
       onProgress?.(`Uploading images… ${++done} of ${assets.length}`);
     };
-    // A few uploads at a time.
     for (let i = 0; i < assets.length; i += 6) await Promise.all(assets.slice(i, i + 6).map(upload));
     const report = failed
       ? { ...conversion.report, warnings: [...conversion.report.warnings, `${failed} of ${assets.length} images couldn’t be uploaded; they appear empty. Try importing again.`] }
@@ -313,39 +384,150 @@ class CloudWorkspace implements Workspace {
   };
 
   open(id: string): ProjectStorage {
-    const endpoint = `/api/projects/${encodeURIComponent(id)}`;
-    /** What the server has, so saves send only the files that changed. */
-    let saved: ProjectFiles | null = null;
+    const endpoint = this.endpoint(id);
+    /** What the server has (text and versions), so saves send only what changed. */
+    let saved: { files: ProjectFiles; versions: Versions } | null = null;
+    /** This editor, so live sync doesn't echo our own saves back to us. */
+    const client = randomClientId();
+    let socket: WebSocket | null = null;
+    const workspace = this;
+
+    const fetchVersions = async (): Promise<Versions | null> => {
+      const response = await fetch(endpoint);
+      if (!response.ok) return null;
+      return ((await response.json()) as { files?: Versions | null }).files ?? null;
+    };
+
     return {
       id,
       location: this.location,
       assetBase: this.assetBase(id),
+      // Cloud saves wait for a pause in editing: fewer, larger saves use far fewer requests.
+      saveDelayMs: 1500,
       async load() {
-        const response = await fetch(endpoint);
-        if (!response.ok) return null;
-        const data = (await response.json()) as { files?: unknown };
-        saved = isFiles(data.files) ? pickFiles(data.files) : null;
-        return saved;
+        const versions = await fetchVersions();
+        if (!versions) return null;
+        const files = await workspace.files(id, versions);
+        saved = { files, versions };
+        return files;
       },
       async save(files) {
-        const changed = Object.fromEntries(Object.entries(files).filter(([name, text]) => saved?.[name] !== text));
-        const response = await fetch(endpoint, {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ files: changed, names: Object.keys(files) }),
-        });
-        if (!response.ok) throw new Error(`Save failed: ${response.status}`);
-        saved = files;
+        const live = socket?.readyState === WebSocket.OPEN;
+        const versions = await workspace.write(id, files, saved, { client, notify: !live });
+        saved = { files, versions };
+        // Tell the other editors over our own connection (1/20 the cost of a server call).
+        if (live) socket!.send(JSON.stringify({ type: 'changed', files: versions }));
       },
-      // Live updates from other tabs and agents come with realtime sync (Durable Objects).
-      onExternalChange: () => () => {},
+      /** Edits saved elsewhere (another tab or device) arrive over a WebSocket to the file's room. */
+      onExternalChange(listener) {
+        let stopped = false;
+        let attempts = 0;
+        let caughtUp = true;
+        let retry: ReturnType<typeof setTimeout> | undefined;
+        let idle: ReturnType<typeof setTimeout> | undefined;
+        let heartbeat: ReturnType<typeof setInterval> | undefined;
+        let queue = Promise.resolve();
+
+        const apply = async (versions: Versions | null) => {
+          if (!versions || !Object.keys(versions).some(isPageFile)) return;
+          const current = saved?.versions ?? {};
+          const changed = Object.keys(versions).filter((n) => current[n] !== versions[n]);
+          const removed = Object.keys(current).filter((n) => !(n in versions));
+          if (!changed.length && !removed.length) return;
+          const fresh = await workspace.files(id, versions, changed);
+          const files: Record<string, string> = {};
+          for (const name of Object.keys(versions)) {
+            const text = fresh[name] ?? saved?.files[name];
+            if (text !== undefined) files[name] = text;
+          }
+          saved = { files, versions };
+          listener(files);
+        };
+
+        const connect = () => {
+          if (stopped || socket) return;
+          const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${endpoint}/live?client=${client}`);
+          socket = ws;
+          ws.onopen = () => {
+            // After a disconnect, catch up on anything saved meanwhile (one small request).
+            if (!caughtUp) queue = queue.then(async () => apply(await fetchVersions()));
+            caughtUp = true;
+            attempts = 0;
+            heartbeat = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send('ping'), 45_000);
+          };
+          ws.onmessage = (event) => {
+            if (event.data === 'pong') return;
+            let message: { type?: string; files?: Versions };
+            try {
+              message = JSON.parse(String(event.data));
+            } catch {
+              return;
+            }
+            if (message.type !== 'changed' || !message.files) return;
+            const versions = Object.fromEntries(Object.entries(message.files).filter(([n, v]) => PROJECT_FILE_NAME.test(n) && typeof v === 'string'));
+            queue = queue.then(() => apply(versions));
+          };
+          ws.onclose = () => {
+            clearInterval(heartbeat);
+            if (socket === ws) socket = null;
+            caughtUp = false;
+            if (stopped || document.visibilityState === 'hidden') return;
+            retry = setTimeout(connect, Math.min(30_000, 1000 * 2 ** attempts++));
+          };
+        };
+
+        // A tab in the background for a while lets its connection go; it catches up on return.
+        const onVisibility = () => {
+          clearTimeout(idle);
+          if (document.visibilityState === 'hidden') {
+            idle = setTimeout(() => socket?.close(), HIDDEN_DISCONNECT_MS);
+          } else if (!socket) {
+            clearTimeout(retry);
+            connect();
+          }
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+        connect();
+        return () => {
+          stopped = true;
+          clearTimeout(retry);
+          clearTimeout(idle);
+          clearInterval(heartbeat);
+          document.removeEventListener('visibilitychange', onVisibility);
+          socket?.close();
+          socket = null;
+        };
+      },
     };
   }
 
+  /** Local creates, and coming back to the tab (throttled: files may have changed elsewhere). */
   onChange(listener: () => void): () => void {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    let last = Date.now();
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < LIST_REFRESH_MS) return;
+      last = Date.now();
+      listener();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      this.listeners.delete(listener);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }
+}
+
+/** The document title (from the first page), recorded for listings. */
+function titleOf(files: ProjectFiles): string | undefined {
+  const html = files['index.html'] ?? Object.entries(files).find(([n]) => isPageFile(n))?.[1];
+  const match = html ? /<title>([^<]*)<\/title>/i.exec(html) : null;
+  return match ? match[1]!.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim() : undefined;
+}
+
+function randomClientId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return Array.from(bytes, (b) => (b % 36).toString(36)).join('');
 }
 
 let workspace: Promise<Workspace> | null = null;
