@@ -22,6 +22,7 @@ Model:
 
 Working well:
 - Start with list_files, then get_page to read the current design (its outline shows tags, classes, ids and text).
+- When given a Plastic frame URL (/file/<file>?frame=<id>), call get_frame with that link. It returns every descendant, original HTML, ordered CSS, tokens and the local assets directory. Reuse that source and compare the rendered implementation; do not infer exact styling from a screenshot alone.
 - Use semantic HTML: real <button>, <input>, <label>, <form>, <nav>, <table>, headings — not divs that look like them.
 - Prefer flexbox/grid inside artboards; use position:absolute only for deliberate free placement.
 - Build in pieces: add an artboard (add_frame or write_html without parentId), then write_html into it with parentId.
@@ -99,6 +100,17 @@ export function createMcpServer(store: ProjectStore): McpServer {
       annotations: readOnly,
     },
     run(({ file, id }) => api.getNode(file, id)),
+  );
+
+  server.registerTool(
+    'get_frame',
+    {
+      title: 'Read frame link',
+      description: 'Read a Plastic frame URL as complete design source: frame identity, every descendant including text and SVG, original HTML, ordered CSS (including global, responsive and font rules), token CSS and local asset location. Read-only; does not fetch arbitrary URLs.',
+      inputSchema: { link: z.string().describe('Copied Plastic frame link, e.g. http://localhost:5173/file/demo?frame=abc123.') },
+      annotations: readOnly,
+    },
+    run(({ link }) => api.getFrame(link)),
   );
 
   server.registerTool(

@@ -29,6 +29,7 @@ import { LibraryStore } from './library.ts';
 import { ASSET_TYPES, PROJECT_ID, ProjectStore, ProjectConflictError, isProjectFiles, sameProjectFiles, type ProjectFiles } from './projectStore.ts';
 import { agentSetup, installWithCli } from './agents.ts';
 import { handleMcpRequest, isLocalRequest } from './mcp/http.ts';
+import { DesignApi } from './mcp/designApi.ts';
 
 export const PROJECT_CHANGED_EVENT = 'plastic:project-changed';
 export const WORKSPACE_CHANGED_EVENT = 'plastic:workspace-changed';
@@ -84,6 +85,16 @@ export function plasticWorkspace(): Plugin {
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://local');
+    const frame = /^\/__plastic\/frame\/([^/]+)\/([\w-]+)$/.exec(url.pathname);
+    if (frame) {
+      if (req.method !== 'GET') return json(res, 405);
+      if (!isLocalRequest(req)) return json(res, 403, { error: 'Local requests only.' });
+      try {
+        const design = await new DesignApi(store).getFrame(`/file/${frame[1]}?frame=${frame[2]}`);
+        const { assetsDirectory: _assetsDirectory, ...publicDesign } = design;
+        return json(res, 200, { ...publicDesign, assetBase: `/__plastic/files/${frame[1]}/` });
+      } catch (error) { return json(res, 404, { error: error instanceof Error ? error.message : 'Frame not found.' }); }
+    }
     if (url.pathname === '/mcp') {
       const raw = req.method === 'POST' ? await readBody(req) : '';
       return handleMcpRequest(store, req, res, raw ? (JSON.parse(raw) as unknown) : undefined);

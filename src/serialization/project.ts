@@ -2,7 +2,7 @@
  * project.json: editor metadata only. Deleting it loses canvas placement, page names and order,
  * and layer names, never the design itself.
  */
-import type { NodeId, Point } from '../document/types.ts';
+import type { ComponentLibrary, NodeId, Point } from '../document/types.ts';
 
 export const PROJECT_FORMAT = 'plastic';
 export const PROJECT_VERSION = 2;
@@ -20,6 +20,7 @@ export interface PageMeta {
 }
 
 export interface ProjectJson {
+  readonly components?: ComponentLibrary;
   readonly format: typeof PROJECT_FORMAT;
   readonly version: number;
   readonly files: { readonly styles: string; readonly tokens: string };
@@ -85,9 +86,53 @@ export function readProjectJson(text: string): ProjectJson {
       )
     : [];
   const v = canvas.viewport;
-  const viewport = isRecord(v) && typeof v.x === 'number' && typeof v.y === 'number' && typeof v.zoom === 'number' ? { x: v.x, y: v.y, zoom: v.zoom } : null;
-  const collapsed = Array.isArray(layers.collapsed) ? layers.collapsed.filter((id): id is string => typeof id === 'string') : [];
+  const viewport =
+    isRecord(v) && typeof v.x === 'number' && typeof v.y === 'number' && typeof v.zoom === 'number'
+      ? { x: v.x, y: v.y, zoom: v.zoom }
+      : null;
+  const collapsed = Array.isArray(layers.collapsed)
+    ? layers.collapsed.filter((id): id is string => typeof id === 'string')
+    : [];
   const activePage = typeof canvas.activePage === 'string' ? canvas.activePage : null;
 
-  return { ...base, pages, canvas: { viewport, activePage, frames }, layers: { names, collapsed } };
+  const components = readComponents(raw.components);
+  return {
+    ...base,
+    ...(components ? { components } : {}),
+    pages,
+    canvas: { viewport, activePage, frames },
+    layers: { names, collapsed },
+  };
+}
+
+/** Ignore malformed component metadata without discarding any HTML. */
+function readComponents(raw: unknown): ComponentLibrary | undefined {
+  if (!isRecord(raw) || !isRecord(raw.definitions) || !isRecord(raw.instances)) return undefined;
+  const validId = (id: string) => /^[\w-]{1,64}$/.test(id);
+  const definitions = Object.fromEntries(
+    Object.entries(raw.definitions)
+      .filter(([id, name]) => validId(id) && typeof name === 'string' && name.trim())
+      .map(([id, name]) => [id, String(name)]),
+  );
+  const instances: Record<string, ComponentLibrary['instances'][string]> = {};
+  for (const [id, link] of Object.entries(raw.instances)) {
+    if (
+      !validId(id) ||
+      !isRecord(link) ||
+      typeof link.source !== 'string' ||
+      !validId(link.source) ||
+      typeof link.baseline !== 'string' ||
+      !isRecord(link.elements)
+    )
+      continue;
+    const entries = Object.entries(link.elements);
+    if (
+      !entries.every(([key, value]) => validId(key) && typeof value === 'string' && validId(value)) ||
+      new Set(entries.map(([, value]) => value)).size !== entries.length ||
+      link.elements[link.source] !== id
+    )
+      continue;
+    instances[id] = { source: link.source, baseline: link.baseline, elements: link.elements as Record<string, string> };
+  }
+  return { definitions, instances };
 }

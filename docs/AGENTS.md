@@ -43,6 +43,7 @@ While the dev server runs, agents that take a URL can use Streamable HTTP at
 | `get_file` | Pages, artboards (id, name, position), classes and tokens of one file |
 | `get_page` | A page as saved: an outline (tag.classes, `data-pl-id`, text), its HTML, artboard positions, `styles.css` and `tokens.css` |
 | `get_node` | One element: tag, attributes, classes with their declarations, text, children, HTML |
+| `get_frame` | Read a copied frame link: complete subtree HTML, ordered CSS, tokens, node metadata and asset paths |
 | `create_file` | A new file (optionally with an empty artboard) |
 | `add_frame` | An empty artboard on a page |
 | `write_html` | Insert HTML into an element, or onto a page as artboards; class rules in `css` merge into `styles.css` |

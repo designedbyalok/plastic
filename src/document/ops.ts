@@ -46,7 +46,11 @@ export function insertRoot(doc: DesignDocument, pageFile: string, index: number,
 
 /** Remove a node from its parent (or its page) without deleting it. */
 export function detach(doc: DesignDocument, id: NodeId): DesignDocument {
-  if (isRoot(doc, id)) return { ...doc, pages: doc.pages.map((p) => (p.roots.includes(id) ? { ...p, roots: p.roots.filter((r) => r !== id) } : p)) };
+  if (isRoot(doc, id))
+    return {
+      ...doc,
+      pages: doc.pages.map((p) => (p.roots.includes(id) ? { ...p, roots: p.roots.filter((r) => r !== id) } : p)),
+    };
   const parentId = getParentId(doc, id);
   if (!parentId) return doc;
   return updateElement(doc, parentId, (el) => ({ ...el, children: el.children.filter((c) => c !== id) }));
@@ -140,7 +144,11 @@ export function setText(doc: DesignDocument, id: NodeId, text: string): DesignDo
   const newId = createId();
   return {
     ...doc,
-    nodes: { ...doc.nodes, [newId]: { kind: 'text', id: newId, text }, [id]: { ...el, children: [newId, ...el.children] } },
+    nodes: {
+      ...doc.nodes,
+      [newId]: { kind: 'text', id: newId, text },
+      [id]: { ...el, children: [newId, ...el.children] },
+    },
   };
 }
 
@@ -166,7 +174,13 @@ export function setSelectOptions(doc: DesignDocument, selectId: NodeId, labels: 
     let optionId = existing[i];
     if (!optionId) {
       optionId = createId();
-      next = { ...next, nodes: { ...next.nodes, [optionId]: { kind: 'element', id: optionId, tag: 'option', attrs: {}, classes: [], children: [] } } };
+      next = {
+        ...next,
+        nodes: {
+          ...next.nodes,
+          [optionId]: { kind: 'element', id: optionId, tag: 'option', attrs: {}, classes: [], children: [] },
+        },
+      };
     }
     next = setText(next, optionId, label);
     children.push(optionId);
@@ -181,7 +195,12 @@ export function setSelectOptions(doc: DesignDocument, selectId: NodeId, labels: 
 // ---------------------------------------------------------------------------------------------
 // Styles
 
-export function setDeclaration(doc: DesignDocument, className: string, prop: string, value: string | null): DesignDocument {
+export function setDeclaration(
+  doc: DesignDocument,
+  className: string,
+  prop: string,
+  value: string | null,
+): DesignDocument {
   const current = doc.styles.rules[className] ?? {};
   if (value === null || value === '') {
     if (!(prop in current)) return doc;
@@ -198,7 +217,11 @@ function withRule(doc: DesignDocument, className: string, decls: Declarations): 
 }
 
 /** Make sure an element has a primary class (creating one named after `base`). */
-export function ensurePrimaryClass(doc: DesignDocument, id: NodeId, base: string): { doc: DesignDocument; className: string } {
+export function ensurePrimaryClass(
+  doc: DesignDocument,
+  id: NodeId,
+  base: string,
+): { doc: DesignDocument; className: string } {
   const el = getElement(doc, id);
   if (!el) return { doc, className: '' };
   const existing = el.classes[0];
@@ -211,7 +234,12 @@ export function ensurePrimaryClass(doc: DesignDocument, id: NodeId, base: string
 }
 
 /** Set a property on each element's primary class (shared classes are only written once). */
-export function setStyleOnNodes(doc: DesignDocument, ids: readonly NodeId[], prop: string, value: string | null): DesignDocument {
+export function setStyleOnNodes(
+  doc: DesignDocument,
+  ids: readonly NodeId[],
+  prop: string,
+  value: string | null,
+): DesignDocument {
   let next = doc;
   const done = new Set<string>();
   for (const id of ids) {
@@ -273,7 +301,11 @@ export interface WrapOptions {
  * Wrap siblings in a flex container ("add auto layout"). `ids` must be in their intended
  * visual order. Wrapped elements lose free positioning and flow inside the container.
  */
-export function wrapInStack(doc: DesignDocument, ids: readonly NodeId[], options: WrapOptions): { doc: DesignDocument; id: NodeId | null } {
+export function wrapInStack(
+  doc: DesignDocument,
+  ids: readonly NodeId[],
+  options: WrapOptions,
+): { doc: DesignDocument; id: NodeId | null } {
   const first = ids[0];
   if (!first) return { doc, id: null };
   const parentId = getParentId(doc, first);
@@ -283,13 +315,24 @@ export function wrapInStack(doc: DesignDocument, ids: readonly NodeId[], options
   const index = Math.min(...siblings.map((id) => parent.children.indexOf(id)));
 
   const className = uniqueClassName(takenClassNames(doc), 'stack');
-  const style: Record<string, string> = { display: 'flex', 'flex-direction': options.direction, gap: `${options.gap}px` };
+  const style: Record<string, string> = {
+    display: 'flex',
+    'flex-direction': options.direction,
+    gap: `${options.gap}px`,
+  };
   if (options.placement) {
-    Object.assign(style, { position: 'absolute', left: `${Math.round(options.placement.x)}px`, top: `${Math.round(options.placement.y)}px` });
+    Object.assign(style, {
+      position: 'absolute',
+      left: `${Math.round(options.placement.x)}px`,
+      top: `${Math.round(options.placement.y)}px`,
+    });
   }
   const id = createId();
   let next: DesignDocument = withRule(doc, className, style);
-  next = { ...next, nodes: { ...next.nodes, [id]: { kind: 'element', id, tag: 'div', attrs: {}, classes: [className], children: [] } } };
+  next = {
+    ...next,
+    nodes: { ...next.nodes, [id]: { kind: 'element', id, tag: 'div', attrs: {}, classes: [className], children: [] } },
+  };
   next = insertChild(next, parent.id, index, id);
 
   siblings.forEach((childId, i) => {
@@ -320,6 +363,7 @@ export function duplicateNodes(doc: DesignDocument, ids: readonly NodeId[]): { d
     const classMap = new Map<string, string>();
     const rules: Record<string, Declarations> = { ...next.styles.rules };
     const nodes: MutableNodes = { ...next.nodes };
+    const idMap = new Map<NodeId, NodeId>();
 
     const mapClass = (cls: string): string => {
       const users = nodesWithClass(next, cls);
@@ -337,6 +381,7 @@ export function duplicateNodes(doc: DesignDocument, ids: readonly NodeId[]): { d
     const clone = (id: NodeId): NodeId => {
       const node = next.nodes[id];
       const newId = createId();
+      idMap.set(id, newId);
       if (!node) return newId;
       nodes[newId] =
         node.kind === 'text'
@@ -347,6 +392,25 @@ export function duplicateNodes(doc: DesignDocument, ids: readonly NodeId[]): { d
 
     const copyId = clone(sourceId);
     next = { ...next, nodes, styles: { ...next.styles, rules } };
+    if (next.components) {
+      const definitions = { ...next.components.definitions };
+      const instances = { ...next.components.instances };
+      for (const [id, name] of Object.entries(next.components.definitions)) {
+        const copy = idMap.get(id);
+        if (copy) definitions[copy] = `${name} copy`;
+      }
+      for (const [id, link] of Object.entries(next.components.instances)) {
+        const copy = idMap.get(id);
+        if (copy)
+          instances[copy] = {
+            ...link,
+            elements: Object.fromEntries(
+              Object.entries(link.elements).map(([key, value]) => [key, idMap.get(value) ?? createId()]),
+            ),
+          };
+      }
+      next = { ...next, components: { definitions, instances } };
+    }
     const page = isRoot(next, sourceId) ? pageOf(next, sourceId) : undefined;
     if (page) {
       next = insertRoot(next, page.file, page.roots.indexOf(sourceId) + 1, copyId);
@@ -357,7 +421,8 @@ export function duplicateNodes(doc: DesignDocument, ids: readonly NodeId[]): { d
       const parent = getElement(next, parentId);
       if (!parent) continue;
       next = insertChild(next, parent.id, parent.children.indexOf(sourceId) + 1, copyId);
-      next = nudgeIfAbsolute(next, copyId, 16);
+      // Linked copies share classes with the main; nudging its class would move every instance.
+      if (!next.components?.instances[copyId]) next = nudgeIfAbsolute(next, copyId, 16);
     }
     created.push(copyId);
   }

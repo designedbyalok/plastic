@@ -1,4 +1,9 @@
+import { ComponentSection, ComponentLibrarySection } from './ComponentSection.tsx';
+import { SourceSection } from './SourceSection.tsx';
+import { ScrollArea } from '../ui/ScrollArea.tsx';
 import { VariantsSection } from './VariantsSection.tsx';
+import { isRoot } from '../../document/tree.ts';
+import { copyFrameContext, copyFrameLink } from '../../editor/frameLinks.ts';
 import { resolvedTheme, useTheme } from '../../app/theme.ts';
 import { ChevronDown, Pipette } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState } from 'react';
@@ -10,9 +15,24 @@ import type { ElementNode } from '../../document/types.ts';
 import { elementSpec } from '../../elements/registry.ts';
 import { VectorSections } from './VectorSections.tsx';
 import { PathOpsSection } from './PathOpsSection.tsx';
-import { AttributesSection, BehaviorSection, ContentSection, ElementSection, TableSection } from './ElementSections.tsx';
 import {
-  BorderSection, ConstraintsSection, CssSection, FillSection, LayoutSection, MarginSection, OpacitySection, RadiusSection, ShadowSection, TextSection,
+  AttributesSection,
+  BehaviorSection,
+  ContentSection,
+  ElementSection,
+  TableSection,
+} from './ElementSections.tsx';
+import {
+  BorderSection,
+  ConstraintsSection,
+  CssSection,
+  FillSection,
+  LayoutSection,
+  MarginSection,
+  OpacitySection,
+  RadiusSection,
+  ShadowSection,
+  TextSection,
 } from './StyleSections.tsx';
 
 export function Inspector() {
@@ -38,6 +58,7 @@ export function Inspector() {
 
   return (
     <aside className="panel inspector" aria-label="Inspector">
+      <ScrollArea className="inspector-scroll" viewportClassName="inspector-content">
       <InspectorHeader />
       {!elements.length ? (
         <EmptyInspector />
@@ -52,6 +73,11 @@ export function Inspector() {
               </div>
             </section>
           )}
+          {single && isRoot(doc, single.id) && <div className="frame-share-actions">
+            <button type="button" className="insp-chip" onClick={() => void copyFrameLink(single.id)}>Copy frame link</button>
+            <button type="button" className="insp-chip" onClick={() => void copyFrameContext(single.id)}>Copy AI context</button>
+          </div>}
+          {single && <ComponentSection el={single} />}
           {single && <VariantsSection key={single.id} el={single} />}
           {single && <ContentSection el={single} />}
           {single && <BehaviorSection el={single} />}
@@ -73,9 +99,11 @@ export function Inspector() {
           <MarginSection ids={ids} />
           <ConstraintsSection ids={ids} />
           {single && <CssSection el={single} />}
+          {single && <SourceSection el={single} />}
           {single && <AttributesSection el={single} />}
         </div>
       )}
+      </ScrollArea>
     </aside>
   );
 }
@@ -87,7 +115,13 @@ function InspectorHeader() {
       <SaveStatus />
       <span className="insp-top-actions">
         <ZoomMenu />
-        <button type="button" className={`insp-top-button${codeOpen ? ' is-active' : ''}`} aria-pressed={codeOpen} onClick={() => useEditor.getState().setCodeOpen(!codeOpen)} title="Show the HTML and CSS being saved">
+        <button
+          type="button"
+          className={`insp-top-button${codeOpen ? ' is-active' : ''}`}
+          aria-pressed={codeOpen}
+          onClick={() => useEditor.getState().setCodeOpen(!codeOpen)}
+          title="Show the HTML and CSS being saved"
+        >
           Code
         </button>
       </span>
@@ -131,7 +165,13 @@ function ZoomMenu() {
   }, [open]);
   return (
     <span className="insp-menu-anchor" ref={ref}>
-      <button type="button" className="insp-zoom" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button
+        type="button"
+        className="insp-zoom"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
         {Math.round(zoom * 100)}%
         <ChevronDown size={12} strokeWidth={1.5} />
       </button>
@@ -170,7 +210,11 @@ function splitColor(color: string, fallback: string): { hex: string; alpha: numb
 
 function joinColor(hex: string, alpha: number): string {
   const a = Math.max(0, Math.min(100, Math.round(alpha)));
-  return a >= 100 ? `#${hex}` : `#${hex}${Math.round((a / 100) * 255).toString(16).padStart(2, '0')}`;
+  return a >= 100
+    ? `#${hex}`
+    : `#${hex}${Math.round((a / 100) * 255)
+        .toString(16)
+        .padStart(2, '0')}`;
 }
 
 /** Nothing selected: settings for the page itself, and connecting agents. */
@@ -183,7 +227,9 @@ function EmptyInspector() {
   const set = (color: string) => {
     // Picking the theme's own canvas color means "no page color": it keeps following the theme.
     const value = color.toLowerCase() === fallback ? null : color;
-    useEditor.getState().apply('Canvas color', (d) => setPageCanvas(d, page.file, value), { coalesce: `canvas:${page.file}` });
+    useEditor
+      .getState()
+      .apply('Canvas color', (d) => setPageCanvas(d, page.file, value), { coalesce: `canvas:${page.file}` });
   };
   const eyeDropper = (window as { EyeDropper?: new () => { open(): Promise<{ sRGBHex: string }> } }).EyeDropper;
 
@@ -210,7 +256,13 @@ function EmptyInspector() {
                 onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
               />
               <span className="insp-prefix">
-                <input type="color" className="insp-swatch" aria-label="Pick canvas color" value={`#${hex}`} onChange={(e) => set(joinColor(e.target.value.slice(1), alpha))} />
+                <input
+                  type="color"
+                  className="insp-swatch"
+                  aria-label="Pick canvas color"
+                  value={`#${hex}`}
+                  onChange={(e) => set(joinColor(e.target.value.slice(1), alpha))}
+                />
               </span>
               <input
                 className="insp-alpha"
@@ -242,6 +294,7 @@ function EmptyInspector() {
           </div>
         </div>
       </section>
+      <ComponentLibrarySection />
       <section className="insp-section">
         <div className="insp-header">
           <span className="insp-title">MCP</span>

@@ -157,7 +157,7 @@ export function Canvas() {
       {pageEmpty && (
         <div className="canvas-empty">
           <p>
-            This page is empty. Press <kbd>F</kbd> and drag to draw a frame.
+            Paste a design here, or press <kbd>F</kbd> and drag to draw a frame.
           </p>
         </div>
       )}

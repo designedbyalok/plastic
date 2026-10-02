@@ -1,3 +1,4 @@
+import { synchronizeComponents } from '../document/components.ts';
 /**
  * Editor store. Two kinds of state live here and must not be confused:
  *
@@ -36,7 +37,11 @@ export interface VectorEdit {
    * outgoing segment yet (and its first no incoming one), so their handles can't be in `d` yet:
    * they wait here until the next point or the close.
    */
-  readonly drawing: { readonly sub: number; readonly out?: { x: number; y: number } | null; readonly startIn?: { x: number; y: number } | null } | null;
+  readonly drawing: {
+    readonly sub: number;
+    readonly out?: { x: number; y: number } | null;
+    readonly startIn?: { x: number; y: number } | null;
+  } | null;
 }
 
 interface Transaction {
@@ -64,6 +69,7 @@ export interface EditorState {
   readonly assetBase: string | null;
   /** Canvas-only responsive/state simulation; never saved or exported. */
   readonly stylePreview: StylePreview | null;
+  readonly styleSourceProperty: string;
 
   /** File of the page shown on the canvas. Always a page of `doc`. */
   readonly activePage: string;
@@ -94,7 +100,10 @@ export interface EditorState {
   undo(): void;
   redo(): void;
   /** Replace the document (open a project). Clears history. */
-  load(doc: DesignDocument, view?: { viewport?: Viewport | null; collapsed?: readonly NodeId[]; activePage?: string | null }): void;
+  load(
+    doc: DesignDocument,
+    view?: { viewport?: Viewport | null; collapsed?: readonly NodeId[]; activePage?: string | null },
+  ): void;
   setActivePage(file: string): void;
   setLeftTab(tab: 'design' | 'theme'): void;
 
@@ -160,6 +169,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   storageLocation: '',
   assetBase: null,
   stylePreview: null,
+  styleSourceProperty: 'color',
   selection: [],
   hoverId: null,
   editingTextId: null,
@@ -177,7 +187,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   apply(label, recipe, options = {}) {
     const { doc, selection, history, tx, revision } = get();
     if (tx) return; // a gesture owns the document until it commits
-    const next = recipe(doc);
+    const next = synchronizeComponents(recipe(doc));
     const nextSelection = options.select ? existing(next, options.select) : existing(next, selection);
     if (next === doc) {
       if (options.select) set({ selection: nextSelection });
@@ -200,7 +210,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   preview(recipe) {
     const { tx, revision } = get();
     if (!tx) return;
-    set({ doc: recipe(tx.base), revision: revision + 1 });
+    set({ doc: synchronizeComponents(recipe(tx.base)), revision: revision + 1 });
   },
 
   commit(label, select) {
@@ -228,7 +238,14 @@ export const useEditor = create<EditorState>()((set, get) => ({
     if (tx) return;
     const result = undo(history, { doc, selection, label: '' });
     if (!result) return;
-    set({ doc: result.snapshot.doc, selection: existing(result.snapshot.doc, result.snapshot.selection), history: result.history, revision: revision + 1, editingTextId: null, activePage: validPage(result.snapshot.doc, get().activePage) });
+    set({
+      doc: result.snapshot.doc,
+      selection: existing(result.snapshot.doc, result.snapshot.selection),
+      history: result.history,
+      revision: revision + 1,
+      editingTextId: null,
+      activePage: validPage(result.snapshot.doc, get().activePage),
+    });
   },
 
   redo() {
@@ -236,7 +253,14 @@ export const useEditor = create<EditorState>()((set, get) => ({
     if (tx) return;
     const result = redo(history, { doc, selection, label: '' });
     if (!result) return;
-    set({ doc: result.snapshot.doc, selection: existing(result.snapshot.doc, result.snapshot.selection), history: result.history, revision: revision + 1, editingTextId: null, activePage: validPage(result.snapshot.doc, get().activePage) });
+    set({
+      doc: result.snapshot.doc,
+      selection: existing(result.snapshot.doc, result.snapshot.selection),
+      history: result.history,
+      revision: revision + 1,
+      editingTextId: null,
+      activePage: validPage(result.snapshot.doc, get().activePage),
+    });
   },
 
   load(doc, view = {}) {
@@ -245,6 +269,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     set((s) => ({
       doc,
       stylePreview: null,
+      styleSourceProperty: 'color',
       history: EMPTY_HISTORY,
       tx: null,
       revision: s.revision + 1,
@@ -262,7 +287,8 @@ export const useEditor = create<EditorState>()((set, get) => ({
   setActivePage(file) {
     const { doc, activePage } = get();
     const next = validPage(doc, file);
-    if (next !== activePage) set({ activePage: next, selection: [], hoverId: null, editingTextId: null, vectorEdit: null });
+    if (next !== activePage)
+      set({ activePage: next, selection: [], hoverId: null, editingTextId: null, vectorEdit: null });
   },
   setLeftTab(tab) {
     set({ stylePreview: null, leftTab: tab });
@@ -318,7 +344,11 @@ export const useEditor = create<EditorState>()((set, get) => ({
     if (get().spacePressed !== pressed) set({ spacePressed: pressed });
   },
   setSaveState(status, savedRevision, location) {
-    set((s) => ({ saveStatus: status, savedRevision: savedRevision ?? s.savedRevision, storageLocation: location ?? s.storageLocation }));
+    set((s) => ({
+      saveStatus: status,
+      savedRevision: savedRevision ?? s.savedRevision,
+      storageLocation: location ?? s.storageLocation,
+    }));
   },
 }));
 

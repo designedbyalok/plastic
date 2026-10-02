@@ -100,6 +100,7 @@ export function VariantsSection({ el }: { el: ElementNode }) {
           value={declared.color ?? ''}
           prefix="Color"
           ariaLabel="Variant color"
+          onFocus={() => useEditor.setState({ styleSourceProperty: 'color' })}
           placeholder="Inherit"
           onChange={(v) => write('color', v)}
         />
@@ -108,6 +109,7 @@ export function VariantsSection({ el }: { el: ElementNode }) {
           value={declared.width ?? ''}
           prefix="W"
           ariaLabel="Variant width"
+          onFocus={() => useEditor.setState({ styleSourceProperty: 'width' })}
           placeholder="Inherit"
           onChange={(v) => write('width', v)}
         />
@@ -117,7 +119,7 @@ export function VariantsSection({ el }: { el: ElementNode }) {
         .map(([prop, val]) => (
           <Row key={`${variant.maxWidth}:${variant.state}:${prop}`}>
             <code>{prop}</code>
-            <TextInput value={val} ariaLabel={`Variant ${prop}`} mono onChange={(v) => write(prop, v)} />
+            <TextInput value={val} ariaLabel={`Variant ${prop}`} onFocus={() => useEditor.setState({ styleSourceProperty: prop })} mono onChange={(v) => write(prop, v)} />
             <button
               type="button"
               className="icon-button"

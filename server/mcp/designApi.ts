@@ -18,6 +18,8 @@ import { parseHTML, serializeNode } from '../../src/serialization/html.ts';
 import { serializeStyleSheet, serializeTokenSheet } from '../../src/document/css.ts';
 import type { ProjectStore } from '../projectStore.ts';
 import { ensureDom } from './dom.ts';
+import { frameDesign, parseFrameLink } from '../../src/serialization/frame.ts';
+import path from 'node:path';
 
 export class DesignError extends Error {}
 
@@ -127,6 +129,12 @@ export class DesignApi {
       children: el.children.filter((c) => doc.nodes[c]?.kind === 'element'),
       html: serializeNode(doc, id, 0),
     };
+  }
+
+  async getFrame(link: string) {
+    const { file, frame } = parseFrameLink(link);
+    const { doc } = await this.open(file);
+    return { file, ...frameDesign(doc, frame), assetBase: `workspace/${file}/`, assetsDirectory: path.join(this.store.root, file, 'assets') };
   }
 
   // --- writing designs -----------------------------------------------------------------------
@@ -337,4 +345,3 @@ function outline(doc: DesignDocument, id: NodeId, depth: number): string {
   const children = node.children.map((c) => outline(doc, c, depth + 1)).filter(Boolean);
   return [head, ...children].join('\n');
 }
-

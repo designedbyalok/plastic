@@ -74,6 +74,8 @@ export interface Point {
 }
 
 export interface DesignDocument {
+  /** Reusable structure links; ordinary HTML/CSS remains the rendered source. */
+  readonly components?: ComponentLibrary;
   readonly title: string;
   /** All nodes of all pages. Ids are unique across the project. */
   readonly nodes: Readonly<Record<NodeId, DocNode>>;
@@ -87,4 +89,17 @@ export interface DesignDocument {
   readonly frames: Readonly<Record<NodeId, Point>>;
   /** User-given layer names. Editor metadata (project.json). */
   readonly names: Readonly<Record<NodeId, string>>;
+}
+
+export interface ComponentInstance {
+  readonly source: NodeId;
+  /** Main element ids → instance element ids. Text is matched by its parent and ordinal. */
+  readonly elements: Readonly<Record<NodeId, NodeId>>;
+  /** Last applied main markup, for merging instance overrides without prompts. */
+  readonly baseline: string;
+}
+
+export interface ComponentLibrary {
+  readonly definitions: Readonly<Record<NodeId, string>>;
+  readonly instances: Readonly<Record<NodeId, ComponentInstance>>;
 }

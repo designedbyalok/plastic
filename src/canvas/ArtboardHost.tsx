@@ -18,6 +18,7 @@ import { useEditor } from '../editor/store.ts';
 import { domElement, onRerenderRequest, registerHost } from './dom.ts';
 import { DomRenderer } from './renderer.ts';
 import { finishTextEditing } from './textEditing.ts';
+import { handleCanvasPaste } from '../editor/clipboard.ts';
 
 /**
  * Editor-only rules, placed *before* the design CSS and wrapped in :where() (zero specificity)
@@ -98,6 +99,8 @@ export function ArtboardHost({ id }: { id: NodeId }) {
       const guard = doc.createElement('style');
       const tokens = doc.createElement('style');
       const style = doc.createElement('style');
+      tokens.dataset.plasticSource = 'tokens.css';
+      style.dataset.plasticSource = 'styles.css';
       guard.textContent = EDITOR_CSS;
       // Same order as the exported page: tokens.css, then styles.css.
       doc.head.append(guard, tokens, style);
@@ -107,7 +110,11 @@ export function ArtboardHost({ id }: { id: NodeId }) {
 
       // The viewport follows the root element's box, so media queries see the artboard width.
       let observed: Element | null = null;
-      const resize = new win.ResizeObserver(() => fit());
+      let fitFrame = 0;
+      const resize = new win.ResizeObserver(() => {
+        win.cancelAnimationFrame(fitFrame);
+        fitFrame = win.requestAnimationFrame(() => fit());
+      });
       const fit = () => {
         const root = domElement(id);
         if (!root) return;
@@ -158,6 +165,8 @@ export function ArtboardHost({ id }: { id: NodeId }) {
         if (editing && !editing.contains(e.target as Node)) finishTextEditing(true);
       };
       doc.addEventListener('pointerdown', onPointerDown);
+      const onPaste = (e: ClipboardEvent) => handleCanvasPaste(e, id);
+      doc.addEventListener('paste', onPaste);
 
       teardown = () => {
         unsubscribe();
@@ -165,7 +174,9 @@ export function ArtboardHost({ id }: { id: NodeId }) {
         unregister();
         unblock();
         resize.disconnect();
+        win.cancelAnimationFrame(fitFrame);
         doc.removeEventListener('pointerdown', onPointerDown);
+        doc.removeEventListener('paste', onPaste);
         renderer.dispose();
         guard.remove();
         tokens.remove();

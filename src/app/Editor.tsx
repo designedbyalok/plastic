@@ -9,6 +9,7 @@ import { LayersPanel } from '../panels/LayersPanel.tsx';
 import { ToolRail } from '../panels/ToolRail.tsx';
 import { ConnectAgents } from '../panels/ConnectAgents.tsx';
 import { linkClick } from './router.ts';
+import { focusLinkedFrame } from '../editor/frameLinks.ts';
 
 // The code editor (CodeMirror) loads when the Code panel is first opened.
 const CodePanel = lazy(() => import('../panels/CodePanel.tsx').then((m) => ({ default: m.CodePanel })));
@@ -24,6 +25,17 @@ export function Editor({ projectId }: { projectId: string }) {
   useShortcuts();
 
   useEffect(() => {
+    if (status !== 'open') return;
+    focusLinkedFrame();
+    window.addEventListener('popstate', focusLinkedFrame);
+    window.addEventListener('plastic:navigate', focusLinkedFrame);
+    return () => {
+      window.removeEventListener('popstate', focusLinkedFrame);
+      window.removeEventListener('plastic:navigate', focusLinkedFrame);
+    };
+  }, [status, projectId]);
+
+  useEffect(() => {
     document.title = status === 'open' ? `${title} — Plastic` : 'Plastic';
   }, [status, title]);
 
@@ -37,7 +49,7 @@ export function Editor({ projectId }: { projectId: string }) {
       stop = opened.stop;
       setStatus(opened.found ? 'open' : 'missing');
       // No saved viewport: frame the artboards once they have been laid out.
-      if (opened.found && !opened.restoredViewport) requestAnimationFrame(() => requestAnimationFrame(zoomToFit));
+      if (opened.found && !opened.restoredViewport && !new URL(location.href).searchParams.has('frame')) requestAnimationFrame(() => requestAnimationFrame(zoomToFit));
     }).catch((error: unknown) => {
       if (cancelled) return;
       setOpenError(error instanceof Error ? error.message : 'Could not open this project.');

@@ -374,3 +374,33 @@ viewport and uses the selector parser to substitute the selected pseudo state wi
 an element identity attribute at equivalent specificity. Preview CSS is cached by
 immutable sheet identity and is never serialized. Preview clears on selection or
 project changes; stopping it restores normal artboard sizing.
+
+### Inspector style provenance
+
+Artboard design styles are tagged with their source filename. The inspector traces one
+property on demand after rendering, using PostCSS to reduce those styles to private
+diagnostic properties. The browser chooses the marker through its native cascade,
+including named layers, selector specificity, grouping conditions and inline priority.
+Two registered markers distinguish inherited and direct declarations. The probe is
+removed synchronously and inline attributes are restored exactly. Diagnostics are bounded
+and cached per artboard document, source text and property. Token dependencies use the
+PostCSS value parser and are traced at their declaration origin. No diagnostic data enters
+the document model or exported files. Unsupported cases show unavailable sources instead
+of an approximate cascade winner.
+
+### Reusable HTML components
+
+`src/document/components.ts` defines linked semantic subtrees without changing HTML/CSS
+rendering. `DesignDocument.components` is optional metadata persisted in project.json.
+Each main is an existing element root; each instance is an expanded clone with unique ids,
+shared CSS classes, an element correspondence map and its last-applied main markup.
+The existing semantic three-way merge (backed by node-diff3) combines that baseline, the
+instance's current markup and the main's new markup. Instance overrides win overlapping
+changes while independent main updates propagate. Table/SVG fragments use parsing context
+wrappers that never reach project HTML. Text ids are retained by element/ordinal in memory.
+Editor apply/gesture paths synchronize before recording history; file reads and writes also
+synchronize, so local agent edits use the same behavior. Snapshots keep propagation undoable.
+Removing links or deleting a main preserves instance content. Link metadata is validated on
+read. Storage baselines are canonicalized without propagation; subsequent component updates
+are saved as actual HTML changes rather than mistaken for bytes already on disk. Initial component nesting is intentionally unavailable, and CSS style ownership remains
+explicitly class based; class detachment continues to create independent styles.

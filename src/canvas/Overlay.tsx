@@ -3,7 +3,7 @@
  * It never transforms with the world, so outlines stay crisp and handles keep their size at
  * any zoom. Positions are measured from the live DOM every frame.
  */
-import { useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { getParentId, isRoot } from '../document/tree.ts';
 import type { NodeId } from '../document/types.ts';
 import { layerName } from '../elements/registry.ts';
@@ -13,6 +13,7 @@ import { domElement, hostOf, screenRectOf, styleOf, toScreenRect } from './dom.t
 import { startFrameMove, startResize, type Handle } from './gestures.ts';
 import { useGesture } from './gestureStore.ts';
 import { VectorOverlay } from '../vector/VectorOverlay.tsx';
+import { setName } from '../document/ops.ts';
 
 interface Measured {
   readonly selection: { id: NodeId; rect: Rect }[];
@@ -48,6 +49,7 @@ const box = (r: Rect) => ({ left: r.x, top: r.y, width: r.width, height: r.heigh
 
 export function Overlay() {
   const [m, setM] = useState<Measured>(EMPTY);
+  const [renaming, setRenaming] = useState<NodeId | null>(null);
   const editing = useEditor((s) => s.editingTextId);
   const zoom = useEditor((s) => s.viewport.zoom);
   const selection = useEditor((s) => s.selection);
@@ -92,9 +94,10 @@ export function Overlay() {
           className={`artboard-title${selection.includes(t.id) ? ' is-selected' : ''}`}
           style={{ left: t.rect.x, top: t.rect.y - 20, maxWidth: Math.max(40, t.rect.width) }}
           onPointerDown={(e) => onTitleDown(e, t.id)}
-          title={`${t.name} — drag to move`}
+          onDoubleClick={(e) => { e.stopPropagation(); useEditor.getState().select([t.id]); setRenaming(t.id); }}
+          title={`${t.name} — drag to move, double-click to rename`}
         >
-          {t.name}
+          {renaming === t.id ? <FrameNameInput id={t.id} name={t.name} done={() => setRenaming(null)} /> : t.name}
         </div>
       ))}
       {m.parent && <div className="ov-parent" style={box(m.parent)} />}
@@ -147,6 +150,26 @@ export function Overlay() {
       )}
     </div>
   );
+}
+
+function FrameNameInput({ id, name, done }: { id: NodeId; name: string; done: () => void }) {
+  const [draft, setDraft] = useState(name);
+  const cancelled = useRef(false);
+  return <input
+    className="artboard-name-input" aria-label="Frame name" value={draft}
+    autoFocus onFocus={(e) => e.currentTarget.select()}
+    onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}
+    onChange={(e) => setDraft(e.target.value)}
+    onBlur={() => {
+      if (!cancelled.current && useEditor.getState().doc.nodes[id]) useEditor.getState().apply('Rename frame', (d) => setName(d, id, draft));
+      done();
+    }}
+    onKeyDown={(e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+      if (e.key === 'Escape') { e.preventDefault(); cancelled.current = true; done(); }
+    }}
+  />;
 }
 
 function fmt(n: number): string {

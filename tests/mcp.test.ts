@@ -59,6 +59,11 @@ describe('Plastic MCP server', () => {
       css: '.login { display: flex; flex-direction: column; gap: var(--spacing-4); } .cta { background: var(--color-primary); color: white; }',
     });
     expect(written.created).toHaveLength(1);
+    const linked = await call<{ frame: { id: string }; nodes: { id: string }[]; html: string; css: string }>('get_frame', { link: `http://localhost:5173/file/agent-login?frame=${frame}` });
+    expect(linked.frame.id).toBe(frame);
+    expect(linked.nodes.some((n) => n.id === written.created[0])).toBe(true);
+    expect(linked.html).toContain('placeholder="you@example.com"');
+    expect(linked.css).toContain('flex-direction: column');
     expect(written.outline).toContain('<form.login>');
     expect(written.outline).toContain('<input type="email" placeholder="you@example.com" required>');
     expect(written.outline).toMatch(/<label\.field> data-pl-id=\S+ "Email"/);

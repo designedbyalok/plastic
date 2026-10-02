@@ -1,8 +1,8 @@
-import { ChevronDown, ChevronRight, File, PanelLeft, Plus, X } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronDown, ChevronRight, Diamond, File, PanelLeft, Plus, X } from 'lucide-react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { setName, setTitle } from '../document/ops.ts';
 import { addPage, nextPageName, removePage, renamePage } from '../document/pages.ts';
-import { elementChildren, getElement } from '../document/tree.ts';
+import { ancestorIds, elementChildren, getElement } from '../document/tree.ts';
 import type { NodeId, Page } from '../document/types.ts';
 import { kindLabel, layerName } from '../elements/registry.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
@@ -10,6 +10,7 @@ import { iconFor } from './icons.tsx';
 import { ThemePanel } from './ThemePanel.tsx';
 import { PanelResizer } from './PanelResizer.tsx';
 import { FileMenu } from './FileMenu.tsx';
+import { ScrollArea } from './ui/ScrollArea.tsx';
 
 export function LayersPanel() {
   const title = useEditor((s) => s.doc.title);
@@ -27,10 +28,18 @@ export function LayersPanel() {
           aria-label="File name"
           value={title}
           spellCheck={false}
-          onChange={(e) => useEditor.getState().apply('Rename file', (d) => setTitle(d, e.target.value), { coalesce: 'title' })}
+          onChange={(e) =>
+            useEditor.getState().apply('Rename file', (d) => setTitle(d, e.target.value), { coalesce: 'title' })
+          }
           onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Escape') && e.currentTarget.blur()}
         />
-        <button type="button" className="icon-button" title="Hide panel  ⌘\\" aria-label="Hide panel" onClick={() => useEditor.getState().setLayersOpen(false)}>
+        <button
+          type="button"
+          className="icon-button"
+          title="Hide panel  ⌘\\"
+          aria-label="Hide panel"
+          onClick={() => useEditor.getState().setLayersOpen(false)}
+        >
           <PanelLeft size={15} strokeWidth={1.5} />
         </button>
       </header>
@@ -72,7 +81,13 @@ function CollapsedFileHeader() {
       <span className="collapsed-title" title={title}>
         {title}
       </span>
-      <button type="button" className="icon-button" title="Show panel  ⌘\\" aria-label="Show panel" onClick={() => useEditor.getState().setLayersOpen(true)}>
+      <button
+        type="button"
+        className="icon-button"
+        title="Show panel  ⌘\\"
+        aria-label="Show panel"
+        onClick={() => useEditor.getState().setLayersOpen(true)}
+      >
         <PanelLeft size={15} strokeWidth={1.5} />
       </button>
     </div>
@@ -104,11 +119,11 @@ function PagesSection() {
         </button>
       </div>
       {open && (
-        <div className="pages-list" role="listbox" aria-label="Pages">
+        <ScrollArea className="pages-list" viewportClassName="pages-list-content" role="listbox" aria-label="Pages">
           {pages.map((p) => (
             <PageRow key={p.file} page={p} canDelete={pages.length > 1} />
           ))}
-        </div>
+        </ScrollArea>
       )}
     </section>
   );
@@ -167,15 +182,46 @@ function PageRow({ page, canDelete }: { page: Page; canDelete: boolean }) {
 
 function LayersTree() {
   const roots = useEditor(activeRoots);
+  // Document edits may recreate an unchanged selection array. Anchor only when its ids change.
+  const selectionKey = useEditor((s) => JSON.stringify(s.selection));
+  const page = useEditor((s) => s.activePage);
+  const viewport = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const store = useEditor.getState();
+    const selection = store.selection;
+    for (const id of selection) {
+      for (const parent of ancestorIds(store.doc, id)) {
+        if (store.collapsed[parent]) store.setCollapsed(parent, false);
+      }
+    }
+    // Expansion renders before measuring. Only selection/page changes trigger anchoring,
+    // so manual scrolling and collapsing remain under the user's control.
+    const raf = requestAnimationFrame(() => {
+      const scroller = viewport.current;
+      const id = selection.at(-1);
+      if (!scroller || !id) return;
+      const row = Array.from(scroller.querySelectorAll<HTMLElement>('[data-layer-id]'))
+        .find((el) => el.dataset.layerId === id);
+      if (!row) return;
+      const bounds = scroller.getBoundingClientRect();
+      const target = row.getBoundingClientRect();
+      const inset = Math.min(28, bounds.height / 4);
+      const delta = target.top < bounds.top + inset ? target.top - bounds.top - inset
+        : target.bottom > bounds.bottom - inset ? target.bottom - bounds.bottom + inset : 0;
+      if (delta) scroller.scrollTo({ top: scroller.scrollTop + delta,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [selectionKey, page]);
   return (
     <>
       <div className="layers-heading">Layers</div>
-      <div className="layers-tree" role="tree">
+      <ScrollArea className="layers-tree" viewportClassName="layers-tree-content" viewportRef={viewport} role="tree">
         {roots.map((id) => (
           <LayerRow key={id} id={id} depth={0} />
         ))}
         {!roots.length && <p className="layers-empty">No layers on this page yet.</p>}
-      </div>
+      </ScrollArea>
     </>
   );
 }
@@ -201,6 +247,7 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
     <>
       <div
         role="treeitem"
+        data-layer-id={id}
         aria-selected={selected}
         aria-expanded={children.length ? !collapsed : undefined}
         className={`layer-row${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}`}
@@ -226,7 +273,16 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         </button>
-        <Icon size={12} strokeWidth={1.75} className="layer-icon" />
+        {doc.components?.definitions[id] || doc.components?.instances[id] ? (
+          <Diamond
+            size={12}
+            strokeWidth={doc.components.definitions[id] ? 2.5 : 1.5}
+            className="layer-icon"
+            aria-label={doc.components.definitions[id] ? 'Main component' : 'Component instance'}
+          />
+        ) : (
+          <Icon size={12} strokeWidth={1.75} className="layer-icon" />
+        )}
         {renaming ? (
           <input
             className="layer-rename"

@@ -1430,3 +1430,16 @@
   position: relative;
   z-index: 10;
 }
+
+/* Match the editor's dropdown surfaces in both app themes. */
+.home-menu-item:hover:not(:disabled),
+.home-menu-item:focus-visible:not(:disabled) {
+  background: var(--ui-raised);
+  color: var(--ui-text);
+  outline: none;
+}
+.home-menu-item.is-danger:hover,
+.home-menu-item.is-danger:focus-visible {
+  background: var(--ui-hover);
+  color: var(--ui-danger);
+}

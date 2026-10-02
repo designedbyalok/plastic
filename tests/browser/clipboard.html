@@ -1,0 +1,24 @@
+<!doctype html><html><head><title>Plastic clipboard verification</title><style>
+body { margin: 0; background: #282828; color: #eee; font: 14px system-ui; padding: 24px; }
+.artboard-host { position: absolute; } .artboard-frame { border: 0; }
+button, textarea { margin-right: 12px; padding: 8px; }
+</style></head><body><h1>Paste into artboard</h1><p>The existing artboard below receives Paper Snapshot HTML through Plastic's native paste handler.</p><button id="undo">Undo</button><button id="redo">Redo</button><button id="empty">Empty canvas</button><textarea aria-label="Normal text paste" placeholder="Normal text paste"></textarea><span id="status"></span><div id="root"></div>
+<script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { ArtboardHost } from '/src/canvas/ArtboardHost.tsx';
+import { useEditor } from '/src/editor/store.ts';
+import { emptyDocument, instantiate } from '/src/document/factory.ts';
+import { insertRoot, setFrame } from '/src/document/ops.ts';
+import { handleCanvasPaste } from '/src/editor/clipboard.ts';
+const made = instantiate(emptyDocument('Clipboard verification'), {tag:'main',className:'artboard',style:{width:'640px','min-height':'420px',padding:'32px','box-sizing':'border-box',background:'#fafafa',color:'#222'},children:[{tag:'h2',children:['Existing artboard']}]});
+useEditor.getState().load(setFrame(insertRoot(made.doc,'index.html',0,made.id),made.id,{x:24,y:220}));
+useEditor.getState().select([made.id]);
+function TestCanvas() { const roots = useEditor(s => s.doc.pages[0].roots); return roots.map(id => React.createElement(ArtboardHost,{id,key:id})); }
+createRoot(document.querySelector('#root')).render(React.createElement(TestCanvas));
+window.addEventListener('paste',handleCanvasPaste);
+document.querySelector('#empty').onclick=()=>{useEditor.getState().load(emptyDocument());useEditor.getState().setViewport({x:0,y:0,zoom:1});};
+document.querySelector('#undo').onclick=()=>useEditor.getState().undo();
+document.querySelector('#redo').onclick=()=>useEditor.getState().redo();
+useEditor.subscribe(s=>document.querySelector('#status').textContent=s.doc.nodes[made.id] ? `${s.doc.nodes[made.id].children.length} artboard children` : `${s.doc.pages[0].roots.length} canvas roots`);
+</script></body></html>

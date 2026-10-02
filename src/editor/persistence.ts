@@ -3,7 +3,7 @@
  * written back shortly after they happen, and edits made to the files by anything else
  * (an editor, git checkout, a coding agent) are loaded in as an undoable change.
  */
-import { parseProject, serializeProject, type ProjectFiles } from '../serialization/index.ts';
+import { parseProject, serializeProject, sameFiles, type ProjectFiles } from '../serialization/index.ts';
 import { connectWorkspace, type ProjectStorage } from '../serialization/storage.ts';
 import { setTitle } from '../document/ops.ts';
 import { starterDocument } from '../elements/insertables.ts';
@@ -67,8 +67,10 @@ export async function openProject(id: string): Promise<OpenedProject> {
   useEditor.setState({ assetBase: project.assetBase });
   useEditor.getState().setSaveState('saved', useEditor.getState().revision, project.location);
   const normalized = (input: ProjectFiles) => {
-    const parsed = parseProject(input);
-    return serializeProject(parsed.doc, parsed.meta);
+    // Canonicalize actual disk bytes without treating propagated instances as already saved.
+    const options = { syncComponents: false };
+    const parsed = parseProject(input, options);
+    return serializeProject(parsed.doc, parsed.meta, options);
   };
   let applying = false;
   const coordinator = new ProjectSync(project, normalized(files), {
@@ -100,6 +102,10 @@ export async function openProject(id: string): Promise<OpenedProject> {
     },
   });
   sync = coordinator;
+  if (!sameFiles(normalized(files), serializeProject(doc, meta))) {
+    useEditor.getState().setSaveState('saving', useEditor.getState().revision - 1);
+    schedule(0);
+  }
   const unsubscribe = useEditor.subscribe((state, previous) => {
     if (applying) return;
     if ((previous.tx && !state.tx) || (previous.editingTextId && !state.editingTextId)) coordinator.drain();

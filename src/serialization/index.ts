@@ -1,4 +1,11 @@
-import { extractStyleTokens, parseStyleSheet, parseTokenSheet, serializeStyleSheet, serializeTokenSheet } from '../document/css.ts';
+import { synchronizeComponents } from '../document/components.ts';
+import {
+  extractStyleTokens,
+  parseStyleSheet,
+  parseTokenSheet,
+  serializeStyleSheet,
+  serializeTokenSheet,
+} from '../document/css.ts';
 import { FIRST_PAGE_FILE } from '../document/factory.ts';
 import type { DesignDocument, NodeId, Page, Point } from '../document/types.ts';
 import { parseHTML, serializeHTML } from './html.ts';
@@ -28,9 +35,20 @@ export interface EditorMeta {
   readonly activePage: string | null;
 }
 
-export function serializeProject(doc: DesignDocument, meta: EditorMeta): Record<string, string> {
+/** Skip propagation only when canonicalizing a storage baseline for comparison. */
+export interface ProjectOptions {
+  readonly syncComponents?: boolean;
+}
+
+export function serializeProject(
+  doc: DesignDocument,
+  meta: EditorMeta,
+  options: ProjectOptions = {},
+): Record<string, string> {
+  if (options.syncComponents !== false) doc = synchronizeComponents(doc);
   const roots = doc.pages.flatMap((p) => p.roots);
   const project: ProjectJson = {
+    ...(doc.components ? { components: doc.components } : {}),
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
     files: { styles: STYLES_FILE, tokens: TOKENS_FILE },
@@ -53,11 +71,20 @@ function pageOrder(files: ProjectFiles, project: ProjectJson): { file: string; n
   const unlisted = available
     .filter((f) => !listed.some((p) => p.file === f))
     .sort((a, b) => (a === FIRST_PAGE_FILE ? -1 : b === FIRST_PAGE_FILE ? 1 : a.localeCompare(b)));
-  const pages = [...listed, ...unlisted.map((file, i) => ({ file, name: file === FIRST_PAGE_FILE ? 'Page 1' : `Page ${listed.length + i + 1}` }))];
+  const pages = [
+    ...listed,
+    ...unlisted.map((file, i) => ({
+      file,
+      name: file === FIRST_PAGE_FILE ? 'Page 1' : `Page ${listed.length + i + 1}`,
+    })),
+  ];
   return pages.length ? pages : [{ file: FIRST_PAGE_FILE, name: 'Page 1' }];
 }
 
-export function parseProject(files: ProjectFiles): { doc: DesignDocument; meta: EditorMeta } {
+export function parseProject(
+  files: ProjectFiles,
+  options: ProjectOptions = {},
+): { doc: DesignDocument; meta: EditorMeta } {
   const project = readProjectJson(files[PROJECT_FILE] ?? '');
   const seen = new Set<NodeId>();
   const nodes: DesignDocument['nodes'] = {};
@@ -90,6 +117,7 @@ export function parseProject(files: ProjectFiles): { doc: DesignDocument; meta: 
     }
   }
   const doc: DesignDocument = {
+    ...(project.components ? { components: project.components } : {}),
     title: title || 'Untitled',
     nodes,
     pages,
@@ -99,7 +127,10 @@ export function parseProject(files: ProjectFiles): { doc: DesignDocument; meta: 
     names: pick(project.layers.names, Object.keys(nodes)),
   };
   const activePage = pages.some((p) => p.file === project.canvas.activePage) ? project.canvas.activePage : null;
-  return { doc, meta: { viewport: project.canvas.viewport, collapsed: project.layers.collapsed, activePage } };
+  return {
+    doc: options.syncComponents === false ? doc : synchronizeComponents(doc),
+    meta: { viewport: project.canvas.viewport, collapsed: project.layers.collapsed, activePage },
+  };
 }
 
 export function sameFiles(a: ProjectFiles, b: ProjectFiles | null | undefined): boolean {

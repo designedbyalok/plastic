@@ -25,13 +25,18 @@ code editor, tokens, pages, undo/redo, local files, cloud accounts, and MCP tool
 
 ## Further product work
 
+- [x] Canvas selection reveals collapsed ancestors and smoothly anchors the active layer.
+  Panel scrollbars overlay content without a gutter and fade out after scrolling.
+- [x] Stable frame deep links with automatic selection/zoom, inline canvas-title renaming,
+  and complete frame source for AI via `get_frame` MCP and portable AI-context copy.
+  Local frame URLs require workspace access; public cloud share links are not implemented.
 - [x] First visual breakpoint/state editor: presets and custom max-width breakpoints;
   default, hover, focus, focus-visible, active and disabled states. Add/edit/remove ordinary
   CSS declarations in a dedicated inspector section with undo/redo and canvas-only preview.
   Discover imported simple max-width queries; preserve other conditions in the code editor.
-- [ ] Inspector provenance: show the selector, inline declaration, theme or breakpoint
+- [x] Inspector provenance: show the selector, inline declaration, theme or breakpoint
   supplying a computed value and explain where an edit will be applied.
-- [ ] Explicit reusable component structure/instances, preserving ordinary HTML output.
+- [x] Explicit reusable component structure/instances, preserving ordinary HTML output.
 - [ ] Browser interaction coverage: select, drag, resize, inline text, code edits, undo,
   responsive rendering, safe embeds, persistence, and designer/agent concurrency.
 - [ ] Profile large imported designs before changing rendering. Measure input latency,
@@ -40,8 +45,11 @@ code editor, tokens, pages, undo/redo, local files, cloud accounts, and MCP tool
 
 ## Open-source choices
 
+- Radix Select (MIT): accessible themed dropdowns, focus management, typeahead and viewport positioning.
+- Radix Scroll Area (MIT): native scrolling with transient overlay scrollbars.
 - PostCSS (MIT): ordered CSS AST and serialization.
 - postcss-safe-parser (MIT): retain tolerant CSS editing while recovering partial syntax.
+- postcss-value-parser (MIT): token references, including nested functions and fallbacks.
 - postcss-selector-parser (MIT): structural selector edits without regex rewriting.
 - Keep the existing CodeMirror, OpenPencil, Paper.js, Zustand and Vitest integrations.
 - node-diff3 (MIT): three-way sequence/text merging, integrated with native DOM and PostCSS trees.
@@ -93,4 +101,75 @@ code editor, tokens, pages, undo/redo, local files, cloud accounts, and MCP tool
 - Initial visual authoring covers max-width queries and the listed states on one selected
   element. Complex selectors/conditions, min-width/container queries and additional states
   remain editable through the existing code editor; preview does not reproduce native input
-  interactions or actually disable controls. Full inspector provenance is next.
+  interactions or actually disable controls. Inspector provenance is available in the Style source section.
+
+## Inspector provenance verification
+
+- Source details show the live computed value, authored selector, file/line, media/supports/
+  layer context, importance, inheritance and referenced token origins. Base and variant edit
+  destinations are explained. CSS field focus selects the property being inspected.
+- PostCSS builds bounded, cached diagnostic stylesheets. Browser-registered diagnostic
+  properties let the native cascade choose sources at original specificity and priority.
+  Separate inherited/non-inherited markers distinguish direct declarations from inheritance.
+  Diagnostic styles and temporary inline markers are always removed; exact style attributes
+  are restored. Diagnostics do not alter document revisions, autosave or exports.
+- Token references use the MIT PostCSS value parser. Alias dependencies are resolved at
+  their declaration origin, rather than incorrectly using descendant overrides.
+- Unit tests cover source mapping, importance, shorthands, resets, preview mapping, layers,
+  safe cleanup/fallback and CSS value parsing. Real-browser checks in
+  tests/browser/provenance-cases.ts exercise 16 cascade cases and verify unchanged markup/CSS.
+- Limits are explicit: unsupported source tracing, imported external styles, anonymous
+  layers, registered custom properties and selectors depending on inline style text do not
+  receive a guessed winner. Animations identify the underlying declaration; their current
+  computed value still comes from the browser. Inheritance tracing covers common text/SVG
+  properties and ordinary custom properties. Untraced UA/presentation sources stay labeled.
+
+## Reusable component verification
+
+- Create/rename main components, insert linked instances beside a component or on another
+  page, navigate to the main, reset instance overrides, detach links, and identify roots
+  with diamond icons in Layers. With no selection, the inspector lists the component library.
+- Optional project.json metadata stores main root names, stable element mappings, and the
+  last applied main markup. HTML remains expanded semantic markup and CSS stays shared;
+  deleting metadata loses links, never the visible design. No component runtime is exported.
+- Reuse the existing semantic HTML/inline-CSS reconciliation and MIT node-diff3 for updates.
+  Instance text, attribute, class and structural overrides are retained automatically.
+  Untouched structure follows the main. CSS declarations remain shared; the existing class
+  detachment control gives an element an independent class when desired.
+- Edits, gesture previews, code edits, agent file loads and serialization synchronize links.
+  Undo/redo include propagation in the initiating edit. Deleted mains detach surviving
+  instances. Duplicating an instance keeps its link; duplicating a main creates another main.
+- Main serialization is cached per nodes identity; unchanged main markup avoids merge work.
+  Tests cover override retention, insertion/deletion, reset, duplication, pages, tables,
+  SVG, malformed metadata, reload, external source edits, gestures and history. Browser checks
+  verify creation, insertion, local text overrides, main propagation, reset/undo, detach/undo
+  and reload. Plain disk edits propagate and are written back to HTML, not just rendered.
+- Initial components are flat: nested definitions/instances are not created by the UI.
+  Text correspondence uses parent plus text ordinal; ambiguous mixed-text structural edits
+  inherit the conservative merge behavior. HTML ids must stay stable to retain links.
+
+## Dropdown and inspector polish
+
+- Inspector selects share the Radix Select primitive, styled with existing Plastic light/dark
+  surface, text, radius, shadow and hover tokens. Portal positioning avoids inspector clipping;
+  long menus scroll. Existing file, tool, token, zoom and dashboard action menus use matching
+  neutral surfaces and highlights. Canvas HTML select elements keep their authored design.
+- Empty inherit/reset values are encoded for Radix and decoded before invoking existing edit
+  callbacks; custom imported values stay visible. Select keyboard focus excludes canvas tool
+  shortcuts and deletion. Browser checks cover click/arrow selection, Escape, empty reset,
+  font choices, overflow positioning, both themes and unchanged canvas selection.
+- Style source is collapsed by default below the main inspector sections. Opening it restores
+  full provenance details; tracing/observers stop while closed, so routine field edits do not
+  run source diagnostics in the background.
+
+## Layer selection and scrolling verification
+
+- Selection reveals every selected node's ancestors and smoothly scrolls the most recently
+  selected layer into view without moving keyboard focus. Reduced-motion preferences use
+  immediate scrolling. Unchanged selection ids do not re-anchor on document edits, so manual
+  scrolling and collapsing remain under user control.
+- Layers, pages, theme tokens and inspector use Radix overlay scrollbars. The 5px scrollbar
+  contains a subtle 3px thumb and disappears after scrolling stops; it reserves no gutter.
+- React regression tests cover ancestor expansion, active-row state, scrolling, focus
+  preservation, reduced motion and avoiding re-anchoring on unrelated edits. Browser checks
+  selected a deeply nested item on the canvas and verified its layer appeared in view.

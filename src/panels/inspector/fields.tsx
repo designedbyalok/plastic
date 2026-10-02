@@ -1,3 +1,5 @@
+import { Select } from '../ui/Select.tsx';
+export { Select } from '../ui/Select.tsx';
 /**
  * Inspector controls. Style controls read the *declared* value from each element's primary
  * class rule and show the browser's *computed* value as the placeholder, so you always see
@@ -10,7 +12,7 @@ import { groupFor, setToken, tokenKind, tokenKindForProperty, tokenReference, to
 import { getElement } from '../../document/tree.ts';
 import type { DesignDocument, NodeId } from '../../document/types.ts';
 import { useEditor } from '../../editor/store.ts';
-import { Check, ChevronDown, Hexagon, Minus, Plus, X } from 'lucide-react';
+import { Check, Hexagon, Minus, Plus, X } from 'lucide-react';
 
 export const MIXED = '\u0000mixed';
 
@@ -77,10 +79,11 @@ interface TextInputProps {
   suffix?: ReactNode;
   onKeyDown?(e: KeyboardEvent<HTMLInputElement>, current: string): void;
   ariaLabel?: string;
+  onFocus?(): void;
 }
 
 /** Text input that keeps its own draft while focused (so "1px solid" survives trimming). */
-export function TextInput({ value, onChange, placeholder, multiline, mono, prefix, suffix, onKeyDown, ariaLabel }: TextInputProps) {
+export function TextInput({ value, onChange, placeholder, multiline, mono, prefix, suffix, onKeyDown, ariaLabel, onFocus }: TextInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? value;
   const className = `insp-input${mono ? ' is-mono' : ''}${prefix ? ' has-prefix' : ''}${suffix ? ' has-suffix' : ''}`;
@@ -91,6 +94,7 @@ export function TextInput({ value, onChange, placeholder, multiline, mono, prefi
       className={className}
       style={style}
       aria-label={ariaLabel}
+      onFocus={onFocus}
       value={shown}
       placeholder={placeholder}
       rows={Math.min(6, Math.max(2, shown.split('\n').length))}
@@ -105,6 +109,7 @@ export function TextInput({ value, onChange, placeholder, multiline, mono, prefi
       className={className}
       style={style}
       aria-label={ariaLabel}
+      onFocus={onFocus}
       value={shown}
       placeholder={placeholder}
       spellCheck={false}
@@ -139,26 +144,6 @@ export function Checkbox({ checked, onChange, label, hint }: { checked: boolean;
       <span>{label}</span>
       {hint && <span className="insp-check-hint">{hint}</span>}
     </label>
-  );
-}
-
-export function Select({ value, onChange, options, placeholder, ariaLabel, mono, prefix }: { value: string; onChange(v: string): void; options: readonly (string | { value: string; label: string })[]; placeholder?: string; ariaLabel: string; mono?: boolean; prefix?: ReactNode }) {
-  return (
-    <span className="insp-select-wrap">
-    <select className={`insp-select${mono ? ' is-mono' : ''}${prefix ? ' has-prefix' : ''}${value === '' ? ' is-placeholder' : ''}`} aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)}>
-      {placeholder !== undefined && <option value="">{placeholder}</option>}
-      {options.map((o) => {
-        const opt = typeof o === 'string' ? { value: o, label: o } : o;
-        return (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        );
-      })}
-    </select>
-      {prefix && <span className="insp-prefix">{prefix}</span>}
-      <ChevronDown size={12} strokeWidth={1.5} className="insp-select-chevron" aria-hidden="true" />
-    </span>
   );
 }
 
@@ -206,6 +191,7 @@ export function computedValue(id: NodeId | undefined, prop: string): string {
 }
 
 export function setStyle(ids: readonly NodeId[], prop: string, value: string): void {
+  useEditor.setState({ styleSourceProperty: prop });
   useEditor.getState().apply(`Set ${prop}`, (d) => setStyleOnNodes(d, ids, prop, value.trim() || null), {
     coalesce: `css:${ids.join(',')}:${prop}`,
   });
@@ -266,6 +252,7 @@ export function CssInput({ ids, prop, placeholder, prefix, numeric, mono, noToke
   const input = (
     <TextInput
       ariaLabel={prop}
+      onFocus={() => useEditor.setState({ styleSourceProperty: prop })}
       prefix={prefix}
       mono={mono}
       value={mixed ? '' : show(declared)}

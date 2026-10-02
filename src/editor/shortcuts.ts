@@ -12,6 +12,7 @@ import { deleteAnchors, moveRefs } from '../vector/path.ts';
 import { runOutlineStroke, runPathOp } from '../vector/pathOps.ts';
 import { setSnapPref, snapPrefs } from '../canvas/snap.ts';
 import { notify } from '../canvas/gestureStore.ts';
+import { handleCanvasPaste } from './clipboard.ts';
 
 /** Keys in vector edit mode. Returns whether the key was handled. */
 function handleVectorKey(e: KeyboardEvent, key: string, mod: boolean): boolean {
@@ -65,7 +66,7 @@ function handleVectorKey(e: KeyboardEvent, key: string, mod: boolean): boolean {
 function isTyping(e: KeyboardEvent): boolean {
   const target = e.composedPath()[0] as HTMLElement | undefined;
   if (!target || target.nodeType !== 1) return false;
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || !!target.closest('[role="combobox"], [role="listbox"], [data-plastic-select]');
 }
 
 export function useShortcuts(): void {
@@ -205,10 +206,13 @@ export function useShortcuts(): void {
       if (e.code === 'Space') useEditor.getState().setSpacePressed(false);
     };
     const onBlur = () => useEditor.getState().setSpacePressed(false);
+    const onPaste = (e: ClipboardEvent) => handleCanvasPaste(e);
+    window.addEventListener('paste', onPaste);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
     return () => {
+      window.removeEventListener('paste', onPaste);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);

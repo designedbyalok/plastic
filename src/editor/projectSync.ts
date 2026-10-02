@@ -48,7 +48,8 @@ export class ProjectSync {
     this.incoming = null;
     this.baseline = incoming;
     if (!sameFiles(local, merged.files)) this.callbacks.apply(merged.files);
-    if (sameFiles(merged.files, incoming)) this.callbacks.status('saved', this.callbacks.read().revision);
+    if (sameFiles(this.callbacks.read().files, incoming))
+      this.callbacks.status('saved', this.callbacks.read().revision);
     else this.callbacks.dirty?.();
   }
 

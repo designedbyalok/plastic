@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type FocusEvent } from 'react';
 import { OTHER_GROUP, TOKEN_GROUPS, TOKEN_NAME, removeToken, renameToken, setToken, tokenKind, tokenUsage, uniqueTokenName, type TokenGroup, type TokenKind } from '../document/tokens.ts';
 import { useEditor } from '../editor/store.ts';
 import { missingFamily } from '../app/fonts.ts';
+import { ScrollArea } from './ui/ScrollArea.tsx';
 
 const editor = useEditor.getState;
 
@@ -44,7 +45,7 @@ export function ThemePanel() {
 
   const groups = [...GROUPS, OTHER_GROUP].filter((g) => byKind(g.kind).length > 0);
   return (
-    <div className="theme" aria-label="Tokens">
+    <ScrollArea className="theme" viewportClassName="theme-content" aria-label="Tokens">
       <div className="left-section-header theme-header">
         <span className="theme-header-title">Tokens</span>
         <AddTokenMenu onAdd={add} />
@@ -57,7 +58,7 @@ export function ThemePanel() {
           No tokens yet. Add colors, spacing, radius or type with <Plus size={11} strokeWidth={2} /> above; they are saved to <code>tokens.css</code> as CSS variables.
         </p>
       )}
-    </div>
+    </ScrollArea>
   );
 }
 
