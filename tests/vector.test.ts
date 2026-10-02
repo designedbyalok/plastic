@@ -92,3 +92,43 @@ describe('svg attributes', () => {
     expect((doc.nodes[made.id] as unknown as { attrs: Record<string, string> }).attrs).toEqual({ 'data-thing': 'x' });
   });
 });
+
+describe('shape tools', () => {
+  it('fits polygons and stars to their box', async () => {
+    const { polygonPoints, starPoints } = await import('../src/vector/shapes.ts');
+    const tri = polygonPoints(3, 100, 80);
+    expect(tri).toHaveLength(3);
+    expect(Math.min(...tri.map((p) => p.x))).toBe(0);
+    expect(Math.max(...tri.map((p) => p.x))).toBe(100);
+    expect(Math.min(...tri.map((p) => p.y))).toBe(0);
+    expect(Math.max(...tri.map((p) => p.y))).toBe(80);
+    expect(tri[0]).toEqual({ x: 50, y: 0 });
+    const star = starPoints(5, 0.382, 100, 100);
+    expect(star).toHaveLength(10);
+    expect(star[0]).toEqual({ x: 50, y: 0 });
+  });
+
+  it('constrains drags like Figma', async () => {
+    const { dragRect } = await import('../src/vector/shapes.ts');
+    expect(dragRect('rectangle', { x: 10, y: 10 }, { x: 60, y: 30 }, true, false).rect).toEqual({ x: 10, y: 10, width: 50, height: 50 });
+    expect(dragRect('ellipse', { x: 50, y: 50 }, { x: 70, y: 60 }, false, true).rect).toEqual({ x: 30, y: 40, width: 40, height: 20 });
+    const line = dragRect('line', { x: 0, y: 0 }, { x: 100, y: 10 }, true, false);
+    expect(line.to.y).toBeCloseTo(0);
+    expect(line.to.x).toBeCloseTo(Math.hypot(100, 10));
+  });
+});
+
+describe('vector inspector', () => {
+  it('edits every shape inside a vector, or just the path being edited', async () => {
+    const { emptyDocument, instantiate } = await import('../src/document/factory.ts');
+    const { vectorShapes } = await import('../src/panels/inspector/VectorSections.tsx');
+    const made = instantiate(emptyDocument(), {
+      tag: 'svg',
+      attrs: { viewBox: '0 0 10 10' },
+      children: [{ tag: 'path', attrs: { d: 'M0 0L1 1' } }, { tag: 'g', children: [{ tag: 'circle', attrs: { r: '2' } }] }],
+    });
+    const shapes = vectorShapes(made.doc, [made.id], null);
+    expect(shapes.map((id) => (made.doc.nodes[id] as unknown as { tag: string }).tag)).toEqual(['path', 'circle']);
+    expect(vectorShapes(made.doc, [made.id], shapes[0]!)).toEqual([shapes[0]]);
+  });
+});

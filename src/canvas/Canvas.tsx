@@ -14,6 +14,7 @@ import { finishTextEditing, useTextEditing } from './textEditing.ts';
 import { useGesture } from './gestureStore.ts';
 import { enterVectorEdit, exitVectorEdit, vectorRootOf, vectorTargetFor } from '../vector/edit.ts';
 import { penDown, startPointMarquee } from '../vector/gestures.ts';
+import { startShapeDraw } from '../vector/shapes.ts';
 
 export function Canvas() {
   const ref = useRef<HTMLDivElement>(null);
@@ -77,6 +78,10 @@ export function Canvas() {
     if (e.button !== 0) return;
     e.preventDefault();
     if (store.tool.kind === 'pen') return penDown(native);
+    if (store.tool.kind === 'shape') {
+      if (store.vectorEdit) exitVectorEdit();
+      return startShapeDraw(native, store.tool.shape);
+    }
     if (store.vectorEdit && store.tool.kind === 'select') {
       // In vector edit mode, empty space box-selects points; a click on another element leaves.
       const edited = vectorRootOf(store.doc, store.vectorEdit.id);

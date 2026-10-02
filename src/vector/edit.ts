@@ -69,6 +69,8 @@ function asPath(doc: DesignDocument, id: NodeId): DesignDocument {
   if (!d) return doc;
   let next = setTag(doc, id, 'path');
   for (const attr of SHAPE_GEOMETRY_ATTRS[el.tag] ?? []) next = setAttribute(next, id, attr, null);
+  // Polygon/star parameters no longer describe a free-form path.
+  for (const attr of ['data-pl-sides', 'data-pl-ratio']) next = setAttribute(next, id, attr, null);
   return setAttribute(next, id, 'd', d);
 }
 

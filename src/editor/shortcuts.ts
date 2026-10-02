@@ -9,6 +9,7 @@ import { saveNow } from './persistence.ts';
 import { useEditor } from './store.ts';
 import { exitVectorEdit, readPath, screenDeltaToUser, writePath } from '../vector/edit.ts';
 import { deleteAnchors, moveRefs } from '../vector/path.ts';
+import { runOutlineStroke, runPathOp } from '../vector/pathOps.ts';
 
 /** Keys in vector edit mode. Returns whether the key was handled. */
 function handleVectorKey(e: KeyboardEvent, key: string, mod: boolean): boolean {
@@ -90,6 +91,25 @@ export function useShortcuts(): void {
         e.preventDefault();
         return;
       }
+      // Path operations (Figma's keys). Alt changes e.key on macOS, so these use e.code.
+      if (e.altKey && e.shiftKey && !mod) {
+        const op = ({ KeyU: 'union', KeyS: 'subtract', KeyI: 'intersect', KeyX: 'exclude' } as const)[e.code as 'KeyU'];
+        if (op) {
+          e.preventDefault();
+          void runPathOp(op);
+          return;
+        }
+      }
+      if (mod && e.altKey && e.code === 'KeyO') {
+        e.preventDefault();
+        void runOutlineStroke();
+        return;
+      }
+      if (mod && !e.shiftKey && key === 'e') {
+        e.preventDefault();
+        void runPathOp('flatten');
+        return;
+      }
       if (mod) {
         if (key === 'z') store[e.shiftKey ? 'redo' : 'undo']();
         else if (key === 'y') store.redo();
@@ -104,6 +124,11 @@ export function useShortcuts(): void {
         return;
       }
       if (e.shiftKey) {
+        if (key === 'l') {
+          store.setTool({ kind: 'shape', shape: 'line' });
+          e.preventDefault();
+          return;
+        }
         if (key === 'a') addFlexOrWrap();
         else if (e.code === 'Digit0') zoomTo(1);
         else if (e.code === 'Digit1') zoomToFit();
@@ -152,6 +177,12 @@ export function useShortcuts(): void {
           break;
         case 'p':
           store.setTool({ kind: 'pen' });
+          break;
+        case 'r':
+          store.setTool({ kind: 'shape', shape: 'rectangle' });
+          break;
+        case 'o':
+          store.setTool({ kind: 'shape', shape: 'ellipse' });
           break;
         default: {
           if (e.shiftKey) return;

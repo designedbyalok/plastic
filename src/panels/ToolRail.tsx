@@ -2,7 +2,8 @@
  * Vertical tool rail. Primary tools are one click; the semantic elements (button, input,
  * field, select…) live in a single Insert menu so the rail stays short.
  */
-import { CirclePlus, Frame, Hand, Heading, Image, MousePointer2, PenTool, Square, Type } from 'lucide-react';
+import { ChevronDown, Circle, CirclePlus, Frame, Hand, Heading, Image, Minus, MousePointer2, MoveUpRight, PenTool, RectangleHorizontal, Square, Star, Triangle, Type, type LucideIcon } from 'lucide-react';
+import { SHAPES, type ShapeKind } from '../vector/shapes.ts';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { INSERTABLES, insertable } from '../elements/insertables.ts';
 import { useEditor, type Tool } from '../editor/store.ts';
@@ -98,6 +99,84 @@ function InsertMenu() {
   );
 }
 
+const SHAPE_ICONS: Record<ShapeKind, LucideIcon> = {
+  rectangle: RectangleHorizontal,
+  ellipse: Circle,
+  line: Minus,
+  arrow: MoveUpRight,
+  polygon: Triangle,
+  star: Star,
+};
+
+/** Figma's shape button: the last shape used, with a menu of all of them. */
+function ShapeMenu() {
+  const [open, setOpen] = useState(false);
+  const [last, setLast] = useState<ShapeKind>('rectangle');
+  const ref = useRef<HTMLDivElement>(null);
+  const tool = useEditor((s) => s.tool);
+  const active = tool.kind === 'shape' ? tool.shape : null;
+  const shown = active ?? last;
+  const Icon = SHAPE_ICONS[shown];
+  const label = SHAPES.find((s) => s.kind === shown)!;
+
+  useEffect(() => {
+    if (active) setLast(active);
+  }, [active]);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('pointerdown', close, true);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('pointerdown', close, true);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+
+  const pick = (kind: ShapeKind) => {
+    setLast(kind);
+    setOpen(false);
+    useEditor.getState().setTool({ kind: 'shape', shape: kind });
+  };
+
+  return (
+    <div className="rail-menu-anchor rail-split" ref={ref}>
+      <button
+        type="button"
+        className={`rail-button${active ? ' is-active' : ''}`}
+        title={label.shortcut ? `${label.label}  ${label.shortcut}` : label.label}
+        aria-label={label.label}
+        aria-pressed={!!active}
+        onClick={() => (active ? useEditor.getState().setTool({ kind: 'select' }) : pick(shown))}
+      >
+        <Icon size={18} strokeWidth={1.5} />
+      </button>
+      <button type="button" className="rail-split-toggle" aria-label="Shape tools" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <ChevronDown size={10} strokeWidth={2} />
+      </button>
+      {open && (
+        <div className="rail-menu" role="menu">
+          <div className="rail-menu-title">Shapes</div>
+          {SHAPES.map((s) => {
+            const ItemIcon = SHAPE_ICONS[s.kind];
+            return (
+              <button key={s.kind} type="button" role="menuitem" className="rail-menu-item" onClick={() => pick(s.kind)}>
+                <ItemIcon size={14} strokeWidth={1.5} />
+                <span>{s.label}</span>
+                {s.shortcut && <kbd>{s.shortcut}</kbd>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ToolRail() {
   const layersOpen = useEditor((s) => s.layersOpen);
   return (
@@ -114,6 +193,7 @@ export function ToolRail() {
         <RailButton tool={{ kind: 'frame' }} label="Frame" shortcut="F">
           <Frame size={18} strokeWidth={1.5} />
         </RailButton>
+        <ShapeMenu />
         <RailButton tool={{ kind: 'pen' }} label="Pen" shortcut="P">
           <PenTool size={18} strokeWidth={1.5} />
         </RailButton>

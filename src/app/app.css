@@ -2512,3 +2512,88 @@ textarea.insp-input {
   font: inherit;
   font-weight: 500;
 }
+
+/* Shape tool: a rail button with a small menu toggle in its corner. */
+.rail-split {
+  position: relative;
+}
+
+.rail-split-toggle {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ui-faint);
+  cursor: pointer;
+}
+
+.rail-split-toggle:hover,
+.rail-split-toggle[aria-expanded='true'] {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+
+.canvas.tool-shape {
+  cursor: crosshair;
+}
+
+.insp-hint {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+/* Path operations */
+.insp-ops {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.insp-op {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-icon);
+}
+
+.insp-op:hover:not(:disabled) {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+
+.insp-op:disabled {
+  opacity: 0.35;
+}
+
+.insp-ops-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--ui-line);
+}
+
+.ov-notice {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--ui-popover);
+  box-shadow: var(--ui-popover-shadow);
+  color: var(--ui-text);
+  font-size: 12px;
+  transform: translateX(-50%);
+}

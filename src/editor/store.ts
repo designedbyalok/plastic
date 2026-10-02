@@ -12,12 +12,14 @@ import { starterDocument } from '../elements/insertables.ts';
 import type { Viewport } from '../canvas/coords.ts';
 import { EMPTY_HISTORY, record, redo, undo, type History } from './history.ts';
 import type { PointRef } from '../vector/path.ts';
+import type { ShapeKind } from '../vector/shapes.ts';
 
 export type Tool =
   | { readonly kind: 'select' }
   | { readonly kind: 'hand' }
   | { readonly kind: 'frame' }
   | { readonly kind: 'pen' }
+  | { readonly kind: 'shape'; readonly shape: ShapeKind }
   | { readonly kind: 'insert'; readonly itemId: string };
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';

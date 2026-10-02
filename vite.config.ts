@@ -21,12 +21,16 @@ function openPencilWorkerFix(): Plugin {
 export default defineConfig({
   plugins: [openPencilWorkerFix(), react(), process.env.VITEST ? null : plasticWorkspace()],
   worker: { format: 'es' },
+  // Path operations use Paper.js for geometry only; its core build leaves out PaperScript.
+  resolve: { alias: [{ find: /^paper$/, replacement: 'paper/dist/paper-core.js' }] },
   server: {
     // Design files are served through the workspace plugin, not as app modules.
     watch: { ignored: ['**/workspace/**'] },
   },
   test: {
     environment: 'node',
+    // Through Vite (and its alias), so paperjs-offset and our code share one Paper.js.
+    server: { deps: { inline: ['paperjs-offset'] } },
     include: ['tests/**/*.test.ts'],
   },
 });

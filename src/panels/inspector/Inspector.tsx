@@ -7,6 +7,8 @@ import { getElement } from '../../document/tree.ts';
 import { setPageCanvas } from '../../document/pages.ts';
 import type { ElementNode } from '../../document/types.ts';
 import { elementSpec } from '../../elements/registry.ts';
+import { VectorSections } from './VectorSections.tsx';
+import { PathOpsSection } from './PathOpsSection.tsx';
 import { AttributesSection, BehaviorSection, ContentSection, ElementSection, TableSection } from './ElementSections.tsx';
 import {
   BorderSection, ConstraintsSection, CssSection, FillSection, LayoutSection, MarginSection, OpacitySection, RadiusSection, ShadowSection, TextSection,
@@ -26,6 +28,8 @@ export function Inspector() {
   const elements = selection.map((id) => getElement(doc, id)).filter((el): el is ElementNode => !!el);
   const single = elements.length === 1 ? elements[0]! : null;
   const ids = elements.map((el) => el.id);
+  // Vectors (svg) get Fill/Stroke for their shapes instead of the box's fill, border and text.
+  const vector = elements.length > 0 && elements.every((el) => el.tag === 'svg');
   const textual = elements.every((el) => {
     const spec = elementSpec(el.tag);
     return spec.editableText || spec.category === 'text' || spec.category === 'form';
@@ -51,11 +55,18 @@ export function Inspector() {
           {single && <BehaviorSection el={single} />}
           {single && <TableSection el={single} />}
           <LayoutSection ids={ids} />
-          <RadiusSection ids={ids} />
+          <PathOpsSection ids={ids} />
+          {!vector && <RadiusSection ids={ids} />}
           <OpacitySection ids={ids} />
-          <FillSection ids={ids} />
-          <TextSection ids={ids} textual={textual} />
-          <BorderSection ids={ids} />
+          {vector ? (
+            <VectorSections ids={ids} />
+          ) : (
+            <>
+              <FillSection ids={ids} />
+              <TextSection ids={ids} textual={textual} />
+              <BorderSection ids={ids} />
+            </>
+          )}
           <ShadowSection ids={ids} />
           <MarginSection ids={ids} />
           <ConstraintsSection ids={ids} />
