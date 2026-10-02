@@ -52,6 +52,12 @@ field, select, checkbox, table…) are in its **Insert element** menu, or on the
 
 Shortcuts are listed in the inspector when nothing is selected.
 
+## Import from Figma
+
+Drop a `.fig` file onto the home screen (in Figma: **File → Save local copy…**). Pages, frames,
+auto layout, text, images, vectors and variables become plain HTML/CSS you can keep editing;
+fonts you don't have installed are highlighted. Parsing uses [OpenPencil](https://github.com/open-pencil/open-pencil).
+
 ## Connect agents (MCP)
 
 Claude, Codex, Cursor, GitHub Copilot and other local agents can read and write your designs

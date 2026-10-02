@@ -41,6 +41,8 @@ export interface EditorState {
   readonly savedRevision: number;
   readonly saveStatus: SaveStatus;
   readonly storageLocation: string;
+  /** Base URL that the project's relative asset paths (assets/…) resolve against, if served. */
+  readonly assetBase: string | null;
 
   /** File of the page shown on the canvas. Always a page of `doc`. */
   readonly activePage: string;
@@ -58,6 +60,8 @@ export interface EditorState {
   readonly layersWidth: number;
   /** The "Connect your agent" dialog. */
   readonly agentsOpen: boolean;
+  /** The keyboard shortcuts popover. */
+  readonly shortcutsOpen: boolean;
   readonly spacePressed: boolean;
 
   apply(label: string, recipe: (doc: DesignDocument) => DesignDocument, options?: ApplyOptions): void;
@@ -83,6 +87,7 @@ export interface EditorState {
   setLayersOpen(open: boolean): void;
   setLayersWidth(width: number): void;
   setAgentsOpen(open: boolean): void;
+  setShortcutsOpen(open: boolean): void;
   setSpacePressed(pressed: boolean): void;
   setSaveState(status: SaveStatus, savedRevision?: number, location?: string): void;
 }
@@ -130,6 +135,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   savedRevision: 0,
   saveStatus: 'idle',
   storageLocation: '',
+  assetBase: null,
   selection: [],
   hoverId: null,
   editingTextId: null,
@@ -140,6 +146,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   layersOpen: readPref('plastic:layers-open') !== '0',
   layersWidth: clampPanelWidth(Number(readPref('plastic:layers-width')) || PANEL_WIDTH.default),
   agentsOpen: false,
+  shortcutsOpen: false,
   spacePressed: false,
 
   apply(label, recipe, options = {}) {
@@ -273,6 +280,9 @@ export const useEditor = create<EditorState>()((set, get) => ({
   },
   setAgentsOpen(open) {
     set({ agentsOpen: open });
+  },
+  setShortcutsOpen(open) {
+    set({ shortcutsOpen: open });
   },
   setSpacePressed(pressed) {
     if (get().spacePressed !== pressed) set({ spacePressed: pressed });

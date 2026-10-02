@@ -8,9 +8,11 @@
  * swap stays local.
  *
  *   GET  /__plastic/workspace          → { location, projects: [{ id, updatedAt, files }] }
- *   POST /__plastic/workspace          { title, files } → { id }
+ *   POST /__plastic/workspace          { title, files, assetsFrom? } → { id }
  *   GET  /__plastic/project/<id>       → { location, files | null }
  *   PUT  /__plastic/project/<id>       { "index.html": "…", "styles.css": "…", … }
+ *   GET  /__plastic/files/<id>/assets/<name>   a project's images (artboards use it as <base>)
+ *   POST /__plastic/import/figma?name=<file.fig>  raw .fig bytes → { id, report }
  *   POST /mcp                          MCP (Streamable HTTP) for agents — see server/mcp
  *   GET  /__plastic/agents             how to connect agents (command, URL, CLI status)
  *   POST /__plastic/agents/install     { agent: "claude" | "codex" } — runs the agent's CLI
@@ -19,7 +21,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin, ViteDevServer } from 'vite';
-import { PROJECT_ID, ProjectStore, isProjectFiles, sameProjectFiles, type ProjectFiles } from './projectStore.ts';
+import { importFigma } from './figma/import.ts';
+import { ASSET_TYPES, PROJECT_ID, ProjectStore, isProjectFiles, sameProjectFiles, type ProjectFiles } from './projectStore.ts';
 import { agentSetup, installWithCli } from './agents.ts';
 import { handleMcpRequest, isLocalRequest } from './mcp/http.ts';
 
@@ -91,12 +94,37 @@ export function plasticWorkspace(): Plugin {
       }
       return json(res, 404);
     }
+    const asset = /^\/__plastic\/files\/([^/]+)\/assets\/([^/]+)$/.exec(url.pathname);
+    if (asset) {
+      const [, assetProject, assetName] = asset.map((p) => decodeURIComponent(p));
+      if (!PROJECT_ID.test(assetProject!) || req.method !== 'GET') return json(res, 404);
+      const bytes = await store.readAsset(assetProject!, assetName!);
+      if (!bytes) return json(res, 404);
+      res.statusCode = 200;
+      res.setHeader('content-type', ASSET_TYPES[assetName!.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream');
+      res.setHeader('cache-control', 'no-cache');
+      return void res.end(bytes);
+    }
+    if (url.pathname === '/__plastic/import/figma') {
+      if (req.method !== 'POST') return json(res, 405);
+      if (!isLocalRequest(req)) return json(res, 403, { error: 'Local requests only.' });
+      // A non-form content type forces a CORS preflight, so other sites can't post files here.
+      if (!String(req.headers['content-type']).startsWith('application/octet-stream')) return json(res, 415, { error: 'Expected the .fig file as application/octet-stream.' });
+      const bytes = await readBytes(req);
+      try {
+        const result = await importFigma(store, bytes, url.searchParams.get('name') ?? 'Imported from Figma');
+        return json(res, 201, result);
+      } catch (error) {
+        return json(res, 422, { error: error instanceof Error ? error.message : String(error) });
+      }
+    }
     if (url.pathname === '/__plastic/workspace') {
       if (req.method === 'GET') return json(res, 200, { location, projects: await listProjects() });
       if (req.method === 'POST') {
-        const body = JSON.parse(await readBody(req)) as { title?: unknown; files?: unknown };
+        const body = JSON.parse(await readBody(req)) as { title?: unknown; files?: unknown; assetsFrom?: unknown };
         if (!isProjectFiles(body.files)) return json(res, 400, { error: 'Expected files { "index.html": "…", … }' });
         const id = await uniqueId(typeof body.title === 'string' ? body.title : 'untitled');
+        if (typeof body.assetsFrom === 'string' && PROJECT_ID.test(body.assetsFrom)) await store.copyAssets(body.assetsFrom, id);
         await writeFiles(id, body.files);
         return json(res, 201, { id });
       }
@@ -138,6 +166,15 @@ function readBody(req: NodeJS.ReadableStream): Promise<string> {
     req.setEncoding('utf8');
     req.on('data', (chunk: string) => (data += chunk));
     req.on('end', () => resolve(data));
+    req.on('error', reject);
+  });
+}
+
+function readBytes(req: NodeJS.ReadableStream): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => resolve(new Uint8Array(Buffer.concat(chunks))));
     req.on('error', reject);
   });
 }

@@ -1,8 +1,7 @@
-import { ChevronDown, ChevronRight, File, Layers3, PanelLeft, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, File, PanelLeft, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { setName, setTitle } from '../document/ops';
 import { addPage, nextPageName, removePage, renamePage } from '../document/pages';
-import { linkClick } from '../app/router';
 import { elementChildren, getElement } from '../document/tree';
 import type { NodeId, Page } from '../document/types';
 import { kindLabel, layerName } from '../elements/registry';
@@ -10,6 +9,7 @@ import { activeRoots, useEditor } from '../editor/store';
 import { iconFor } from './icons';
 import { ThemePanel } from './ThemePanel';
 import { PanelResizer } from './PanelResizer';
+import { FileMenu } from './FileMenu';
 
 export function LayersPanel() {
   const title = useEditor((s) => s.doc.title);
@@ -21,9 +21,7 @@ export function LayersPanel() {
     <aside className="panel layers-panel" aria-label="File" style={{ width }}>
       <PanelResizer />
       <header className="file-header">
-        <a className="file-mark" href="/" onClick={linkClick} title="All files" aria-label="All files">
-          <Layers3 size={15} strokeWidth={1.75} />
-        </a>
+        <FileMenu />
         <input
           className="file-title"
           aria-label="File name"
@@ -70,9 +68,7 @@ function CollapsedFileHeader() {
   const title = useEditor((s) => s.doc.title);
   return (
     <div className="collapsed-header">
-      <a className="file-mark" href="/" onClick={linkClick} title="All files" aria-label="All files">
-        <Layers3 size={15} strokeWidth={1.75} />
-      </a>
+      <FileMenu />
       <span className="collapsed-title" title={title}>
         {title}
       </span>

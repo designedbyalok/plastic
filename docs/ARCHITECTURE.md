@@ -279,28 +279,34 @@ Layers show both: `Email  <label>`, `you@example.com  <input>`, `Continue  <butt
   toggled per element (Layout ⇄ Free) without the element jumping.
 - Multi-selection edits apply to each selected element's class.
 
-## 11. Figma import (later)
+## 11. Figma import
 
-The importer is a translator from Figma's node tree into `NodeSpec` trees — the same structure
-insert templates use — so it needs no special path into the document:
+Drop a `.fig` on the home screen (or press **Import**, or call the `import_figma` MCP tool).
+Reading the binary format is not ours to maintain: [OpenPencil](https://github.com/open-pencil/open-pencil)'s
+`@open-pencil/core` (MIT) decodes the kiwi archive into a scene graph with component instances
+expanded. `server/figma/convert.ts` maps that scene graph onto Plastic's model and saves through
+the normal serializer, so an imported file is an ordinary, fully editable project.
 
-| Figma                      | NodeSpec                                                        |
-| -------------------------- | --------------------------------------------------------------- |
-| Frame / Rectangle          | `div` (frames with children become containers)                  |
-| Auto layout H / V          | `display:flex; flex-direction: row / column`                    |
-| Item spacing / padding     | `gap` / `padding`                                               |
-| Text                       | `p` (or `h1–h6` by style name / size heuristics, as a suggestion) |
-| Image fill                 | `img` (or `background-image` for fills on frames)               |
-| Vector / boolean / complex | exported SVG (`svg` subtree) or an `img` of the SVG            |
-| Corner radius / effects    | `border-radius` / `box-shadow`, `filter`                        |
-| Absolute children          | `position:absolute; left; top` inside a `position:relative` parent |
-| Variables / styles         | Tokens in tokens.css (`--color-*`, `--spacing-*`…); modes → override blocks |
+| Figma                          | Plastic                                                                     |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| Pages                          | One HTML file per page (first is index.html)                                |
+| Top-level layers               | Artboards at their canvas positions; layer names kept                       |
+| Auto layout H / V / grid       | `display: flex` (direction, gap, padding, justify/align, wrap) / `grid`     |
+| Fill / hug / fixed             | `flex: 1 1 0` or `align-self: stretch` / no size / `width`, `height`        |
+| Absolute children, constraints | `position: absolute` with left/right/center/scale from constraints          |
+| Fills                          | `background` layers: solids, linear/radial/conic gradients, image files     |
+| Image-filled rectangles        | `<img>` with `object-fit`; images saved to `assets/`                        |
+| Strokes                        | `border` (inside, with padding compensated) or `outline` (center/outside)   |
+| Effects, radius, opacity, blend | `box-shadow`, `filter`, `backdrop-filter`, `border-radius`, `mix-blend-mode` |
+| Text and style runs            | `p` / `h1–h3` by size, with `span`s for runs; curved text → SVG `textPath`   |
+| Fonts                          | `font-*` tokens, so swapping a missing font is one token edit               |
+| Vectors, icons, masks          | Inline `<svg>` from OpenPencil's SVG exporter (masks → SVG `<mask>`)        |
+| Variables                      | Tokens; other modes become `[data-mode="…"]` override blocks               |
 
-Priority: appearance first (fallback to SVG rather than failing), editability second, semantics
-third. Semantic upgrades ("rectangle + placeholder text → input?", "repeated rows → table?") are
-offered as **suggestions** that the user accepts; they run as ordinary document ops and are
-undoable. Stable `data-pl-id`s let a later re-import map Figma node ids → Plastic ids in
-project.json.
+Identical layers (e.g. instances of one component) share a class. Fonts are checked against the
+browser on import (`src/app/fonts.ts`); missing ones are flagged in the import report, the Text
+section and the Theme panel. Known gaps: auto-layout children of rotated frames use unrotated
+boxes, vector masks over images/text clip to their bounding box, and prototype links are ignored.
 
 ## 12. First milestone (this slice)
 

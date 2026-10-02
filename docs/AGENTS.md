@@ -52,6 +52,7 @@ While the dev server runs, agents that take a URL can use Streamable HTTP at
 | `move_node` / `delete_nodes` | Restructure |
 | `create_page` / `rename_page` / `delete_page` | Pages (one HTML file each) |
 | `get_tokens` / `set_tokens` / `rename_token` | Design tokens; renaming updates every `var()` |
+| `import_figma` | Convert a local `.fig` file into a new Plastic file |
 
 The server's instructions tell agents how Plastic files are organized: semantic HTML, one class
 per element styled in `styles.css`, tokens as `var(--color-…)`, flex/grid inside artboards.

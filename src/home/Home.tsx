@@ -2,13 +2,14 @@
  * Home: the workspace's files, most recently edited first. Each file is a folder on disk;
  * its name is the document's <title> and its thumbnail is the design itself.
  */
-import { Clock, Folder, Layers3, LayoutGrid, List, Minus, Plus, Search } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Clock, FileUp, Folder, Layers3, LayoutGrid, List, Minus, Plus, Search } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react';
 import { fileHref, linkClick, navigate } from '../app/router';
 import type { DesignDocument } from '../document/types';
 import { createProject } from '../editor/persistence';
 import { STYLES_FILE, TOKENS_FILE, parseProject } from '../serialization';
-import { connectWorkspace, type ProjectSummary } from '../serialization/storage';
+import { connectWorkspace, type ProjectSummary, type Workspace } from '../serialization/storage';
+import { DropOverlay, ImportDialog, isFigmaFile, useFileDrop, type ImportState } from './FigmaImport';
 import { Thumbnail } from './Thumbnail';
 import { editedAgo } from './time';
 import './home.css';
@@ -21,6 +22,8 @@ interface FileEntry {
   readonly updatedAt: number;
   readonly doc: DesignDocument;
   readonly css: string;
+  /** Where the project's assets/ are served from (thumbnails resolve images against it). */
+  readonly base: string | null;
 }
 
 const VIEW_KEY = 'plastic:home-view';
@@ -42,12 +45,12 @@ function writePref(key: string, value: string): void {
   }
 }
 
-function toEntry(summary: ProjectSummary): FileEntry | null {
+function toEntry(summary: ProjectSummary, workspace: Workspace): FileEntry | null {
   try {
     const { doc } = parseProject(summary.files);
     // Thumbnails render the first page with the project's tokens and styles, in cascade order.
     const css = `${summary.files[TOKENS_FILE] ?? ''}\n${summary.files[STYLES_FILE] ?? ''}`;
-    return { id: summary.id, title: doc.title || summary.id, updatedAt: summary.updatedAt, doc, css };
+    return { id: summary.id, title: doc.title || summary.id, updatedAt: summary.updatedAt, doc, css, base: workspace.assetBase(summary.id) };
   } catch {
     return null;
   }
@@ -68,14 +71,19 @@ export function Home() {
   const [query, setQuery] = useState('');
   const [view, setView] = useState<View>(() => (readPref(VIEW_KEY) === 'list' ? 'list' : 'grid'));
   const [creating, setCreating] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [importState, setImportState] = useState<ImportState>({ status: 'idle' });
+  const [canImport, setCanImport] = useState(false);
+  const pickerRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const now = useNow();
 
   const refresh = useCallback(async () => {
     const workspace = await connectWorkspace();
     setLocation(workspace.location);
+    setCanImport(!!workspace.importFigma);
     const list = await workspace.list();
-    setFiles(list.map(toEntry).filter((f): f is FileEntry => f !== null));
+    setFiles(list.map((p) => toEntry(p, workspace)).filter((f): f is FileEntry => f !== null));
   }, []);
 
   useEffect(() => {
@@ -115,6 +123,47 @@ export function Home() {
     }
   };
 
+  const importFile = async (file: File) => {
+    if (importState.status === 'importing') return;
+    if (!isFigmaFile(file)) {
+      setImportState({ status: 'error', name: file.name, message: 'Only Figma .fig files can be imported. In Figma, use File → Save local copy… to get one.' });
+      return;
+    }
+    const workspace = await connectWorkspace();
+    if (!workspace.importFigma) {
+      setImportState({ status: 'error', name: file.name, message: 'Importing needs the Plastic dev server (bun run dev), which converts the file on disk.' });
+      return;
+    }
+    setImportState({ status: 'importing', name: file.name });
+    try {
+      const result = await workspace.importFigma(file);
+      setSelected(result.id);
+      setImportState({ status: 'done', result });
+      void refresh();
+    } catch (error) {
+      setImportState({ status: 'error', name: file.name, message: error instanceof Error ? error.message : String(error) });
+    }
+  };
+  const dragging = useFileDrop(canImport && importState.status !== 'importing', (file) => void importFile(file));
+
+  /** Click selects a file; double-click (or Enter) opens it. Modifier clicks keep link behavior. */
+  const cardProps = (id: string) => ({
+    onClick: (e: MouseEvent<HTMLAnchorElement>) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setSelected(id);
+    },
+    onDoubleClick: () => navigate(fileHref(id)),
+    onKeyDown: (e: ReactKeyboardEvent<HTMLAnchorElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        navigate(fileHref(id));
+      }
+    },
+    onFocus: () => setSelected(id),
+  });
+
   const changeView = (next: View) => {
     setView(next);
     writePref(VIEW_KEY, next);
@@ -127,7 +176,26 @@ export function Home() {
         <header className="home-header">
           <div className="home-header-inner">
             <h1 className="home-title">{query.trim() ? 'Search' : 'Recents'}</h1>
-            <div className="home-actions">
+ <div className="home-actions">
+              {canImport && (
+                <>
+                  <button type="button" className="home-import" onClick={() => pickerRef.current?.click()} disabled={importState.status === 'importing'} title="Import a Figma .fig file (or drop it anywhere)">
+                    <FileUp size={13} strokeWidth={1.75} />
+                    Import
+                  </button>
+                  <input
+                    ref={pickerRef}
+                    type="file"
+                    accept=".fig"
+                    hidden
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (file) void importFile(file);
+                    }}
+                  />
+                </>
+              )}
               <button type="button" className="home-new" onClick={() => void newFile()} disabled={creating}>
                 <Plus size={12} strokeWidth={2} />
                 New file
@@ -151,28 +219,28 @@ export function Home() {
           </div>
         </header>
 
-        <section className="home-files" aria-label="Files">
+        <section className="home-files" aria-label="Files" onClick={() => setSelected(null)}>
           <div className="home-files-inner">
             {files === null ? null : visible.length === 0 ? (
               <EmptyState searching={!!query.trim()} onNew={() => void newFile()} />
             ) : view === 'grid' ? (
               <div className="home-grid">
                 {visible.map((f) => (
-                  <a key={f.id} className="home-card" href={fileHref(f.id)} onClick={linkClick}>
+                  <a key={f.id} className={`home-card${selected === f.id ? ' is-selected' : ''}`} href={fileHref(f.id)} {...cardProps(f.id)}>
                     <div className="home-card-meta">
                       <span className="home-card-title">{f.title}</span>
                       <span className="home-card-subtitle">{editedAgo(f.updatedAt, now)}</span>
                     </div>
-                    <Thumbnail doc={f.doc} css={f.css} />
+                    <Thumbnail doc={f.doc} css={f.css} base={f.base} />
                   </a>
                 ))}
               </div>
             ) : (
               <div className="home-list" role="list">
                 {visible.map((f) => (
-                  <a key={f.id} role="listitem" className="home-row" href={fileHref(f.id)} onClick={linkClick}>
+                  <a key={f.id} role="listitem" className={`home-row${selected === f.id ? ' is-selected' : ''}`} href={fileHref(f.id)} {...cardProps(f.id)}>
                     <span className="home-row-thumb">
-                      <Thumbnail doc={f.doc} css={f.css} />
+                      <Thumbnail doc={f.doc} css={f.css} base={f.base} />
                     </span>
                     <span className="home-row-title">{f.title}</span>
                     <span className="home-row-path">{`${location}/${f.id}`}</span>
@@ -184,6 +252,17 @@ export function Home() {
           </div>
         </section>
       </main>
+      {dragging && <DropOverlay />}
+      {importState.status !== 'idle' && (
+        <ImportDialog
+          state={importState}
+          onClose={() => setImportState({ status: 'idle' })}
+          onOpen={(id) => {
+            setImportState({ status: 'idle' });
+            navigate(fileHref(id));
+          }}
+        />
+      )}
     </div>
   );
 }

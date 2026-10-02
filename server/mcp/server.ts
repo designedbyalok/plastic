@@ -3,10 +3,13 @@
  * designs and tokens. Tools are thin wrappers over DesignApi, which uses the editor's own
  * document operations, so agent edits produce the same files the editor would.
  */
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { ProjectStore } from '../projectStore.ts';
 import { DesignApi, DesignError } from './designApi.ts';
+import { importFigma } from '../figma/import.ts';
 
 const INSTRUCTIONS = `Plastic is a visual editor whose designs are real HTML and CSS.
 
@@ -205,6 +208,24 @@ export function createMcpServer(store: ProjectStore): McpServer {
     'delete_nodes',
     { title: 'Delete elements', description: 'Delete elements and everything inside them.', inputSchema: { file, ids: z.array(z.string()) }, annotations: destructive },
     run(({ file, ids }) => api.deleteNodes(file, ids)),
+  );
+
+  server.registerTool(
+    'import_figma',
+    {
+      title: 'Import Figma file',
+      description:
+        'Convert a local Figma .fig file into a new Plastic file: pages, artboards, auto layout (as flexbox/grid), text, images, vectors (inline SVG) and variables (tokens). Returns the new file id and a report, including the fonts it uses.',
+      inputSchema: { path: z.string().describe('Absolute path to a .fig file (in Figma: File → Save local copy…).') },
+      annotations: writes,
+    },
+    run(async ({ path: figPath }) => {
+      if (!/\.fig$/i.test(figPath)) throw new DesignError('Expected a path to a .fig file.');
+      const bytes = await fsp.readFile(figPath).catch(() => {
+        throw new DesignError(`Can't read ${figPath}.`);
+      });
+      return importFigma(store, new Uint8Array(bytes), path.basename(figPath));
+    }),
   );
 
   // --- pages -----------------------------------------------------------------------------------

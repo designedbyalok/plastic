@@ -4,6 +4,7 @@ import {
   addFlexOrWrap, deleteSelection, toggleClipContent, duplicateSelection, enterSelection, nudgeSelection, selectParent,
   zoomBy, zoomTo, zoomToFit, zoomToSelection,
 } from './commands';
+import { navigate } from '../app/router';
 import { saveNow } from './persistence';
 import { useEditor } from './store';
 
@@ -37,6 +38,7 @@ export function useShortcuts(): void {
       if (mod) {
         if (key === 'z') store[e.shiftKey ? 'redo' : 'undo']();
         else if (key === 'y') store.redo();
+        else if (key === 'd' && e.shiftKey) navigate('/');
         else if (key === 'd') duplicateSelection();
         else if (key === '=' || key === '+') zoomBy(1.25);
         else if (key === '-') zoomBy(0.8);

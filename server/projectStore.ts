@@ -11,6 +11,13 @@ export const PROJECT_FILE_NAME = /^[a-z0-9][a-z0-9_.-]*\.(html|css|json)$/i;
 /** Project ids are folder names. Restricting them keeps every path inside the workspace. */
 export const PROJECT_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
+/** Binary files a project may reference, in its assets/ folder (images from imports). */
+export const ASSET_NAME = /^[a-z0-9][a-z0-9_.-]*\.(png|jpe?g|gif|webp|avif|svg)$/i;
+
+export const ASSET_TYPES: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif', svg: 'image/svg+xml',
+};
+
 export type ProjectFiles = Record<string, string>;
 
 export interface ProjectSummary {
@@ -72,6 +79,32 @@ export class ProjectStore {
     for (const name of await fsp.readdir(dir).catch(() => [] as string[])) {
       if (name.endsWith('.html') && PROJECT_FILE_NAME.test(name) && !(name in files)) await fsp.rm(path.join(dir, name));
     }
+  }
+
+  /** Write binary files under assets/ (paths like "assets/abc.png"). */
+  async writeAssets(id: string, assets: Record<string, Uint8Array>): Promise<void> {
+    const dir = path.join(this.dirOf(id), 'assets');
+    for (const [file, bytes] of Object.entries(assets)) {
+      const name = file.replace(/^assets\//, '');
+      if (!ASSET_NAME.test(name)) continue;
+      await fsp.mkdir(dir, { recursive: true });
+      await fsp.writeFile(path.join(dir, name), bytes);
+    }
+  }
+
+  /** Copy another project's assets/ folder (duplicating a file keeps its images). */
+  async copyAssets(from: string, to: string): Promise<void> {
+    const source = path.join(this.dirOf(from), 'assets');
+    const names = (await fsp.readdir(source).catch(() => [] as string[])).filter((n) => ASSET_NAME.test(n));
+    if (!names.length) return;
+    const target = path.join(this.dirOf(to), 'assets');
+    await fsp.mkdir(target, { recursive: true });
+    for (const name of names) await fsp.copyFile(path.join(source, name), path.join(target, name));
+  }
+
+  async readAsset(id: string, name: string): Promise<Buffer | null> {
+    if (!ASSET_NAME.test(name)) return null;
+    return fsp.readFile(path.join(this.dirOf(id), 'assets', name)).catch(() => null);
   }
 
   async list(): Promise<ProjectSummary[]> {

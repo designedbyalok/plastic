@@ -45,12 +45,14 @@ function cached<T extends object>(sheet: T, serialize: (sheet: T) => string): st
 const READY_ATTR = 'data-plastic-artboard';
 
 /** Give the iframe a standards-mode document (about:blank starts in quirks mode). */
-function prepareDocument(frame: HTMLIFrameElement): Document | null {
+function prepareDocument(frame: HTMLIFrameElement, base: string | null): Document | null {
   const doc = frame.contentDocument;
   if (!doc) return null;
   if (!doc.documentElement.hasAttribute(READY_ATTR)) {
+    // <base> makes the design's relative URLs (assets/…) resolve inside its project folder.
+    const baseTag = base ? `<base href="${base.replace(/"/g, '&quot;')}">` : '';
     doc.open();
-    doc.write(`<!doctype html><html lang="en" ${READY_ATTR}><head><meta charset="utf-8"></head><body></body></html>`);
+    doc.write(`<!doctype html><html lang="en" ${READY_ATTR}><head><meta charset="utf-8">${baseTag}</head><body></body></html>`);
     doc.close();
   }
   return doc;
@@ -89,7 +91,7 @@ export function ArtboardHost({ id }: { id: NodeId }) {
 
     const setup = () => {
       teardown?.();
-      const doc = prepareDocument(iframe);
+      const doc = prepareDocument(iframe, useEditor.getState().assetBase);
       if (!doc) return;
       const win = doc.defaultView!;
       const guard = doc.createElement('style');

@@ -16,6 +16,8 @@ export interface ProjectStorage {
   readonly id: string;
   /** Human-readable location, e.g. "workspace/demo". */
   readonly location: string;
+  /** URL the project folder is served from (for assets/…), or null. */
+  readonly assetBase: string | null;
   load(): Promise<ProjectFiles | null>;
   save(files: ProjectFiles): Promise<void>;
   /** Called when the files change outside the editor (text editor, git, coding agent). */
@@ -27,11 +29,36 @@ export interface Workspace {
   readonly location: string;
   /** Projects, most recently edited first. */
   list(): Promise<ProjectSummary[]>;
-  /** Create a project; returns its id. */
-  create(title: string, files: ProjectFiles): Promise<string>;
+  /** Create a project; returns its id. `assetsFrom` copies another project's assets/. */
+  create(title: string, files: ProjectFiles, options?: { assetsFrom?: string }): Promise<string>;
   open(id: string): ProjectStorage;
+  /** URL a project's folder is served from, for its assets/ (null when assets aren't served). */
+  assetBase(id: string): string | null;
+  /** Convert a Figma .fig file into a new project. Null when this workspace can't import. */
+  readonly importFigma: ((file: File) => Promise<FigmaImportResult>) | null;
   /** Called when projects are added, removed or edited anywhere. */
   onChange(listener: () => void): () => void;
+}
+
+export interface FigmaFontUse {
+  readonly family: string;
+  readonly token: string;
+  readonly weights: readonly number[];
+  readonly italic: boolean;
+  readonly layers: number;
+}
+
+export interface FigmaImportResult {
+  readonly id: string;
+  readonly report: {
+    readonly title: string;
+    readonly pages: readonly { readonly name: string; readonly file: string; readonly artboards: number }[];
+    readonly layers: number;
+    readonly fonts: readonly FigmaFontUse[];
+    readonly images: number;
+    readonly tokens: number;
+    readonly warnings: readonly string[];
+  };
 }
 
 const PROJECT_CHANGED_EVENT = 'plastic:project-changed';
@@ -69,21 +96,37 @@ class DevServerWorkspace implements Workspace {
     });
   }
 
-  async create(title: string, files: ProjectFiles): Promise<string> {
+  async create(title: string, files: ProjectFiles, options: { assetsFrom?: string } = {}): Promise<string> {
     const response = await fetch('/__plastic/workspace', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title, files }),
+      body: JSON.stringify({ title, files, assetsFrom: options.assetsFrom }),
     });
     if (!response.ok) throw new Error(`Could not create project: ${response.status}`);
     return ((await response.json()) as { id: string }).id;
   }
+
+  assetBase(id: string): string {
+    return `/__plastic/files/${encodeURIComponent(id)}/`;
+  }
+
+  readonly importFigma = async (file: File): Promise<FigmaImportResult> => {
+    const response = await fetch(`/__plastic/import/figma?name=${encodeURIComponent(file.name)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+      body: file,
+    });
+    const data = (await response.json().catch(() => ({}))) as { error?: string } & Partial<FigmaImportResult>;
+    if (!response.ok || !data.id || !data.report) throw new Error(data.error ?? `Import failed (${response.status}).`);
+    return data as FigmaImportResult;
+  };
 
   open(id: string): ProjectStorage {
     const endpoint = `/__plastic/project/${encodeURIComponent(id)}`;
     return {
       id,
       location: `${this.location}/${id}`,
+      assetBase: this.assetBase(id),
       async load() {
         const response = await fetch(endpoint);
         if (!response.ok) return null;
@@ -157,10 +200,17 @@ class LocalStorageWorkspace implements Workspace {
     return id;
   }
 
+  assetBase(): null {
+    return null;
+  }
+
+  readonly importFigma = null;
+
   open(id: string): ProjectStorage {
     return {
       id,
       location: 'this browser',
+      assetBase: null,
       load: async () => this.read()[id]?.files ?? null,
       save: async (files) => this.write({ ...this.read(), [id]: { files, updatedAt: Date.now() } }),
       onExternalChange: () => () => {},

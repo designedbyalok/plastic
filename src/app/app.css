@@ -202,9 +202,79 @@ html.is-resizing-panel * {
   color: #ffffff80;
 }
 
-.file-mark:hover {
+.file-mark {
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.file-mark:hover,
+.file-mark.is-active {
   background: var(--ui-hover);
   color: var(--ui-text);
+}
+
+.file-menu-anchor {
+  position: relative;
+  flex: none;
+}
+
+.file-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 248px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #1e1e1e;
+  box-shadow: 0 0 0 1px #ffffff14, 0 8px 24px #00000080;
+}
+
+.file-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 28px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 12px;
+  text-align: left;
+}
+
+.file-menu-item:hover {
+  background: var(--ui-accent);
+}
+
+.file-menu-check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+}
+
+.file-menu-label {
+  flex: 1;
+}
+
+.file-menu-item kbd {
+  color: var(--ui-faint);
+  font: inherit;
+  letter-spacing: 0.04em;
+}
+
+.file-menu-item:hover kbd {
+  color: #ffffffb3;
+}
+
+.file-menu-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--ui-line);
 }
 
 .file-title {
@@ -2177,4 +2247,43 @@ textarea.insp-input {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* --- missing fonts ------------------------------------------------------------------------ */
+
+.insp-font-missing {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f5a5241a;
+  color: #f7c063;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.insp-font-missing svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.insp-font-missing b {
+  font-weight: 600;
+}
+
+.token-row.is-missing .token-value {
+  color: #f7c063;
+}
+
+.token-missing {
+  flex: none;
+  color: #f7c063;
+}
+
+/* The open file menu floats above the tool rail and canvas. */
+.layers-panel:has(.file-menu),
+.collapsed-header:has(.file-menu) {
+  z-index: 45;
 }

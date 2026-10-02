@@ -74,6 +74,7 @@ export async function openProject(id: string): Promise<OpenedProject> {
   const { doc, meta } = parseProject(files);
   useEditor.getState().load(doc, { viewport: meta.viewport, collapsed: meta.collapsed, activePage: meta.activePage });
   storage = project;
+  useEditor.setState({ assetBase: project.assetBase });
   lastWritten = files;
   useEditor.getState().setSaveState('saved', useEditor.getState().revision, project.location);
 
@@ -98,4 +99,15 @@ export async function createProject(title = 'Untitled'): Promise<string> {
   const workspace = await connectWorkspace();
   const files = serializeProject(setTitle(starterDocument(), title), { viewport: null, collapsed: [], activePage: null });
   return workspace.create(title, files);
+}
+
+/** Save the open project as a new file (with its assets); returns the new id. */
+export async function duplicateOpenProject(): Promise<string | null> {
+  if (!storage) return null;
+  await saveNow();
+  const state = useEditor.getState();
+  const title = `${state.doc.title || 'Untitled'} copy`;
+  const files = serializeProject(setTitle(state.doc, title), editorMeta(state));
+  const workspace = await connectWorkspace();
+  return workspace.create(title, files, { assetsFrom: storage.id });
 }

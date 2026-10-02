@@ -4,11 +4,12 @@
  * one to edit it. Renaming a token rewrites every var() that uses it.
  */
 import {
-  ALargeSmall, Baseline, Bold, ChevronDown, ChevronRight, Hexagon, Layers2, MoveDiagonal, Plus, Space, SquareDashed, Type, X, type LucideIcon,
+  ALargeSmall, Baseline, Bold, ChevronDown, ChevronRight, Hexagon, Layers2, MoveDiagonal, Plus, Space, SquareDashed, TriangleAlert, Type, X, type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type FocusEvent } from 'react';
 import { OTHER_GROUP, TOKEN_GROUPS, TOKEN_NAME, removeToken, renameToken, setToken, tokenKind, tokenUsage, uniqueTokenName, type TokenGroup, type TokenKind } from '../document/tokens';
 import { useEditor } from '../editor/store';
+import { missingFamily } from '../app/fonts';
 
 const editor = useEditor.getState;
 
@@ -162,10 +163,14 @@ function TokenIcon({ kind, value }: { kind: TokenKind; value: string }) {
 function TokenRow({ name, kind, onEdit }: { name: string; kind: TokenKind; onEdit(): void }) {
   const value = useEditor((s) => s.doc.tokens.values[name] ?? '');
   const usage = useEditor((s) => tokenUsage(s.doc, name));
+  const tokens = useEditor((s) => s.doc.tokens.values);
+  const missing = kind === 'font' ? missingFamily(value, tokens) : null;
+  const title = `var(--${name}): ${value} · used ${usage}×.${missing ? ` ${missing} isn’t installed on this computer; a fallback is shown.` : ''} Click to edit.`;
   return (
-    <button type="button" className="token-row" onClick={onEdit} title={`var(--${name}): ${value} · used ${usage}×. Click to edit.`}>
+    <button type="button" className={`token-row${missing ? ' is-missing' : ''}`} onClick={onEdit} title={title}>
       <TokenIcon kind={kind} value={value} />
       <span className="token-name">{name}</span>
+      {missing && <TriangleAlert size={12} strokeWidth={1.75} className="token-missing" aria-label="Font not installed" />}
       <span className="token-value">{displayValue(kind, value)}</span>
     </button>
   );

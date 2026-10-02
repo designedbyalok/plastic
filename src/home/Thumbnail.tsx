@@ -10,7 +10,7 @@ const PADDING = 12;
 /** Viewport used for laying out roots whose width depends on it (before measuring). */
 const LAYOUT_WIDTH = 1440;
 
-function thumbnailDocument(doc: DesignDocument, css: string): string {
+function thumbnailDocument(doc: DesignDocument, css: string, base: string | null): string {
   const roots = doc.pages[0]?.roots ?? [];
   const frames = roots.map((id) => doc.frames[id] ?? { x: 0, y: 0 });
   const minX = Math.min(0, ...frames.map((f) => f.x));
@@ -19,13 +19,13 @@ function thumbnailDocument(doc: DesignDocument, css: string): string {
     .map((id, i) => `<div data-thumb-root style="position:absolute;left:${frames[i]!.x - minX}px;top:${frames[i]!.y - minY}px">${serializeNode(doc, id, 0, { ids: false })}</div>`)
     .join('');
   const safeCss = css.replace(/<\/style/gi, '<\\/style');
-  return `<!doctype html><html><head><meta charset="utf-8"><style>:where(html,body){margin:0;overflow:hidden;background:transparent}</style><style>${safeCss}</style></head><body>${markup}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8">${base ? `<base href="${base.replace(/"/g, '&quot;')}">` : ''}<style>:where(html,body){margin:0;overflow:hidden;background:transparent}</style><style>${safeCss}</style></head><body>${markup}</body></html>`;
 }
 
-export function Thumbnail({ doc, css }: { doc: DesignDocument; css: string }) {
+export function Thumbnail({ doc, css, base = null }: { doc: DesignDocument; css: string; base?: string | null }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const srcDoc = useMemo(() => thumbnailDocument(doc, css), [doc, css]);
+  const srcDoc = useMemo(() => thumbnailDocument(doc, css, base), [doc, css, base]);
 
   useEffect(() => {
     const box = boxRef.current!;

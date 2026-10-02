@@ -5,7 +5,7 @@
  */
 import {
   ALargeSmall, Angle, ArrowDown, ArrowDownToLine, ArrowRight, ArrowUpToLine, Baseline, Bold, Check, ChevronDown, FlipHorizontal2, FlipVertical2, FoldVertical,
-  LayoutGrid, RotateCwSquare, SlidersVertical, Space, Strikethrough, TextAlignCenter, TextAlignEnd, TextAlignStart, Type, Underline, X,
+  LayoutGrid, RotateCwSquare, SlidersVertical, Space, Strikethrough, TextAlignCenter, TextAlignEnd, TextAlignStart, TriangleAlert, Type, Underline, X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { domElement, isOutOfFlow, styleOf } from '../../canvas/dom';
@@ -16,6 +16,7 @@ import { elementSpec } from '../../elements/registry';
 import { tokenKind, tokenReference, tokenVar, type TokenKind } from '../../document/tokens';
 import { addFlexOrWrap, setFreePositioning } from '../../editor/commands';
 import { useEditor } from '../../editor/store';
+import { missingFamily } from '../../app/fonts';
 import {
   Checkbox, ColorInput, CssInput, CssSelect, CssSlider, MIXED, Row, Section, Segmented, Select, TextInput, TokenSlot, type Choice,
   clearStyles, computedValue, setStyle, useAnyDeclared, useDeclared,
@@ -444,6 +445,24 @@ function FontFamilySelect({ ids }: Ids) {
   );
 }
 
+/** Flags a font family that isn't installed here (common after a Figma import). */
+function MissingFontNote({ ids }: Ids) {
+  const declared = useDeclared(ids, 'font-family');
+  const tokens = useEditor((s) => s.doc.tokens.values);
+  const value = declared && declared !== MIXED ? declared : computedValue(ids[0], 'font-family');
+  const missing = value ? missingFamily(value, tokens) : null;
+  if (!missing) return null;
+  const token = tokenReference(value);
+  return (
+    <div className="insp-font-missing" role="note">
+      <TriangleAlert size={12} strokeWidth={1.75} />
+      <span>
+        <b>{missing}</b> isn’t installed; a fallback font is shown.{token ? ` Change --${token} in Theme to swap it everywhere.` : ''}
+      </span>
+    </div>
+  );
+}
+
 function FontWeightSelect({ ids }: Ids) {
   const weightTokens = useTokenOptions('font-weight');
   const declared = useDeclared(ids, 'font-weight');
@@ -534,6 +553,7 @@ export function TextSection({ ids, textual }: Ids & { textual: boolean }) {
       <Row>
         <FontFamilySelect ids={ids} />
       </Row>
+      <MissingFontNote ids={ids} />
       <Row>
         <FontWeightSelect ids={ids} />
       </Row>

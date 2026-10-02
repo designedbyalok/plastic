@@ -1,6 +1,7 @@
 /** Keyboard shortcuts, behind a button at the bottom of the tool rail. */
 import { Keyboard } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
+import { useEditor } from '../editor/store';
 
 const GROUPS: readonly { title: string; items: readonly [string, readonly string[]][] }[] = [
   {
@@ -53,7 +54,8 @@ const GROUPS: readonly { title: string; items: readonly [string, readonly string
 ];
 
 export function ShortcutsMenu() {
-  const [open, setOpen] = useState(false);
+  const open = useEditor((s) => s.shortcutsOpen);
+  const setOpen = useEditor.getState().setShortcutsOpen;
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
