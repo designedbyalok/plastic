@@ -34,8 +34,13 @@ export type Declarations = Readonly<Record<string, string>>;
 export interface StyleSheet {
   /** Single-class rules (`.name { … }`): the part of styles.css the inspector edits. */
   readonly rules: Readonly<Record<string, Declarations>>;
-  /** Everything else in styles.css (at-rules, complex selectors), kept verbatim. */
+  /**
+   * Everything else in styles.css (at-rules, complex selectors), kept verbatim and on the same
+   * side of the class rules as in the file, because cascade order matters: `:root` variables
+   * usually come first, `@media` overrides must come after the rules they override.
+   */
   readonly preserved: string;
+  readonly preservedAfter: string;
 }
 
 export interface Point {

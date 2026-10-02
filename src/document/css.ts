@@ -6,7 +6,7 @@
  */
 import type { Declarations, StyleSheet } from './types';
 
-export const EMPTY_SHEET: StyleSheet = { rules: {}, preserved: '' };
+export const EMPTY_SHEET: StyleSheet = { rules: {}, preserved: '', preservedAfter: '' };
 
 const CLASS_NAME = /^-?[_a-zA-Z][_a-zA-Z0-9-]*$/;
 const CLASS_SELECTOR = /^\.(-?[_a-zA-Z][_a-zA-Z0-9-]*)$/;
@@ -117,7 +117,9 @@ export function serializeDeclarations(decls: Declarations, indent = '  '): strin
 export function parseStyleSheet(css: string): StyleSheet {
   const src = stripComments(css);
   const rules: Record<string, Record<string, string>> = {};
-  const preserved: string[] = [];
+  const before: string[] = [];
+  const after: string[] = [];
+  const keep = (text: string) => (Object.keys(rules).length ? after : before).push(text);
   let start = 0;
   let i = 0;
   while (i < src.length) {
@@ -128,7 +130,7 @@ export function parseStyleSheet(css: string): StyleSheet {
     }
     if (ch === ';') {
       const statement = src.slice(start, i + 1).trim();
-      if (statement !== ';') preserved.push(statement);
+      if (statement !== ';') keep(statement);
       start = ++i;
       continue;
     }
@@ -140,14 +142,14 @@ export function parseStyleSheet(css: string): StyleSheet {
       if (match?.[1] && !body.includes('{')) {
         rules[match[1]] = { ...rules[match[1]], ...parseDeclarations(body) };
       } else {
-        preserved.push(src.slice(start, close + 1).trim());
+        keep(src.slice(start, close + 1).trim());
       }
       start = i = close + 1;
       continue;
     }
     i++;
   }
-  return { rules, preserved: preserved.join('\n\n') };
+  return { rules, preserved: before.join('\n\n'), preservedAfter: after.join('\n\n') };
 }
 
 export function serializeStyleSheet(sheet: StyleSheet): string {
@@ -157,5 +159,6 @@ export function serializeStyleSheet(sheet: StyleSheet): string {
     const body = serializeDeclarations(decls);
     parts.push(body ? `.${name} {\n${body}\n}` : `.${name} {}`);
   }
+  if (sheet.preservedAfter.trim()) parts.push(sheet.preservedAfter.trim());
   return parts.join('\n\n') + '\n';
 }
