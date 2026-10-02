@@ -3,7 +3,7 @@
  * disk; without it (a static build) the browser's localStorage is used. Tauri will add a
  * native implementation behind the same interfaces.
  */
-import type { ProjectFiles } from './index';
+import { PROJECT_FILE_NAME, isPageFile, type ProjectFiles } from './index';
 
 export interface ProjectSummary {
   readonly id: string;
@@ -37,14 +37,15 @@ export interface Workspace {
 const PROJECT_CHANGED_EVENT = 'plastic:project-changed';
 const WORKSPACE_CHANGED_EVENT = 'plastic:workspace-changed';
 
+/** A project: file name → text, with at least one page. Unknown or unsafe names are dropped. */
 function isFiles(value: unknown): value is ProjectFiles {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return typeof v.html === 'string' && typeof v.css === 'string' && typeof v.project === 'string';
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const entries = Object.entries(value as Record<string, unknown>);
+  return entries.some(([name]) => isPageFile(name)) && entries.every(([, text]) => typeof text === 'string');
 }
 
 function pickFiles(v: ProjectFiles): ProjectFiles {
-  return { html: v.html, css: v.css, project: v.project };
+  return Object.fromEntries(Object.entries(v).filter(([name]) => PROJECT_FILE_NAME.test(name)));
 }
 
 function onHot(event: string, handler: (data: unknown) => void): () => void {
@@ -121,8 +122,15 @@ class LocalStorageWorkspace implements Workspace {
   private read(): LocalProjects {
     try {
       const parsed = JSON.parse(localStorage.getItem(LOCAL_KEY) ?? '{}') as LocalProjects;
-      const legacy: unknown = JSON.parse(localStorage.getItem(LEGACY_KEY) ?? 'null');
-      if (isFiles(legacy) && !parsed.untitled) parsed.untitled = { files: pickFiles(legacy), updatedAt: Date.now() };
+      // Earlier builds stored { html, css, project } under one key.
+      const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) ?? 'null') as { html?: unknown; css?: unknown; project?: unknown } | null;
+      if (legacy && typeof legacy.html === 'string' && !parsed.untitled) {
+        parsed.untitled = { files: { 'index.html': legacy.html, 'styles.css': String(legacy.css ?? ''), 'project.json': String(legacy.project ?? '') }, updatedAt: Date.now() };
+      }
+      for (const [id, p] of Object.entries(parsed)) {
+        const old = p.files as unknown as { html?: unknown; css?: unknown; project?: unknown };
+        if (typeof old.html === 'string') parsed[id] = { ...p, files: { 'index.html': old.html, 'styles.css': String(old.css ?? ''), 'project.json': String(old.project ?? '') } };
+      }
       return parsed;
     } catch {
       return {};

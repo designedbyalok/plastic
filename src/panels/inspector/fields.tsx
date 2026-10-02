@@ -3,13 +3,14 @@
  * class rule and show the browser's *computed* value as the placeholder, so you always see
  * both what the CSS says and what the browser did with it.
  */
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { domElement, styleOf } from '../../canvas/dom';
 import { setStyleOnNodes } from '../../document/ops';
+import { groupFor, setToken, tokenKind, tokenKindForProperty, tokenReference, tokenVar, uniqueTokenName, type TokenKind } from '../../document/tokens';
 import { getElement } from '../../document/tree';
 import type { DesignDocument, NodeId } from '../../document/types';
 import { useEditor } from '../../editor/store';
-import { Check, ChevronDown, Minus, Plus } from 'lucide-react';
+import { Check, ChevronDown, Hexagon, Minus, Plus, X } from 'lucide-react';
 
 export const MIXED = '\u0000mixed';
 
@@ -141,10 +142,10 @@ export function Checkbox({ checked, onChange, label, hint }: { checked: boolean;
   );
 }
 
-export function Select({ value, onChange, options, placeholder, ariaLabel, mono }: { value: string; onChange(v: string): void; options: readonly (string | { value: string; label: string })[]; placeholder?: string; ariaLabel: string; mono?: boolean }) {
+export function Select({ value, onChange, options, placeholder, ariaLabel, mono, prefix }: { value: string; onChange(v: string): void; options: readonly (string | { value: string; label: string })[]; placeholder?: string; ariaLabel: string; mono?: boolean; prefix?: ReactNode }) {
   return (
     <span className="insp-select-wrap">
-    <select className={`insp-select${mono ? ' is-mono' : ''}`} aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select className={`insp-select${mono ? ' is-mono' : ''}${prefix ? ' has-prefix' : ''}${value === '' ? ' is-placeholder' : ''}`} aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)}>
       {placeholder !== undefined && <option value="">{placeholder}</option>}
       {options.map((o) => {
         const opt = typeof o === 'string' ? { value: o, label: o } : o;
@@ -155,6 +156,7 @@ export function Select({ value, onChange, options, placeholder, ariaLabel, mono 
         );
       })}
     </select>
+      {prefix && <span className="insp-prefix">{prefix}</span>}
       <ChevronDown size={12} strokeWidth={1.5} className="insp-select-chevron" aria-hidden="true" />
     </span>
   );
@@ -252,14 +254,16 @@ interface CssInputProps {
   /** Numeric field: shows px values without the unit and treats bare numbers as px. */
   numeric?: boolean;
   mono?: boolean;
+  /** Set by wrappers that provide their own token slot. */
+  noToken?: boolean;
 }
 
-export function CssInput({ ids, prop, placeholder, prefix, numeric, mono }: CssInputProps) {
+export function CssInput({ ids, prop, placeholder, prefix, numeric, mono, noToken }: CssInputProps) {
   const declared = useDeclared(ids, prop);
   const computed = computedValue(ids[0], prop);
   const mixed = declared === MIXED;
   const show = (v: string) => (numeric ? compactPx(v) : v);
-  return (
+  const input = (
     <TextInput
       ariaLabel={prop}
       prefix={prefix}
@@ -276,6 +280,7 @@ export function CssInput({ ids, prop, placeholder, prefix, numeric, mono }: CssI
       }}
     />
   );
+  return noToken ? input : <TokenSlot ids={ids} prop={prop} prefix={prefix}>{input}</TokenSlot>;
 }
 
 /** Computed lengths like "143.594px" are noise in a placeholder; round them. */
@@ -315,8 +320,9 @@ export function ColorInput({ ids, prop, computedProp }: { ids: readonly NodeId[]
   const computed = computedValue(ids[0], computedProp ?? prop);
   const value = declared === MIXED ? '' : declared;
   return (
+    <TokenSlot ids={ids} prop={prop}>
     <span className="insp-field">
-      <CssInput ids={ids} prop={prop} placeholder={declared === MIXED ? 'Mixed' : computed} prefix={<span />} />
+      <CssInput ids={ids} prop={prop} placeholder={declared === MIXED ? 'Mixed' : computed} prefix={<span />} noToken />
       <span className="insp-prefix">
         <input
           type="color"
@@ -327,6 +333,7 @@ export function ColorInput({ ids, prop, computedProp }: { ids: readonly NodeId[]
         />
       </span>
     </span>
+    </TokenSlot>
   );
 }
 
@@ -347,5 +354,116 @@ export function CssSlider({ ids, prop, min, max, step = 1, unit = 'px', scale = 
       style={{ ['--fill' as string]: `${((Math.min(max, numeric * scale) - min) / (max - min)) * 100}%` }}
       onChange={(e) => setStyle(ids, prop, `${Number(e.target.value) / scale}${unit}`)}
     />
+  );
+}
+
+// --- tokens ------------------------------------------------------------------------------------
+
+/**
+ * Wraps a style field with token binding. A value of exactly `var(--name)` shows as a token
+ * chip; otherwise a token button opens a picker of tokens that fit the property.
+ */
+export function TokenSlot({ ids, prop, prefix, children }: { ids: readonly NodeId[]; prop: string; prefix?: ReactNode; children: ReactNode }) {
+  const kind = tokenKindForProperty(prop);
+  const declared = useDeclared(ids, prop);
+  const bound = declared === MIXED ? null : tokenReference(declared);
+  const [open, setOpen] = useState(false);
+  if (!kind) return <>{children}</>;
+  return (
+    <span className={`insp-field insp-token-slot${open ? ' is-open' : ''}`}>
+      {bound ? <TokenChip name={bound} kind={kind} prefix={prefix} onOpen={() => setOpen(true)} onDetach={() => detachToken(ids, prop, bound)} /> : children}
+      {!bound && (
+        <button type="button" className="insp-token-button" title="Use a token" aria-label={`Use a token for ${prop}`} onClick={() => setOpen(!open)}>
+          <Hexagon size={11} strokeWidth={1.75} />
+        </button>
+      )}
+      {open && <TokenPicker ids={ids} prop={prop} kind={kind} current={declared === MIXED ? '' : declared} onClose={() => setOpen(false)} />}
+    </span>
+  );
+}
+
+function detachToken(ids: readonly NodeId[], prop: string, name: string): void {
+  const value = useEditor.getState().doc.tokens.values[name] ?? '';
+  useEditor.getState().apply('Detach token', (d) => setStyleOnNodes(d, ids, prop, value || null));
+}
+
+function TokenChip({ name, kind, prefix, onOpen, onDetach }: { name: string; kind: TokenKind; prefix?: ReactNode; onOpen(): void; onDetach(): void }) {
+  const value = useEditor((s) => s.doc.tokens.values[name]);
+  return (
+    <span className={`insp-token-chip${value === undefined ? ' is-missing' : ''}`} title={value === undefined ? `var(--${name}) is not defined in tokens.css` : `var(--${name}) = ${value}`}>
+      {prefix && typeof prefix !== 'object' && <span className="insp-token-chip-prefix">{prefix}</span>}
+      <button type="button" className="insp-token-chip-main" onClick={onOpen}>
+        {kind === 'color' ? <span className="insp-token-chip-swatch" style={{ background: value }} /> : <Hexagon size={11} strokeWidth={1.75} />}
+        <span className="insp-token-chip-name">{name}</span>
+      </button>
+      <button type="button" className="insp-token-chip-detach" aria-label={`Detach ${name}`} title="Detach (use the raw value)" onClick={onDetach}>
+        <X size={11} strokeWidth={1.75} />
+      </button>
+    </span>
+  );
+}
+
+function TokenPicker({ ids, prop, kind, current, onClose }: { ids: readonly NodeId[]; prop: string; kind: TokenKind; current: string; onClose(): void }) {
+  const values = useEditor((s) => s.doc.tokens.values);
+  const ref = useRef<HTMLDivElement>(null);
+  const group = groupFor(kind);
+  const names = Object.keys(values).filter((n) => tokenKind(n) === kind);
+  const raw = current && !tokenReference(current) ? current : '';
+
+  useEffect(() => {
+    const close = (e: PointerEvent) => {
+      if (!ref.current?.parentElement?.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('pointerdown', close, true);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('pointerdown', close, true);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [onClose]);
+
+  const bind = (name: string) => {
+    useEditor.getState().apply('Use token', (d) => setStyleOnNodes(d, ids, prop, tokenVar(name)));
+    onClose();
+  };
+  const saveAsToken = () => {
+    const doc = useEditor.getState().doc;
+    const name = uniqueTokenName(doc, `${group.prefix}${kind === 'color' ? 'new' : names.length + 1}`);
+    useEditor.getState().apply('Create token', (d) => setStyleOnNodes(setToken(d, name, raw), ids, prop, tokenVar(name)));
+    onClose();
+  };
+
+  return (
+    <div className="insp-menu insp-token-picker" role="menu" ref={ref}>
+      <div className="rail-menu-title">{group.label}</div>
+      {names.map((name) => (
+        <button key={name} type="button" role="menuitem" className="insp-menu-item" onClick={() => bind(name)}>
+          {kind === 'color' ? <span className="insp-token-chip-swatch" style={{ background: values[name] }} /> : <Hexagon size={11} strokeWidth={1.75} />}
+          <span>{name}</span>
+          <kbd>{values[name]}</kbd>
+        </button>
+      ))}
+      {!names.length && <div className="insp-token-empty">No {group.label.toLowerCase()} tokens yet.</div>}
+      <div className="insp-menu-divider" />
+      {raw && (
+        <button type="button" role="menuitem" className="insp-menu-item" onClick={saveAsToken}>
+          <Plus size={12} strokeWidth={1.75} />
+          <span>Save “{raw}” as a token</span>
+        </button>
+      )}
+      <button
+        type="button"
+        role="menuitem"
+        className="insp-menu-item"
+        onClick={() => {
+          useEditor.getState().setLayersOpen(true);
+          useEditor.getState().setLeftTab('theme');
+          onClose();
+        }}
+      >
+        <span>Edit tokens…</span>
+      </button>
+    </div>
   );
 }

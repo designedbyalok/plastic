@@ -4,7 +4,7 @@
  * A deliberately small parser: single-class rules become editable declarations, everything
  * else is preserved verbatim. Comments are not preserved (documented limitation).
  */
-import type { Declarations, StyleSheet } from './types';
+import type { Declarations, StyleSheet, TokenSheet } from './types';
 
 export const EMPTY_SHEET: StyleSheet = { rules: {}, preserved: '', preservedAfter: '' };
 
@@ -114,12 +114,9 @@ export function serializeDeclarations(decls: Declarations, indent = '  '): strin
     .join('\n');
 }
 
-export function parseStyleSheet(css: string): StyleSheet {
+/** Walk top-level statements and blocks of a stylesheet (comments stripped). */
+function scanTopLevel(css: string, onBlock: (prelude: string, body: string, raw: string) => void, onStatement: (raw: string) => void): void {
   const src = stripComments(css);
-  const rules: Record<string, Record<string, string>> = {};
-  const before: string[] = [];
-  const after: string[] = [];
-  const keep = (text: string) => (Object.keys(rules).length ? after : before).push(text);
   let start = 0;
   let i = 0;
   while (i < src.length) {
@@ -130,26 +127,78 @@ export function parseStyleSheet(css: string): StyleSheet {
     }
     if (ch === ';') {
       const statement = src.slice(start, i + 1).trim();
-      if (statement !== ';') keep(statement);
+      if (statement !== ';') onStatement(statement);
       start = ++i;
       continue;
     }
     if (ch === '{') {
       const close = matchBrace(src, i);
-      const prelude = src.slice(start, i).trim();
-      const body = src.slice(i + 1, close);
-      const match = CLASS_SELECTOR.exec(prelude);
-      if (match?.[1] && !body.includes('{')) {
-        rules[match[1]] = { ...rules[match[1]], ...parseDeclarations(body) };
-      } else {
-        keep(src.slice(start, close + 1).trim());
-      }
+      onBlock(src.slice(start, i).trim(), src.slice(i + 1, close), src.slice(start, close + 1).trim());
       start = i = close + 1;
       continue;
     }
     i++;
   }
+}
+
+export function parseStyleSheet(css: string): StyleSheet {
+  const rules: Record<string, Record<string, string>> = {};
+  const before: string[] = [];
+  const after: string[] = [];
+  const keep = (text: string) => (Object.keys(rules).length ? after : before).push(text);
+  scanTopLevel(
+    css,
+    (prelude, body, raw) => {
+      const match = CLASS_SELECTOR.exec(prelude);
+      if (match?.[1] && !body.includes('{')) rules[match[1]] = { ...rules[match[1]], ...parseDeclarations(body) };
+      else keep(raw);
+    },
+    keep,
+  );
   return { rules, preserved: before.join('\n\n'), preservedAfter: after.join('\n\n') };
+}
+
+const TOKENS_HEADER =
+  '/* Design tokens, written by Plastic. Use them in styles.css as var(--name).\n' +
+  '   Names follow the Tailwind v4 theme namespaces: color-, spacing-, radius-, font-, text-, … */';
+
+/**
+ * tokens.css: custom properties on the first plain `:root` rule are tokens; everything else
+ * (dark-mode overrides, @font-face…) is preserved verbatim after them.
+ */
+export function parseTokenSheet(css: string): TokenSheet {
+  const values: Record<string, string> = {};
+  const preserved: string[] = [];
+  scanTopLevel(
+    css,
+    (prelude, body, raw) => {
+      const decls = prelude === ':root' && !body.includes('{') ? parseDeclarations(body) : null;
+      if (decls && Object.keys(decls).every((p) => p.startsWith('--'))) {
+        for (const [prop, value] of Object.entries(decls)) values[prop.slice(2)] = value;
+      } else {
+        preserved.push(raw);
+      }
+    },
+    (raw) => preserved.push(raw),
+  );
+  return { values, preserved: preserved.join('\n\n') };
+}
+
+export function serializeTokenSheet(sheet: TokenSheet): string {
+  const entries = Object.entries(sheet.values);
+  const parts = [TOKENS_HEADER];
+  parts.push(entries.length ? `:root {\n${entries.map(([n, v]) => `  --${n}: ${v};`).join('\n')}\n}` : ':root {}');
+  if (sheet.preserved.trim()) parts.push(sheet.preserved.trim());
+  return parts.join('\n\n') + '\n';
+}
+
+/**
+ * Projects from before tokens.css kept `:root { --x: … }` in styles.css. Move those variables
+ * into tokens, leaving the rest of the preserved CSS untouched.
+ */
+export function extractRootTokens(preserved: string): { tokens: Record<string, string>; rest: string } {
+  const sheet = parseTokenSheet(preserved);
+  return { tokens: { ...sheet.values }, rest: sheet.preserved };
 }
 
 export function serializeStyleSheet(sheet: StyleSheet): string {

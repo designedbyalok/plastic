@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fileHref, linkClick, navigate } from '../app/router';
 import type { DesignDocument } from '../document/types';
 import { createProject } from '../editor/persistence';
-import { parseProject } from '../serialization';
+import { STYLES_FILE, TOKENS_FILE, parseProject } from '../serialization';
 import { connectWorkspace, type ProjectSummary } from '../serialization/storage';
 import { Thumbnail } from './Thumbnail';
 import { editedAgo } from './time';
@@ -45,7 +45,9 @@ function writePref(key: string, value: string): void {
 function toEntry(summary: ProjectSummary): FileEntry | null {
   try {
     const { doc } = parseProject(summary.files);
-    return { id: summary.id, title: doc.title || summary.id, updatedAt: summary.updatedAt, doc, css: summary.files.css };
+    // Thumbnails render the first page with the project's tokens and styles, in cascade order.
+    const css = `${summary.files[TOKENS_FILE] ?? ''}\n${summary.files[STYLES_FILE] ?? ''}`;
+    return { id: summary.id, title: doc.title || summary.id, updatedAt: summary.updatedAt, doc, css };
   } catch {
     return null;
   }
@@ -221,7 +223,7 @@ function Sidebar({ location, query, onQuery, searchRef }: { location: string; qu
             <div className="home-card-note">
               <div className="home-card-note-title">Your files are plain HTML</div>
               <div className="home-card-note-body">
-                Each file is a folder of index.html and styles.css. Open it in any editor, or commit it to Git.
+                Each file is a folder of HTML pages and CSS. Open it in any editor, or commit it to Git.
               </div>
               <button
                 type="button"

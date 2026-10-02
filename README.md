@@ -21,7 +21,8 @@ bun run dev
 ```
 
 Open the printed URL. The home screen lists the files in `workspace/`. Each file is a folder
-(`workspace/<id>/index.html`, `styles.css`, `project.json`) saved continuously while you edit,
+(`workspace/<id>/`: one `.html` per page, `tokens.css`, `styles.css`, `project.json`) saved
+continuously while you edit,
 and opened at `/file/<id>`. Edit those files with anything — a text editor, git, a coding
 agent — and the open editor and the home screen update (in the editor, as an undoable change).
 

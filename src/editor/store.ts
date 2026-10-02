@@ -42,6 +42,10 @@ export interface EditorState {
   readonly saveStatus: SaveStatus;
   readonly storageLocation: string;
 
+  /** File of the page shown on the canvas. Always a page of `doc`. */
+  readonly activePage: string;
+  /** Left panel tab: the design (pages + layers) or the theme (tokens). */
+  readonly leftTab: 'design' | 'theme';
   readonly selection: readonly NodeId[];
   readonly hoverId: NodeId | null;
   readonly editingTextId: NodeId | null;
@@ -60,7 +64,9 @@ export interface EditorState {
   undo(): void;
   redo(): void;
   /** Replace the document (open a project). Clears history. */
-  load(doc: DesignDocument, view?: { viewport?: Viewport | null; collapsed?: readonly NodeId[] }): void;
+  load(doc: DesignDocument, view?: { viewport?: Viewport | null; collapsed?: readonly NodeId[]; activePage?: string | null }): void;
+  setActivePage(file: string): void;
+  setLeftTab(tab: 'design' | 'theme'): void;
 
   select(ids: readonly NodeId[]): void;
   toggleSelected(id: NodeId): void;
@@ -79,9 +85,18 @@ function existing(doc: DesignDocument, ids: readonly NodeId[]): NodeId[] {
   return ids.filter((id) => doc.nodes[id]);
 }
 
+/** Keep the active page valid when pages are added, removed or undone. */
+function validPage(doc: DesignDocument, file: string): string {
+  return doc.pages.some((p) => p.file === file) ? file : doc.pages[0]!.file;
+}
+
+const initialDoc = starterDocument();
+
 export const useEditor = create<EditorState>()((set, get) => ({
-  doc: starterDocument(),
+  doc: initialDoc,
   history: EMPTY_HISTORY,
+  activePage: initialDoc.pages[0]!.file,
+  leftTab: 'design',
   tx: null,
   revision: 0,
   savedRevision: 0,
@@ -111,6 +126,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
       history: record(history, { doc, selection, label }, options.coalesce ?? null, Date.now()),
       selection: nextSelection,
       revision: revision + 1,
+      activePage: validPage(next, get().activePage),
     });
   },
 
@@ -150,7 +166,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     if (tx) return;
     const result = undo(history, { doc, selection, label: '' });
     if (!result) return;
-    set({ doc: result.snapshot.doc, selection: existing(result.snapshot.doc, result.snapshot.selection), history: result.history, revision: revision + 1, editingTextId: null });
+    set({ doc: result.snapshot.doc, selection: existing(result.snapshot.doc, result.snapshot.selection), history: result.history, revision: revision + 1, editingTextId: null, activePage: validPage(result.snapshot.doc, get().activePage) });
   },
 
   redo() {
@@ -158,7 +174,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     if (tx) return;
     const result = redo(history, { doc, selection, label: '' });
     if (!result) return;
-    set({ doc: result.snapshot.doc, selection: existing(result.snapshot.doc, result.snapshot.selection), history: result.history, revision: revision + 1, editingTextId: null });
+    set({ doc: result.snapshot.doc, selection: existing(result.snapshot.doc, result.snapshot.selection), history: result.history, revision: revision + 1, editingTextId: null, activePage: validPage(result.snapshot.doc, get().activePage) });
   },
 
   load(doc, view = {}) {
@@ -174,8 +190,18 @@ export const useEditor = create<EditorState>()((set, get) => ({
       hoverId: null,
       editingTextId: null,
       collapsed,
+      activePage: validPage(doc, view.activePage ?? doc.pages[0]!.file),
       ...(view.viewport ? { viewport: view.viewport } : {}),
     }));
+  },
+
+  setActivePage(file) {
+    const { doc, activePage } = get();
+    const next = validPage(doc, file);
+    if (next !== activePage) set({ activePage: next, selection: [], hoverId: null, editingTextId: null });
+  },
+  setLeftTab(tab) {
+    set({ leftTab: tab });
   },
 
   select(ids) {
@@ -218,5 +244,12 @@ export const useEditor = create<EditorState>()((set, get) => ({
 }));
 
 export function editorMeta(state: EditorState) {
-  return { viewport: state.viewport, collapsed: Object.keys(state.collapsed) };
+  return { viewport: state.viewport, collapsed: Object.keys(state.collapsed), activePage: state.activePage };
+}
+
+const NO_ROOTS: readonly NodeId[] = [];
+
+/** Roots of the page on the canvas. Returns stable arrays, so it is safe as a selector. */
+export function activeRoots(state: EditorState): readonly NodeId[] {
+  return state.doc.pages.find((p) => p.file === state.activePage)?.roots ?? NO_ROOTS;
 }

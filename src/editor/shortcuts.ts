@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { INSERTABLES } from '../elements/insertables';
 import {
-  addFlexOrWrap, deleteSelection, duplicateSelection, enterSelection, nudgeSelection, selectParent,
+  addFlexOrWrap, deleteSelection, toggleClipContent, duplicateSelection, enterSelection, nudgeSelection, selectParent,
   zoomBy, zoomTo, zoomToFit, zoomToSelection,
 } from './commands';
 import { saveNow } from './persistence';
@@ -50,7 +50,13 @@ export function useShortcuts(): void {
         else if (e.code === 'Digit2') zoomToSelection();
         else if (!key.startsWith('arrow') && key !== 'enter') return;
       }
-      if (e.altKey) return;
+      if (e.altKey) {
+        if (e.code === 'KeyC' && !e.shiftKey) {
+          e.preventDefault();
+          toggleClipContent();
+        }
+        return;
+      }
 
       const step = e.shiftKey ? 10 : 1;
       switch (key) {

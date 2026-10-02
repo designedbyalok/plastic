@@ -20,8 +20,18 @@ export interface NodeSpec {
   readonly children?: readonly (NodeSpec | string)[];
 }
 
+export const FIRST_PAGE_FILE = 'index.html';
+
 export function emptyDocument(title = 'Untitled'): DesignDocument {
-  return { title, nodes: {}, roots: [], styles: EMPTY_SHEET, frames: {}, names: {} };
+  return {
+    title,
+    nodes: {},
+    pages: [{ file: FIRST_PAGE_FILE, name: 'Page 1', roots: [] }],
+    styles: EMPTY_SHEET,
+    tokens: { values: {}, preserved: '' },
+    frames: {},
+    names: {},
+  };
 }
 
 export function takenClassNames(doc: DesignDocument): Set<string> {

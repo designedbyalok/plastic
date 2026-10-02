@@ -11,14 +11,15 @@ const PADDING = 12;
 const LAYOUT_WIDTH = 1440;
 
 function thumbnailDocument(doc: DesignDocument, css: string): string {
-  const frames = doc.roots.map((id) => doc.frames[id] ?? { x: 0, y: 0 });
+  const roots = doc.pages[0]?.roots ?? [];
+  const frames = roots.map((id) => doc.frames[id] ?? { x: 0, y: 0 });
   const minX = Math.min(0, ...frames.map((f) => f.x));
   const minY = Math.min(0, ...frames.map((f) => f.y));
-  const roots = doc.roots
+  const markup = roots
     .map((id, i) => `<div data-thumb-root style="position:absolute;left:${frames[i]!.x - minX}px;top:${frames[i]!.y - minY}px">${serializeNode(doc, id, 0, { ids: false })}</div>`)
     .join('');
   const safeCss = css.replace(/<\/style/gi, '<\\/style');
-  return `<!doctype html><html><head><meta charset="utf-8"><style>:where(html,body){margin:0;overflow:hidden;background:transparent}</style><style>${safeCss}</style></head><body>${roots}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>:where(html,body){margin:0;overflow:hidden;background:transparent}</style><style>${safeCss}</style></head><body>${markup}</body></html>`;
 }
 
 export function Thumbnail({ doc, css }: { doc: DesignDocument; css: string }) {

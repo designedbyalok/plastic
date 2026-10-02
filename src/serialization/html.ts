@@ -1,7 +1,7 @@
 /** DesignDocument nodes <-> index.html. */
 import { createId } from '../document/ids';
 import { BOOLEAN_ATTRS, ID_ATTR, SVG_NS, VOID_TAGS, childLayout } from '../document/markup';
-import type { DesignDocument, DocNode, ElementNode, NodeId } from '../document/types';
+import type { DesignDocument, DocNode, ElementNode, NodeId, Page } from '../document/types';
 
 const INDENT = '  ';
 
@@ -43,8 +43,9 @@ export function serializeNode(doc: DesignDocument, id: NodeId, depth = 0, option
   return `${open}\n${inner}\n${INDENT.repeat(depth)}${close}`;
 }
 
-export function serializeHTML(doc: DesignDocument, options: MarkupOptions = {}): string {
-  const body = doc.roots.map((id) => INDENT.repeat(2) + serializeNode(doc, id, 2, options)).join('\n');
+/** One page as a standalone HTML document. Every page links the shared tokens and styles. */
+export function serializeHTML(doc: DesignDocument, page: Page, options: MarkupOptions = {}): string {
+  const body = page.roots.map((id) => INDENT.repeat(2) + serializeNode(doc, id, 2, options)).join('\n');
   return [
     '<!doctype html>',
     '<html lang="en">',
@@ -52,6 +53,7 @@ export function serializeHTML(doc: DesignDocument, options: MarkupOptions = {}):
     `${INDENT.repeat(2)}<meta charset="utf-8">`,
     `${INDENT.repeat(2)}<meta name="viewport" content="width=device-width, initial-scale=1">`,
     `${INDENT.repeat(2)}<title>${escapeText(doc.title)}</title>`,
+    `${INDENT.repeat(2)}<link rel="stylesheet" href="tokens.css">`,
     `${INDENT.repeat(2)}<link rel="stylesheet" href="styles.css">`,
     `${INDENT}</head>`,
     `${INDENT}<body>`,
@@ -74,13 +76,12 @@ export interface ParsedMarkup {
 }
 
 /**
- * Parse index.html. Elements keep their `data-pl-id` when present and unique; hand-written or
+ * Parse one page. `seen` is shared across a project's pages so ids stay unique. Elements keep their `data-pl-id` when present and unique; hand-written or
  * agent-written markup without ids gets fresh ones, so any HTML file can be opened.
  */
-export function parseHTML(html: string): ParsedMarkup {
+export function parseHTML(html: string, seen: Set<NodeId> = new Set()): ParsedMarkup {
   const dom = new DOMParser().parseFromString(html, 'text/html');
   const nodes: Record<NodeId, DocNode> = {};
-  const seen = new Set<NodeId>();
 
   const convert = (el: Element): NodeId | null => {
     const tag = el.namespaceURI === SVG_NS ? el.localName : el.localName.toLowerCase();

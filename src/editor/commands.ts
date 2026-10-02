@@ -5,12 +5,12 @@
 import { fitRect, screenToWorld, unionRects, zoomAround, type Rect } from '../canvas/coords';
 import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf, styleOf } from '../canvas/dom';
 import { instantiate } from '../document/factory';
-import { duplicateNodes, insertChild, removeNodes, setFrame, setStyleOnNodes, stripPosition, wrapInStack } from '../document/ops';
+import { duplicateNodes, insertRoot, removeNodes, setFrame, setStyleOnNodes, stripPosition, wrapInStack } from '../document/ops';
 import { getElement, getParentId, hasOnlyTextChildren, isRoot, topmostIds } from '../document/tree';
 import type { DesignDocument, NodeId } from '../document/types';
 import { frameSpec } from '../elements/insertables';
 import { elementSpec } from '../elements/registry';
-import { useEditor } from './store';
+import { activeRoots, useEditor } from './store';
 
 const px = (n: number) => `${Math.round(n)}px`;
 const state = () => useEditor.getState();
@@ -99,6 +99,17 @@ export function addFlexOrWrap(): void {
   wrapSelectionInStack();
 }
 
+/** ⌥C / "Clip content": toggle `overflow: hidden` on the selection. */
+export function toggleClipContent(): void {
+  const { selection, doc } = state();
+  if (!selection.length) return;
+  const clipped = selection.every((id) => {
+    const cls = getElement(doc, id)?.classes[0];
+    return !!cls && doc.styles.rules[cls]?.overflow === 'hidden';
+  });
+  state().apply('Clip content', (d) => setStyleOnNodes(d, selection, 'overflow', clipped ? null : 'hidden'));
+}
+
 /** Switch between free positioning and layout positioning without the element jumping. */
 export function setFreePositioning(ids: readonly NodeId[], free: boolean): void {
   if (free) {
@@ -185,7 +196,7 @@ export function createFrame(rect: Rect): void {
   state().apply('Add frame', (d) => {
     const made = instantiate(d, frameSpec(rect.width, rect.height));
     id = made.id;
-    return setFrame(insertChild(made.doc, null, d.roots.length, made.id), made.id, { x: rect.x, y: rect.y });
+    return setFrame(insertRoot(made.doc, state().activePage, Number.MAX_SAFE_INTEGER, made.id), made.id, { x: rect.x, y: rect.y });
   });
   state().select([id]);
 }
@@ -216,8 +227,7 @@ function worldRectOf(screenRect: Rect): Rect {
 }
 
 export function zoomToFit(): void {
-  const { doc } = state();
-  const rects = doc.roots
+  const rects = activeRoots(state())
     .map((id) => hostOf(id))
     .filter((h): h is HTMLIFrameElement => !!h)
     .map((h) => {

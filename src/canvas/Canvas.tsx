@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { canEditText } from '../editor/commands';
-import { useEditor } from '../editor/store';
+import { activeRoots, useEditor } from '../editor/store';
 import { ArtboardHost } from './ArtboardHost';
 import { zoomAround } from './coords';
 import { nodeIdAt, setViewportElement, toScreen } from './dom';
@@ -14,7 +14,8 @@ import { finishTextEditing, useTextEditing } from './textEditing';
 
 export function Canvas() {
   const ref = useRef<HTMLDivElement>(null);
-  const roots = useEditor((s) => s.doc.roots);
+  const roots = useEditor(activeRoots);
+  const pageEmpty = roots.length === 0;
   const viewport = useEditor((s) => s.viewport);
   const tool = useEditor((s) => s.tool);
   const spacePressed = useEditor((s) => s.spacePressed);
@@ -93,6 +94,13 @@ export function Canvas() {
         ))}
       </div>
       <Overlay />
+      {pageEmpty && (
+        <div className="canvas-empty">
+          <p>
+            This page is empty. Press <kbd>F</kbd> and drag to draw a frame.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

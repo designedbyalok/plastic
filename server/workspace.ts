@@ -10,7 +10,7 @@
  *   GET  /__plastic/workspace          → { location, projects: [{ id, updatedAt, files }] }
  *   POST /__plastic/workspace          { title, files } → { id }
  *   GET  /__plastic/project/<id>       → { location, files | null }
- *   PUT  /__plastic/project/<id>       { html, css, project }
+ *   PUT  /__plastic/project/<id>       { "index.html": "…", "styles.css": "…", … }
  */
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -18,9 +18,9 @@ import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin, ViteDevServer } from 'vite';
 
-const FILES = { html: 'index.html', css: 'styles.css', project: 'project.json' } as const;
-type FileKey = keyof typeof FILES;
-type ProjectFiles = Record<FileKey, string>;
+/** Project files: one .html per page, .css files and project.json — no folders. */
+const PROJECT_FILE_NAME = /^[a-z0-9][a-z0-9_.-]*\.(html|css|json)$/i;
+type ProjectFiles = Record<string, string>;
 
 export const PROJECT_CHANGED_EVENT = 'plastic:project-changed';
 export const WORKSPACE_CHANGED_EVENT = 'plastic:workspace-changed';
@@ -42,27 +42,32 @@ export function plasticWorkspace(): Plugin {
   const dirOf = (id: string) => path.join(root, id);
 
   async function readFiles(id: string): Promise<ProjectFiles | null> {
-    const entries = await Promise.all(
-      (Object.keys(FILES) as FileKey[]).map(async (key) => [key, await fsp.readFile(path.join(dirOf(id), FILES[key]), 'utf8').catch(() => '')] as const),
-    );
-    const files = Object.fromEntries(entries) as ProjectFiles;
-    return files.html ? files : null;
+    const names = await fsp.readdir(dirOf(id)).catch(() => [] as string[]);
+    const managed = names.filter((n) => PROJECT_FILE_NAME.test(n));
+    if (!managed.some((n) => n.endsWith('.html'))) return null;
+    const files: ProjectFiles = {};
+    for (const name of managed.sort()) files[name] = await fsp.readFile(path.join(dirOf(id), name), 'utf8').catch(() => '');
+    return files;
   }
 
   async function updatedAt(id: string): Promise<number> {
-    const times = await Promise.all(
-      Object.values(FILES).map((f) => fsp.stat(path.join(dirOf(id), f)).then((s) => s.mtimeMs, () => 0)),
-    );
-    return Math.max(...times);
+    const names = (await fsp.readdir(dirOf(id)).catch(() => [] as string[])).filter((n) => PROJECT_FILE_NAME.test(n));
+    const times = await Promise.all(names.map((f) => fsp.stat(path.join(dirOf(id), f)).then((s) => s.mtimeMs, () => 0)));
+    return Math.max(0, ...times);
   }
 
+  /** Write the project's files; pages that no longer exist (deleted .html files) are removed. */
   async function writeFiles(id: string, files: ProjectFiles): Promise<void> {
     await fsp.mkdir(dirOf(id), { recursive: true });
     known.set(id, files);
-    for (const key of Object.keys(FILES) as FileKey[]) {
-      const target = path.join(dirOf(id), FILES[key]);
+    for (const [name, text] of Object.entries(files)) {
+      const target = path.join(dirOf(id), name);
       const current = await fsp.readFile(target, 'utf8').catch(() => null);
-      if (current !== files[key]) await fsp.writeFile(target, files[key], 'utf8');
+      if (current !== text) await fsp.writeFile(target, text, 'utf8');
+    }
+    const existing = await fsp.readdir(dirOf(id)).catch(() => [] as string[]);
+    for (const name of existing) {
+      if (name.endsWith('.html') && PROJECT_FILE_NAME.test(name) && !(name in files)) await fsp.rm(path.join(dirOf(id), name));
     }
   }
 
@@ -124,7 +129,7 @@ export function plasticWorkspace(): Plugin {
       if (req.method === 'GET') return json(res, 200, { location, projects: await listProjects() });
       if (req.method === 'POST') {
         const body = JSON.parse(await readBody(req)) as { title?: unknown; files?: unknown };
-        if (!isFiles(body.files)) return json(res, 400, { error: 'Expected files { html, css, project }' });
+        if (!isFiles(body.files)) return json(res, 400, { error: 'Expected files { "index.html": "…", … }' });
         const id = await uniqueId(typeof body.title === 'string' ? body.title : 'untitled');
         await writeFiles(id, body.files);
         return json(res, 201, { id });
@@ -141,7 +146,7 @@ export function plasticWorkspace(): Plugin {
     }
     if (req.method === 'PUT') {
       const files = JSON.parse(await readBody(req)) as unknown;
-      if (!isFiles(files)) return json(res, 400, { error: 'Expected { html, css, project } strings' });
+      if (!isFiles(files)) return json(res, 400, { error: 'Expected { "<name>.html|css|json": "…" } with at least one page' });
       await writeFiles(id, files);
       return json(res, 204);
     }
@@ -162,13 +167,17 @@ export function plasticWorkspace(): Plugin {
 }
 
 function isFiles(value: unknown): value is ProjectFiles {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return typeof v.html === 'string' && typeof v.css === 'string' && typeof v.project === 'string';
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const entries = Object.entries(value as Record<string, unknown>);
+  return (
+    entries.some(([name]) => name.endsWith('.html')) &&
+    entries.every(([name, text]) => PROJECT_FILE_NAME.test(name) && typeof text === 'string')
+  );
 }
 
 function sameFiles(a: ProjectFiles, b: ProjectFiles): boolean {
-  return a.html === b.html && a.css === b.css && a.project === b.project;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
 }
 
 function readBody(req: NodeJS.ReadableStream): Promise<string> {

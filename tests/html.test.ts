@@ -7,9 +7,9 @@ import { instantiate } from '../src/document/factory';
 import { insertChild } from '../src/document/ops';
 import { docFrom, shape } from './helpers';
 
-const meta = { viewport: { x: 10, y: 20, zoom: 0.5 }, collapsed: [] };
+const meta = { viewport: { x: 10, y: 20, zoom: 0.5 }, collapsed: [], activePage: null };
 
-describe('index.html', () => {
+describe('page HTML', () => {
   it('writes the semantic markup you would write by hand', () => {
     const { doc, root } = docFrom({
       tag: 'form',
@@ -20,7 +20,7 @@ describe('index.html', () => {
         { tag: 'button', attrs: { type: 'submit' }, children: ['Continue'] },
       ],
     });
-    const html = serializeHTML(doc, { ids: false });
+    const html = serializeHTML(doc, doc.pages[0]!, { ids: false });
     expect(html).toContain(
       [
         '    <form class="login-form">',
@@ -30,7 +30,8 @@ describe('index.html', () => {
         '    </form>',
       ].join('\n'),
     );
-    expect(serializeHTML(doc)).toContain(`data-pl-id="${root}"`);
+    expect(serializeHTML(doc, doc.pages[0]!)).toContain(`data-pl-id="${root}"`);
+    expect(html).toContain('<link rel="stylesheet" href="tokens.css">\n    <link rel="stylesheet" href="styles.css">');
   });
 
   it('round-trips every insertable through HTML and CSS', () => {
@@ -41,7 +42,7 @@ describe('index.html', () => {
     }
     const files = serializeProject(doc, meta);
     const reopened = parseProject(files);
-    expect(reopened.doc.roots).toEqual(doc.roots);
+    expect(reopened.doc.pages).toEqual(doc.pages);
     expect(shape(reopened.doc, root)).toEqual(shape(doc, root));
     expect(reopened.doc.styles).toEqual(doc.styles);
     expect(reopened.doc.frames).toEqual(doc.frames);
@@ -65,8 +66,8 @@ describe('index.html', () => {
   });
 
   it('places roots without stored positions instead of stacking them', () => {
-    const { doc } = parseProject({ html: '<body><main></main><section></section></body>', css: '', project: '' });
-    const [a, b] = doc.roots.map((id) => doc.frames[id]!);
+    const { doc } = parseProject({ 'index.html': '<body><main></main><section></section></body>' });
+    const [a, b] = doc.pages[0]!.roots.map((id) => doc.frames[id]!);
     expect(a).toEqual({ x: 0, y: 0 });
     expect(b!.x).toBeGreaterThan(0);
   });

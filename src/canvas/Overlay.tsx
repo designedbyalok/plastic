@@ -7,7 +7,7 @@ import { useEffect, useState, type PointerEvent as ReactPointerEvent } from 'rea
 import { getParentId, isRoot } from '../document/tree';
 import type { NodeId } from '../document/types';
 import { layerName } from '../elements/registry';
-import { useEditor } from '../editor/store';
+import { activeRoots, useEditor } from '../editor/store';
 import type { Rect } from './coords';
 import { domElement, hostOf, screenRectOf, styleOf, toScreenRect } from './dom';
 import { startFrameMove, startResize, type Handle } from './gestures';
@@ -35,7 +35,7 @@ function measure(): Measured {
     const display = styleOf(parentEl).display;
     if (display.includes('flex') || display.includes('grid')) parent = screenRectOf(parentId);
   }
-  const titles = doc.roots.flatMap((id) => {
+  const titles = activeRoots(useEditor.getState()).flatMap((id) => {
     const host = hostOf(id);
     if (!host) return [];
     return [{ id, name: layerName(doc, id), rect: toScreenRect(host.getBoundingClientRect()) }];

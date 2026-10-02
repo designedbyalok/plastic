@@ -1,4 +1,4 @@
-import type { DesignDocument, ElementNode, NodeId, TextNode } from './types';
+import type { DesignDocument, ElementNode, NodeId, Page, TextNode } from './types';
 
 const parentCache = new WeakMap<object, Map<NodeId, NodeId>>();
 
@@ -49,7 +49,22 @@ export function subtreeIds(doc: DesignDocument, id: NodeId): NodeId[] {
 }
 
 export function isRoot(doc: DesignDocument, id: NodeId): boolean {
-  return doc.roots.includes(id);
+  return doc.pages.some((p) => p.roots.includes(id));
+}
+
+/** Root ids of every page. */
+export function allRoots(doc: DesignDocument): NodeId[] {
+  return doc.pages.flatMap((p) => p.roots);
+}
+
+export function getPage(doc: DesignDocument, file: string | null | undefined): Page | undefined {
+  return doc.pages.find((p) => p.file === file);
+}
+
+/** The page a node lives on. */
+export function pageOf(doc: DesignDocument, id: NodeId): Page | undefined {
+  const root = rootOf(doc, id);
+  return doc.pages.find((p) => p.roots.includes(root));
 }
 
 export function rootOf(doc: DesignDocument, id: NodeId): NodeId {

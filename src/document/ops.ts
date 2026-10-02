@@ -6,7 +6,7 @@
  */
 import { createId } from './ids';
 import { takenClassNames, uniqueClassName } from './factory';
-import { getElement, getParentId, isRoot, nodesWithClass, subtreeIds } from './tree';
+import { getElement, getParentId, isRoot, nodesWithClass, pageOf, subtreeIds } from './tree';
 import type { Declarations, DesignDocument, DocNode, ElementNode, NodeId, Point } from './types';
 
 type MutableNodes = Record<NodeId, DocNode>;
@@ -21,13 +21,8 @@ function updateElement(doc: DesignDocument, id: NodeId, fn: (el: ElementNode) =>
 // ---------------------------------------------------------------------------------------------
 // Structure
 
-/** Attach an existing (detached) node. `parentId === null` makes it a root/artboard. */
-export function insertChild(doc: DesignDocument, parentId: NodeId | null, index: number, childId: NodeId): DesignDocument {
-  if (parentId === null) {
-    const roots = [...doc.roots];
-    roots.splice(clampIndex(index, roots.length), 0, childId);
-    return { ...doc, roots };
-  }
+/** Attach an existing (detached) node as a child of an element. */
+export function insertChild(doc: DesignDocument, parentId: NodeId, index: number, childId: NodeId): DesignDocument {
   return updateElement(doc, parentId, (el) => {
     const children = [...el.children];
     children.splice(clampIndex(index, children.length), 0, childId);
@@ -35,19 +30,32 @@ export function insertChild(doc: DesignDocument, parentId: NodeId | null, index:
   });
 }
 
-/** Remove a node from its parent (or the roots) without deleting it. */
+/** Attach an existing (detached) node as an artboard (body child) of a page. */
+export function insertRoot(doc: DesignDocument, pageFile: string, index: number, childId: NodeId): DesignDocument {
+  return {
+    ...doc,
+    pages: doc.pages.map((p) => {
+      if (p.file !== pageFile) return p;
+      const roots = [...p.roots];
+      roots.splice(clampIndex(index, roots.length), 0, childId);
+      return { ...p, roots };
+    }),
+  };
+}
+
+/** Remove a node from its parent (or its page) without deleting it. */
 export function detach(doc: DesignDocument, id: NodeId): DesignDocument {
-  if (isRoot(doc, id)) return { ...doc, roots: doc.roots.filter((r) => r !== id) };
+  if (isRoot(doc, id)) return { ...doc, pages: doc.pages.map((p) => (p.roots.includes(id) ? { ...p, roots: p.roots.filter((r) => r !== id) } : p)) };
   const parentId = getParentId(doc, id);
   if (!parentId) return doc;
   return updateElement(doc, parentId, (el) => ({ ...el, children: el.children.filter((c) => c !== id) }));
 }
 
-/** Move a node. `index` is its position among the target's children after it was removed. */
-export function moveNode(doc: DesignDocument, id: NodeId, parentId: NodeId | null, index: number): DesignDocument {
-  if (parentId !== null && subtreeIds(doc, id).includes(parentId)) return doc;
+/** Move a node into an element. `index` is its position among the children after it was removed. */
+export function moveNode(doc: DesignDocument, id: NodeId, parentId: NodeId, index: number): DesignDocument {
+  if (subtreeIds(doc, id).includes(parentId)) return doc;
   let next = insertChild(detach(doc, id), parentId, index, id);
-  if (parentId !== null && next.frames[id]) next = removeKeys(next, [id]);
+  if (next.frames[id]) next = removeKeys(next, [id]);
   return next;
 }
 
@@ -275,7 +283,7 @@ export function wrapInStack(doc: DesignDocument, ids: readonly NodeId[], options
   const id = createId();
   let next: DesignDocument = withRule(doc, className, style);
   next = { ...next, nodes: { ...next.nodes, [id]: { kind: 'element', id, tag: 'div', attrs: {}, classes: [className], children: [] } } };
-  next = insertChild(next, parentId, index, id);
+  next = insertChild(next, parent.id, index, id);
 
   siblings.forEach((childId, i) => {
     next = stripPosition(next, childId);
@@ -332,15 +340,16 @@ export function duplicateNodes(doc: DesignDocument, ids: readonly NodeId[]): { d
 
     const copyId = clone(sourceId);
     next = { ...next, nodes, styles: { ...next.styles, rules } };
-    if (isRoot(next, sourceId)) {
-      next = insertChild(next, null, next.roots.indexOf(sourceId) + 1, copyId);
+    const page = isRoot(next, sourceId) ? pageOf(next, sourceId) : undefined;
+    if (page) {
+      next = insertRoot(next, page.file, page.roots.indexOf(sourceId) + 1, copyId);
       const frame = next.frames[sourceId] ?? { x: 0, y: 0 };
       next = setFrame(next, copyId, { x: frame.x + 40, y: frame.y + 40 });
     } else {
       const parentId = getParentId(next, sourceId);
       const parent = getElement(next, parentId);
       if (!parent) continue;
-      next = insertChild(next, parentId, parent.children.indexOf(sourceId) + 1, copyId);
+      next = insertChild(next, parent.id, parent.children.indexOf(sourceId) + 1, copyId);
       next = nudgeIfAbsolute(next, copyId, 16);
     }
     created.push(copyId);

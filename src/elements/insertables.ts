@@ -3,7 +3,7 @@
  * (field, checkbox, table) are built from the same semantic elements a developer would write.
  */
 import { instantiate, emptyDocument, type NodeSpec } from '../document/factory';
-import { insertChild, setFrame } from '../document/ops';
+import { insertRoot, setFrame } from '../document/ops';
 import type { DesignDocument } from '../document/types';
 
 export interface Insertable {
@@ -195,5 +195,5 @@ export function insertable(id: string): Insertable | undefined {
 /** A new project: one empty artboard. */
 export function starterDocument(): DesignDocument {
   const made = instantiate(emptyDocument('Untitled'), frameSpec());
-  return setFrame(insertChild(made.doc, null, 0, made.id), made.id, { x: 0, y: 0 });
+  return setFrame(insertRoot(made.doc, made.doc.pages[0]!.file, 0, made.id), made.id, { x: 0, y: 0 });
 }

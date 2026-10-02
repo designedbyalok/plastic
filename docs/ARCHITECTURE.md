@@ -20,13 +20,15 @@ src/
     ops.ts           Pure edits: (doc, …) => doc
     table.ts         Table structure edits (rows/columns)
     factory.ts       NodeSpec templates → nodes + class rules
-    css.ts           styles.css parser/serializer
+    css.ts           styles.css and tokens.css parsers/serializers
+    pages.ts         Page edits (add, rename, delete, reorder)
+    tokens.ts        Token kinds, binding helpers, rename-with-references
     markup.ts        HTML rules shared by serializer and renderer (void tags, whitespace, ids)
   elements/        What the editor knows about HTML elements
     registry.ts      Friendly names, attribute schemas, swappable tags, layer naming
     insertables.ts   Insert templates (heading, input, labeled field, table…)
   serialization/   Files on disk ↔ DesignDocument
-    html.ts          index.html
+    html.ts          one page ↔ its .html file
     project.ts       project.json (editor metadata only)
     index.ts         serializeProject / parseProject
     storage.ts       Workspace (list/create/open projects) and per-project storage
@@ -62,9 +64,10 @@ Dependency direction: `document` ← `elements` ← `serialization` ← `editor`
 ```ts
 interface DesignDocument {
   title: string;
-  nodes: Record<NodeId, ElementNode | TextNode>; // flat map, immutable
-  roots: NodeId[];                               // children of <body>, shown as artboards
-  styles: StyleSheet;                            // styles.css
+  nodes: Record<NodeId, ElementNode | TextNode>; // flat map of all pages, immutable
+  pages: Page[];                                 // { file, name, roots }: one HTML file each
+  styles: StyleSheet;                            // styles.css, shared by all pages
+  tokens: TokenSheet;                            // tokens.css: :root custom properties
   frames: Record<NodeId, Point>;                 // artboard canvas positions → project.json
   names: Record<NodeId, string>;                 // custom layer names → project.json
 }
@@ -100,7 +103,7 @@ interface TextNode    { kind: 'text'; id; text }
 | ------------------------------------------ | ----------------------------------------------- |
 | Changed only via `apply()` / transactions  | Changed freely                                  |
 | Undoable                                   | Never in history                                |
-| Saved to index.html / styles.css (+frames, names in project.json) | Partly saved to project.json (viewport, collapsed layers) |
+| Saved to page .html files, styles.css, tokens.css (+pages, frames, names in project.json) | Partly saved to project.json (viewport, collapsed layers) |
 | Pure functions in `src/document`           | selection, hover, tool, viewport, text-editing id, panel toggles, save status |
 
 Transient gesture visuals (marquee, drop line, ghost) live in a separate tiny store
@@ -115,7 +118,8 @@ Canvas (viewport, overflow hidden) ← receives every pointer event
 │       └── <iframe> (pointer-events: none, sized to the root element)
 │           └── standards-mode document
 │               ├── <style>  editor guard rules (zero specificity)
-│               ├── <style>  styles.css, verbatim
+│               ├── <style>  tokens.css
+│               ├── <style>  styles.css
 │               └── <body> → <div class="frame" data-pl-id>  ← the real design DOM
 └── Overlay (screen space, pointer-events: none except handles/titles)
 ```
@@ -193,10 +197,24 @@ A workspace is a folder of projects; a project is a plain folder:
 
 ```
 workspace/demo/
-├── index.html     the design: semantic markup, one data-pl-id per element
+├── index.html     page 1: semantic markup, one data-pl-id per element
+├── pricing.html   page 2 … (every .html file in the folder is a page)
+├── tokens.css     design tokens: :root { --color-primary: …; --spacing-4: …; }
 ├── styles.css     the presentation: one rule per class, plus preserved rules
-└── project.json   editor metadata only: artboard positions, layer names, viewport, collapsed layers
+└── project.json   editor metadata only: page order and names, artboard positions,
+                   layer names, viewport, collapsed layers
 ```
+
+- **Pages are HTML files.** A multi-page design is a small static site: each page links
+  `tokens.css` then `styles.css`. A page's file name is its id and never changes when the page
+  is renamed (names live in project.json), so diffs stay small. Deleting a page deletes its
+  file. An .html file added by hand or by an agent shows up as a new page.
+- **Tokens are CSS custom properties** in `tokens.css`, used as `var(--name)`. Their kind comes
+  from the name prefix, following the Tailwind v4 theme namespaces (which Paper also uses):
+  `color-`, `spacing-`, `radius-`, `font-`, `text-`, `font-weight-`, `leading-`, `tracking-`,
+  `opacity-`, `shadow-`. Other rules in tokens.css (e.g. a `[data-theme=dark]` override block)
+  are preserved. Projects from before tokens.css have their `:root` variables moved out of
+  styles.css on first open.
 
 - **index.html is the source of truth** and is pretty-printed deterministically, so a change
   produces a minimal, readable diff. Saving twice without edits is byte-identical (tested).
@@ -273,7 +291,7 @@ insert templates use — so it needs no special path into the document:
 | Vector / boolean / complex | exported SVG (`svg` subtree) or an `img` of the SVG            |
 | Corner radius / effects    | `border-radius` / `box-shadow`, `filter`                        |
 | Absolute children          | `position:absolute; left; top` inside a `position:relative` parent |
-| Variables / styles         | CSS custom properties in the preserved part of styles.css       |
+| Variables / styles         | Tokens in tokens.css (`--color-*`, `--spacing-*`…); modes → override blocks |
 
 Priority: appearance first (fallback to SVG rather than failing), editability second, semantics
 third. Semantic upgrades ("rectangle + placeholder text → input?", "repeated rows → table?") are
@@ -300,7 +318,10 @@ Implemented:
 - Layers panel with friendly names + tags, collapse, rename.
 - Inline text editing (double-click), undo/redo with transactions and coalescing,
   duplicate, delete, nudge.
-- Code view (index.html / styles.css / project.json, with or without editor ids).
+- Code view (current page / styles.css / tokens.css / project.json, with or without editor ids).
+- Pages: add, rename, delete, switch; one HTML file each, sharing tokens and styles.
+- Tokens: a Theme tab grouped by kind; bind any style field to a token, detach, or save a
+  value as a new token; renaming a token rewrites every `var()` that uses it.
 - Autosave to `workspace/<id>/`, reload from disk, live sync of external edits.
 - Home screen: recent files with live thumbnails, search (⌘F), grid/list views, New file.
 
@@ -310,7 +331,9 @@ Implemented:
    (today they are preserved and honored, but only editable as text).
 2. **State styles**: `:hover`, `:focus-visible`, `:invalid`, `:disabled` as editable rules, with a
    state switcher on the canvas.
-3. **CSS variables / basic tokens**: edit `:root` custom properties and bind controls to them.
+3. **Token modes and aliases**: light/dark (and brand) modes as override blocks in tokens.css
+   (`[data-theme=dark] { --color-surface: … }`) with a mode switcher per artboard; token-to-token
+   aliases in the Theme tab (already valid CSS: `--color-accent: var(--color-primary)`).
 4. **Agent API (MCP)**: expose `src/document/ops.ts` + queries over MCP. The document already
    has stable ids, semantic tags and pure operations; the API is mostly a thin transport.
 5. **Components**: a class + markup template with slots, saved under `components/`, mapping to

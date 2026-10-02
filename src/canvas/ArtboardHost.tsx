@@ -10,9 +10,9 @@
  * See docs/ARCHITECTURE.md (rendering).
  */
 import { useLayoutEffect, useRef } from 'react';
-import { serializeStyleSheet } from '../document/css';
+import { serializeStyleSheet, serializeTokenSheet } from '../document/css';
 import { rootOf } from '../document/tree';
-import type { NodeId, StyleSheet } from '../document/types';
+import type { NodeId } from '../document/types';
 import { useEditor } from '../editor/store';
 import { domElement, onRerenderRequest, registerHost } from './dom';
 import { DomRenderer } from './renderer';
@@ -31,12 +31,12 @@ const EDITOR_CSS = `
 /** Width used for a root whose width depends on the viewport (e.g. `width: auto`). */
 const DEFAULT_VIEWPORT_WIDTH = 1440;
 
-const cssCache = new WeakMap<StyleSheet, string>();
+const cssCache = new WeakMap<object, string>();
 
-function designCss(sheet: StyleSheet): string {
+function cached<T extends object>(sheet: T, serialize: (sheet: T) => string): string {
   let css = cssCache.get(sheet);
   if (css === undefined) {
-    css = serializeStyleSheet(sheet);
+    css = serialize(sheet);
     cssCache.set(sheet, css);
   }
   return css;
@@ -93,9 +93,11 @@ export function ArtboardHost({ id }: { id: NodeId }) {
       if (!doc) return;
       const win = doc.defaultView!;
       const guard = doc.createElement('style');
+      const tokens = doc.createElement('style');
       const style = doc.createElement('style');
       guard.textContent = EDITOR_CSS;
-      doc.head.append(guard, style);
+      // Same order as the exported page: tokens.css, then styles.css.
+      doc.head.append(guard, tokens, style);
       const renderer = new DomRenderer(doc.body);
       const unblock = blockNativeInteraction(doc);
       const unregister = registerHost(id, iframe);
@@ -124,7 +126,9 @@ export function ArtboardHost({ id }: { id: NodeId }) {
         const { doc: design } = useEditor.getState();
         if (design === lastDoc || !design.nodes[id]) return;
         lastDoc = design;
-        const css = designCss(design.styles);
+        const tokenCss = cached(design.tokens, serializeTokenSheet);
+        if (tokens.textContent !== tokenCss) tokens.textContent = tokenCss;
+        const css = cached(design.styles, serializeStyleSheet);
         if (style.textContent !== css) style.textContent = css;
         renderer.render(design, id);
         observe();
@@ -152,6 +156,7 @@ export function ArtboardHost({ id }: { id: NodeId }) {
         doc.removeEventListener('pointerdown', onPointerDown);
         renderer.dispose();
         guard.remove();
+        tokens.remove();
         style.remove();
         teardown = null;
       };

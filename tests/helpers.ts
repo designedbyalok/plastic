@@ -1,12 +1,12 @@
 import { emptyDocument, instantiate, type NodeSpec } from '../src/document/factory';
-import { insertChild, setFrame } from '../src/document/ops';
+import { insertRoot, setFrame } from '../src/document/ops';
 import { getElement } from '../src/document/tree';
 import type { DesignDocument, ElementNode, NodeId } from '../src/document/types';
 
 /** Build a document with one root from a spec. */
 export function docFrom(spec: NodeSpec): { doc: DesignDocument; root: NodeId } {
   const made = instantiate(emptyDocument('Test'), spec);
-  return { doc: setFrame(insertChild(made.doc, null, 0, made.id), made.id, { x: 0, y: 0 }), root: made.id };
+  return { doc: setFrame(insertRoot(made.doc, 'index.html', 0, made.id), made.id, { x: 0, y: 0 }), root: made.id };
 }
 
 export function el(doc: DesignDocument, id: NodeId | undefined): ElementNode {

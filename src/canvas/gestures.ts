@@ -3,9 +3,9 @@
  * start, then produces document edits inside a transaction so the whole drag is one undo step.
  */
 import { canEditText, createFrame } from '../editor/commands';
-import { useEditor } from '../editor/store';
+import { activeRoots, useEditor } from '../editor/store';
 import { instantiate, withRootStyle } from '../document/factory';
-import { insertChild, moveNode, setFrame, setStyleOnNodes } from '../document/ops';
+import { insertChild, insertRoot, moveNode, setFrame, setStyleOnNodes } from '../document/ops';
 import { getElement, getParentId, isRoot, topmostIds } from '../document/tree';
 import type { DesignDocument, NodeId, Point } from '../document/types';
 import { FRAME_SIZE, insertable } from '../elements/insertables';
@@ -184,7 +184,7 @@ function marqueeCandidates(scope: NodeId | null): NodeId[] {
   const { doc } = editor();
   const childrenOf = (id: NodeId) => getElement(doc, id)?.children.filter((c) => doc.nodes[c]?.kind === 'element') ?? [];
   if (scope) return childrenOf(scope);
-  return doc.roots.flatMap((r) => {
+  return activeRoots(editor()).flatMap((r) => {
     const el = getElement(doc, r);
     return el && elementSpec(el.tag).acceptsChildren ? childrenOf(r) : [r];
   });
@@ -201,7 +201,7 @@ function startMarquee(e: PointerEvent, scope: NodeId | null, base: readonly Node
         const r = screenRectOf(id);
         return r && rectsIntersect(r, rect);
       });
-      const rootHits = !scope && !hits.length ? editor().doc.roots.filter((id) => {
+      const rootHits = !scope && !hits.length ? activeRoots(editor()).filter((id) => {
         const r = screenRectOf(id);
         return r && rectsIntersect(r, rect);
       }) : [];
@@ -305,7 +305,7 @@ export function insertAt(e: PointerEvent, itemId: string): void {
     editor().apply(`Insert ${item.label}`, (d) => {
       const made = instantiate(d, item.spec());
       newId = made.id;
-      return setFrame(insertChild(made.doc, null, d.roots.length, made.id), made.id, world);
+      return setFrame(insertRoot(made.doc, editor().activePage, Number.MAX_SAFE_INTEGER, made.id), made.id, world);
     });
   } else if (insertsInFlow(doc, container)) {
     const insertion = flowInsertion(doc, container, new Set(), e.clientX, e.clientY);

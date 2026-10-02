@@ -3,7 +3,7 @@
  * written back shortly after they happen, and edits made to the files by anything else
  * (an editor, git checkout, a coding agent) are loaded in as an undoable change.
  */
-import { parseProject, serializeProject, type ProjectFiles } from '../serialization';
+import { parseProject, sameFiles, serializeProject, type ProjectFiles } from '../serialization';
 import { connectWorkspace, type ProjectStorage } from '../serialization/storage';
 import { setTitle } from '../document/ops';
 import { starterDocument } from '../elements/insertables';
@@ -15,9 +15,7 @@ let storage: ProjectStorage | null = null;
 let lastWritten: ProjectFiles | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-function same(a: ProjectFiles, b: ProjectFiles | null): boolean {
-  return !!b && a.html === b.html && a.css === b.css && a.project === b.project;
-}
+const same = sameFiles;
 
 function schedule(delay = AUTOSAVE_MS): void {
   clearTimeout(timer);
@@ -74,7 +72,7 @@ export async function openProject(id: string): Promise<OpenedProject> {
   if (!files) return { found: false, restoredViewport: false, stop: () => {} };
 
   const { doc, meta } = parseProject(files);
-  useEditor.getState().load(doc, { viewport: meta.viewport, collapsed: meta.collapsed });
+  useEditor.getState().load(doc, { viewport: meta.viewport, collapsed: meta.collapsed, activePage: meta.activePage });
   storage = project;
   lastWritten = files;
   useEditor.getState().setSaveState('saved', useEditor.getState().revision, project.location);
@@ -98,6 +96,6 @@ export async function openProject(id: string): Promise<OpenedProject> {
 /** Create a project with one empty artboard; resolves with its id. */
 export async function createProject(title = 'Untitled'): Promise<string> {
   const workspace = await connectWorkspace();
-  const files = serializeProject(setTitle(starterDocument(), title), { viewport: null, collapsed: [] });
+  const files = serializeProject(setTitle(starterDocument(), title), { viewport: null, collapsed: [], activePage: null });
   return workspace.create(title, files);
 }

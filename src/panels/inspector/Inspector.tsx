@@ -1,7 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { zoomBy, zoomTo, zoomToFit, zoomToSelection } from '../../editor/commands';
-import { useEditor } from '../../editor/store';
+import { activeRoots, useEditor } from '../../editor/store';
 import { getElement } from '../../document/tree';
 import type { ElementNode } from '../../document/types';
 import { elementSpec } from '../../elements/registry';
@@ -15,7 +15,7 @@ export function Inspector() {
   const doc = useEditor((s) => s.doc);
   // Computed-value placeholders read the live DOM; re-read once after new artboards mount.
   const [, refresh] = useReducer((n: number) => n + 1, 0);
-  const rootCount = doc.roots.length;
+  const rootCount = useEditor((s) => activeRoots(s).length);
   useEffect(() => {
     const raf = requestAnimationFrame(refresh);
     return () => cancelAnimationFrame(raf);
@@ -149,7 +149,7 @@ function EmptyInspector() {
   return (
     <div className="insp-empty">
       <p className="insp-empty-stats">
-        {doc.roots.length} artboard{doc.roots.length === 1 ? '' : 's'} · {elements} elements · {Object.keys(doc.styles.rules).length} classes
+        {doc.pages.length} page{doc.pages.length === 1 ? '' : 's'} · {elements} elements · {Object.keys(doc.styles.rules).length} classes · {Object.keys(doc.tokens.values).length} tokens
       </p>
       <dl className="insp-shortcuts">
         {[
