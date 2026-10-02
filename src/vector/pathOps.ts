@@ -6,14 +6,15 @@
  * The result is styled like the bottom-most operand (Figma does the same).
  */
 import SvgPath from 'svgpath';
-import { instantiate } from '../document/factory.ts';
+import { instantiate, type NodeSpec } from '../document/factory.ts';
 import { insertChild, removeNodes, setAttribute, setStyleOnNodes } from '../document/ops.ts';
 import { getElement, getParentId, isRoot } from '../document/tree.ts';
 import type { DesignDocument, NodeId } from '../document/types.ts';
 import { useEditor } from '../editor/store.ts';
 import { domElement, styleOf } from '../canvas/dom.ts';
 import { notify } from '../canvas/gestureStore.ts';
-import { EDITABLE_SHAPES } from './edit.ts';
+import { EDITABLE_SHAPES, gradientOf } from './edit.ts';
+import { parseCssGradient, svgGradientSpec, type Gradient } from '../paint/gradient.ts';
 import { shapeToPathData } from './path.ts';
 import { booleanPaths, outlineStroke, pathBounds, type BooleanOp } from './booleans.ts';
 
@@ -70,6 +71,8 @@ interface Operand {
   /** Path data in the parent's padding-box coordinates (CSS px). */
   readonly d: string;
   readonly paint: Record<string, string>;
+  /** A gradient fill, carried into the result's own <defs> (the original lives in its source svg). */
+  readonly gradient: Gradient | null;
 }
 
 function radius(value: string, size: number): number {
@@ -165,10 +168,11 @@ function operandOf(doc: DesignDocument, id: NodeId, parent: HTMLElement): Operan
   const oy = pr.top + parent.clientTop;
   if (operandKind(doc, id) === 'box') {
     const r = el.getBoundingClientRect();
-    return { id, d: roundedBox(r.left - ox, r.top - oy, r.width, r.height, styleOf(el)), paint: boxPaint(el) };
+    return { id, d: roundedBox(r.left - ox, r.top - oy, r.width, r.height, styleOf(el)), paint: boxPaint(el), gradient: parseCssGradient(styleOf(el).backgroundImage) };
   }
   const parts: string[] = [];
   let paint: Record<string, string> | null = null;
+  let gradient: Gradient | null = null;
   for (const shapeId of shapesUnder(doc, id)) {
     const node = getElement(doc, shapeId)!;
     const shapeEl = domElement(shapeId) as unknown as SVGGraphicsElement | null;
@@ -176,9 +180,12 @@ function operandOf(doc: DesignDocument, id: NodeId, parent: HTMLElement): Operan
     const raw = node.tag === 'path' ? node.attrs.d : shapeToPathData(node.tag, node.attrs);
     if (!shapeEl || !ctm || !raw) continue;
     parts.push(SvgPath(raw).matrix([ctm.a, ctm.b, ctm.c, ctm.d, ctm.e - ox, ctm.f - oy]).round(2).toString());
-    paint ??= shapePaint(shapeEl as unknown as Element);
+    if (!paint) {
+      paint = shapePaint(shapeEl as unknown as Element);
+      gradient = paint.fill ? gradientOf(doc, shapeId, paint.fill) : null;
+    }
   }
-  return parts.length ? { id, d: parts.join(''), paint: paint ?? { fill: '#000000' } } : null;
+  return parts.length ? { id, d: parts.join(''), paint: paint ?? { fill: '#000000' }, gradient } : null;
 }
 
 // --- running ----------------------------------------------------------------------------------
@@ -220,6 +227,12 @@ export async function runPathOp(op: PathOp): Promise<void> {
   const topIndex = Math.max(...sorted.map((id) => parent.children.indexOf(id)));
   const before = parent.children.slice(0, topIndex).filter((c) => sorted.includes(c)).length;
   let created: NodeId | null = null;
+  // The result's paint, with a gradient fill re-created in its own <defs>.
+  const base = operands[0]!;
+  const gradientId = base.gradient ? `pl-gradient-${Math.random().toString(36).slice(2, 8)}` : null;
+  const paint = gradientId ? { ...base.paint, fill: `url(#${gradientId})`, 'fill-opacity': undefined } : base.paint;
+  const children: NodeSpec[] = [{ tag: 'path', attrs: Object.fromEntries(Object.entries({ d: local, ...paint }).filter((e): e is [string, string] => e[1] !== undefined)) }];
+  if (gradientId) children.unshift({ tag: 'defs', children: [svgGradientSpec(base.gradient!, gradientId)] });
 
   editor().apply(
     label,
@@ -229,7 +242,7 @@ export async function runPathOp(op: PathOp): Promise<void> {
         className: op,
         attrs: { xmlns: 'http://www.w3.org/2000/svg', viewBox: `0 0 ${round(w)} ${round(h)}`, fill: 'none' },
         style: { position: 'absolute', left: px(b.x), top: px(b.y), width: px(w), height: px(h), overflow: 'visible' },
-        children: [{ tag: 'path', attrs: { d: local, ...operands[0]!.paint } }],
+        children,
       });
       created = made.id;
       let next = removeNodes(made.doc, sorted);

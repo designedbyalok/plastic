@@ -7,12 +7,12 @@
  */
 import { insertChild, removeNodes, setAttribute } from '../../document/ops.ts';
 import { instantiate } from '../../document/factory.ts';
-import { gradientFrom, parseColor, readSvgGradient, svgGradientSpec, type Gradient } from '../../paint/gradient.ts';
+import { gradientFrom, parseColor, svgGradientSpec, type Gradient } from '../../paint/gradient.ts';
 import { GradientEditor } from './GradientEditor.tsx';
 import { getElement, getParentId } from '../../document/tree.ts';
 import type { DesignDocument, ElementNode, NodeId } from '../../document/types.ts';
 import { useEditor } from '../../editor/store.ts';
-import { EDITABLE_SHAPES, readPath, vectorRootOf, writePath } from '../../vector/edit.ts';
+import { EDITABLE_SHAPES, gradientElement, gradientOf, readPath, vectorRootOf, writePath } from '../../vector/edit.ts';
 import { moveRefs, setRadius } from '../../vector/path.ts';
 import { Radius } from 'lucide-react';
 import { DEFAULT_STAR_RATIO, polygonPoints, starPoints } from '../../vector/shapes.ts';
@@ -130,29 +130,6 @@ function PaintRow({ shapes, attr, opacityAttr, label }: { shapes: readonly NodeI
       </span>
     </Row>
   );
-}
-
-/** The gradient element a `url(#id)` fill points to, inside the shape's svg. */
-function gradientElement(doc: DesignDocument, shape: NodeId, fill: string): ElementNode | null {
-  const id = /^url\(\s*#([^)\s]+)\s*\)$/i.exec(fill)?.[1];
-  const root = vectorRootOf(doc, shape);
-  if (!id || !root) return null;
-  let found: ElementNode | null = null;
-  const walk = (nodeId: NodeId) => {
-    const el = getElement(doc, nodeId);
-    if (!el || found) return;
-    if (el.attrs.id === id && (el.tag === 'linearGradient' || el.tag === 'radialGradient')) found = el;
-    else el.children.forEach(walk);
-  };
-  walk(root);
-  return found;
-}
-
-function gradientOf(doc: DesignDocument, shape: NodeId, fill: string): Gradient | null {
-  const el = gradientElement(doc, shape, fill);
-  if (!el) return null;
-  const stops = el.children.map((c) => getElement(doc, c)).filter((c): c is ElementNode => !!c && c.tag === 'stop');
-  return readSvgGradient(el, stops);
 }
 
 /** Put a gradient in the vector's <defs> (replacing the shapes' current one) and point the shapes at it. */

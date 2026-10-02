@@ -6,7 +6,8 @@
 import { instantiate, type NodeSpec } from '../document/factory.ts';
 import { insertChild, insertRoot, removeNodes, setAttribute, setFrame, setStyleOnNodes, setTag } from '../document/ops.ts';
 import { getElement, getParentId } from '../document/tree.ts';
-import type { DesignDocument, NodeId, Point } from '../document/types.ts';
+import type { DesignDocument, ElementNode, NodeId, Point } from '../document/types.ts';
+import { readSvgGradient, type Gradient } from '../paint/gradient.ts';
 import { activeRoots, useEditor, type VectorEdit } from '../editor/store.ts';
 import { screenToWorld } from '../canvas/coords.ts';
 import { clientRectOf, domElement, styleOf, toScreen } from '../canvas/dom.ts';
@@ -52,11 +53,45 @@ export function vectorTargetFor(doc: DesignDocument, hit: NodeId): NodeId | null
   return shapes.length === 1 ? shapes[0]! : null;
 }
 
-/** The editable path: the un-rounded points (data-pl-d) with their radii, or `d` itself. */
+/**
+ * The editable path: the un-rounded points (data-pl-d) with their radii, or `d` itself. The source
+ * is only trusted while `d` is still what it rounds to; once `d` was changed elsewhere (the code
+ * panel, an import), `d` wins and the stale radii are dropped on the next write.
+ */
 export function readPath(doc: DesignDocument, id: NodeId): VectorPath {
   const el = getElement(doc, id);
   if (el?.tag !== 'path') return [];
-  return applyRadii(parsePath(el.attrs['data-pl-d'] ?? el.attrs.d ?? ''), el.attrs['data-pl-radius']);
+  const d = el.attrs.d ?? '';
+  const source = el.attrs['data-pl-d'];
+  if (source !== undefined) {
+    const path = applyRadii(parsePath(source), el.attrs['data-pl-radius']);
+    if (serializePath(roundCorners(path)) === serializePath(parsePath(d))) return path;
+  }
+  return parsePath(d);
+}
+
+/** The gradient element a `url(#id)` paint points to, inside the shape's svg. */
+export function gradientElement(doc: DesignDocument, shape: NodeId, paint: string): ElementNode | null {
+  // Attributes say url(#id); computed styles say url("#id"), possibly with the page URL first.
+  const id = /^url\(\s*["']?[^"'#)]*#([^"')\s]+)["']?\s*\)$/i.exec(paint.trim())?.[1];
+  const root = vectorRootOf(doc, shape);
+  if (!id || !root) return null;
+  let found: ElementNode | null = null;
+  const walk = (nodeId: NodeId) => {
+    const el = getElement(doc, nodeId);
+    if (!el || found) return;
+    if (el.attrs.id === id && (el.tag === 'linearGradient' || el.tag === 'radialGradient')) found = el;
+    else el.children.forEach(walk);
+  };
+  walk(root);
+  return found;
+}
+
+export function gradientOf(doc: DesignDocument, shape: NodeId, paint: string): Gradient | null {
+  const el = gradientElement(doc, shape, paint);
+  if (!el) return null;
+  const stops = el.children.map((c) => getElement(doc, c)).filter((c): c is ElementNode => !!c && c.tag === 'stop');
+  return readSvgGradient(el, stops);
 }
 
 /** Write points back; rounded corners keep their source in data-pl-d and draw the result in d. */

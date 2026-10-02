@@ -171,5 +171,13 @@ describe('corner radius', () => {
     expect(readPath(doc, pathId)[0]!.anchors[1]!.radius).toBe(8);
     const flat = writePath(doc, pathId, setRadius(readPath(doc, pathId), [{ sub: 0, index: 1, part: 'anchor' }], 0));
     expect((flat.nodes[pathId] as unknown as { attrs: Record<string, string> }).attrs).toEqual({ d: 'M0 0L100 0L100 100Z' });
+
+    // `d` edited elsewhere (e.g. the code panel): the stale source and radii are ignored.
+    const { setAttribute } = await import('../src/document/ops.ts');
+    const edited = setAttribute(doc, pathId, 'd', 'M0 0L50 0L50 50Z');
+    const path = readPath(edited, pathId);
+    expect(serializePath(path)).toBe('M0 0L50 0L50 50Z');
+    expect(path[0]!.anchors.some((a) => a.radius)).toBe(false);
+    expect((writePath(edited, pathId, path).nodes[pathId] as unknown as { attrs: Record<string, string> }).attrs).toEqual({ d: 'M0 0L50 0L50 50Z' });
   });
 });
