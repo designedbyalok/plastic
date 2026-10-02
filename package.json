@@ -6,7 +6,7 @@
   "description": "A visual editor for real interfaces: HTML and CSS are the design source.",
   "scripts": {
     "dev": "vite",
-    "build": "npm run typecheck && vite build",
+    "build": "bun run typecheck && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "test": "vitest run",
     "preview": "vite preview"
@@ -26,5 +26,6 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
-  }
+  },
+  "packageManager": "bun@1.4.0"
 }

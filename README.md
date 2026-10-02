@@ -16,8 +16,8 @@ That is what the editor saves — not a scene graph that has to be translated in
 ## Run
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 Open the printed URL. The home screen lists the files in `workspace/`. Each file is a folder
@@ -25,12 +25,12 @@ Open the printed URL. The home screen lists the files in `workspace/`. Each file
 and opened at `/file/<id>`. Edit those files with anything — a text editor, git, a coding
 agent — and the open editor and the home screen update (in the editor, as an undoable change).
 
-Use a different workspace folder with `PLASTIC_WORKSPACE=path/to/folder npm run dev`.
+Use a different workspace folder with `PLASTIC_WORKSPACE=path/to/folder bun run dev`.
 
 ```bash
-npm test           # model, serialization, history
-npm run typecheck
-npm run build
+bun run test       # model, serialization, history (Vitest; not `bun test`)
+bun run typecheck
+bun run build
 ```
 
 ## Try the first workflow
