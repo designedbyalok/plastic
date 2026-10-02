@@ -4,6 +4,10 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Served only on the custom domain (the auth URL and cookies are tied to it).
+  "routes": [{ "pattern": "useplastic.app", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
@@ -21,8 +25,8 @@
     }
   ],
   "vars": {
-    // Your public URL once deployed (e.g. https://plastic.<you>.workers.dev or a custom domain).
-    "BETTER_AUTH_URL": "http://localhost:8787"
+    // Public URL of the app. `wrangler dev` overrides it from .dev.vars.
+    "BETTER_AUTH_URL": "https://useplastic.app"
   },
   "observability": { "enabled": true }
 }

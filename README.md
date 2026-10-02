@@ -78,7 +78,7 @@ bun run deploy             # build and deploy
 ```
 
 Set the auth secret once with `openssl rand -hex 32 | bunx wrangler secret put BETTER_AUTH_SECRET`,
-and `BETTER_AUTH_URL` in `wrangler.jsonc` to the deployed URL. GitHub/Google sign-in turn on when
+The app is served on https://useplastic.app (`routes` and `BETTER_AUTH_URL` in `wrangler.jsonc`; `.dev.vars` sets `BETTER_AUTH_URL=http://localhost:8787` for `wrangler dev`). GitHub/Google sign-in turn on when
 `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` (or the `GOOGLE_` pair) are set as secrets.
 
 ## Docs
