@@ -4,8 +4,8 @@
  * anywhere else (a static build) the browser's localStorage is used. Tauri will add a native
  * implementation behind the same interfaces.
  */
-import { detectBackend } from '../auth/client';
-import { PROJECT_FILE_NAME, isPageFile, type ProjectFiles } from './index';
+import { detectBackend } from '../auth/client.ts';
+import { PROJECT_FILE_NAME, isPageFile, type ProjectFiles } from './index.ts';
 
 export interface ProjectSummary {
   readonly id: string;
@@ -39,7 +39,7 @@ export interface Workspace {
   /** URL a project's folder is served from, for its assets/ (null when assets aren't served). */
   assetBase(id: string): string | null;
   /** Convert a Figma .fig file into a new project. Null when this workspace can't import. */
-  readonly importFigma: ((file: File) => Promise<FigmaImportResult>) | null;
+  readonly importFigma: ((file: File, onProgress?: (message: string) => void) => Promise<FigmaImportResult>) | null;
   /** Called when projects are added, removed or edited anywhere. */
   onChange(listener: () => void): () => void;
 }
@@ -276,8 +276,41 @@ class CloudWorkspace implements Workspace {
     return `/api/projects/${encodeURIComponent(id)}/`;
   }
 
-  // Figma import in the cloud converts on Cloudflare (next step); until then it's local only.
-  readonly importFigma = null;
+  /**
+   * Figma import in the cloud: the file is converted here in the browser (OpenPencil parses it in
+   * a Web Worker), then saved to the account like any new file, followed by its images.
+   */
+  readonly importFigma = async (file: File, onProgress?: (message: string) => void): Promise<FigmaImportResult> => {
+    onProgress?.('Reading the Figma file…');
+    const { convertFigFile, titleFromFileName } = await import('../figma/convert.ts');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    onProgress?.('Converting pages, auto layout, text and images…');
+    // Let the progress message paint before the conversion takes the main thread.
+    await new Promise((r) => setTimeout(r, 30));
+    const conversion = await convertFigFile(bytes, titleFromFileName(file.name));
+    onProgress?.('Saving to your account…');
+    const id = await this.create(conversion.title, conversion.files);
+    const assets = Object.entries(conversion.assets);
+    let done = 0;
+    let failed = 0;
+    const upload = async ([path, data]: [string, Uint8Array]) => {
+      const url = `${this.assetBase(id)}${path.split('/').map(encodeURIComponent).join('/')}`;
+      // Retry briefly; one image that won't upload shouldn't lose the whole import.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const response = await fetch(url, { method: 'PUT', body: data as BodyInit }).catch(() => null);
+        if (response?.ok) break;
+        if (attempt === 2) failed++;
+        else await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
+      onProgress?.(`Uploading images… ${++done} of ${assets.length}`);
+    };
+    // A few uploads at a time.
+    for (let i = 0; i < assets.length; i += 6) await Promise.all(assets.slice(i, i + 6).map(upload));
+    const report = failed
+      ? { ...conversion.report, warnings: [...conversion.report.warnings, `${failed} of ${assets.length} images couldn’t be uploaded; they appear empty. Try importing again.`] }
+      : conversion.report;
+    return { id, report };
+  };
 
   open(id: string): ProjectStorage {
     const endpoint = `/api/projects/${encodeURIComponent(id)}`;

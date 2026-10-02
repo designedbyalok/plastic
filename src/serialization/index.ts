@@ -1,8 +1,8 @@
-import { extractRootTokens, parseStyleSheet, parseTokenSheet, serializeStyleSheet, serializeTokenSheet } from '../document/css';
-import { FIRST_PAGE_FILE } from '../document/factory';
-import type { DesignDocument, NodeId, Page, Point } from '../document/types';
-import { parseHTML, serializeHTML } from './html';
-import { PROJECT_FORMAT, PROJECT_VERSION, readProjectJson, type ProjectJson, type ViewportMeta } from './project';
+import { extractRootTokens, parseStyleSheet, parseTokenSheet, serializeStyleSheet, serializeTokenSheet } from '../document/css.ts';
+import { FIRST_PAGE_FILE } from '../document/factory.ts';
+import type { DesignDocument, NodeId, Page, Point } from '../document/types.ts';
+import { parseHTML, serializeHTML } from './html.ts';
+import { PROJECT_FORMAT, PROJECT_VERSION, readProjectJson, type ProjectJson, type ViewportMeta } from './project.ts';
 
 /**
  * The files of a project folder, by file name: one .html per page, styles.css, tokens.css and

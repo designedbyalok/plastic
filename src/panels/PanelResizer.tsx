@@ -4,7 +4,7 @@
  * store on release. Double-click resets the width.
  */
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { PANEL_WIDTH, clampPanelWidth, useEditor } from '../editor/store';
+import { PANEL_WIDTH, clampPanelWidth, useEditor } from '../editor/store.ts';
 
 export function PanelResizer() {
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {

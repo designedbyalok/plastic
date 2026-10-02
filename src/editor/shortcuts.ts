@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
-import { INSERTABLES } from '../elements/insertables';
+import { INSERTABLES } from '../elements/insertables.ts';
 import {
   addFlexOrWrap, deleteSelection, toggleClipContent, duplicateSelection, enterSelection, nudgeSelection, selectParent,
   zoomBy, zoomTo, zoomToFit, zoomToSelection,
-} from './commands';
-import { navigate } from '../app/router';
-import { saveNow } from './persistence';
-import { useEditor } from './store';
+} from './commands.ts';
+import { navigate } from '../app/router.ts';
+import { saveNow } from './persistence.ts';
+import { useEditor } from './store.ts';
 
 function isTyping(e: KeyboardEvent): boolean {
   const target = e.composedPath()[0] as HTMLElement | undefined;

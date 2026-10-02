@@ -4,12 +4,12 @@
  * both what the CSS says and what the browser did with it.
  */
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { domElement, styleOf } from '../../canvas/dom';
-import { setStyleOnNodes } from '../../document/ops';
-import { groupFor, setToken, tokenKind, tokenKindForProperty, tokenReference, tokenVar, uniqueTokenName, type TokenKind } from '../../document/tokens';
-import { getElement } from '../../document/tree';
-import type { DesignDocument, NodeId } from '../../document/types';
-import { useEditor } from '../../editor/store';
+import { domElement, styleOf } from '../../canvas/dom.ts';
+import { setStyleOnNodes } from '../../document/ops.ts';
+import { groupFor, setToken, tokenKind, tokenKindForProperty, tokenReference, tokenVar, uniqueTokenName, type TokenKind } from '../../document/tokens.ts';
+import { getElement } from '../../document/tree.ts';
+import type { DesignDocument, NodeId } from '../../document/types.ts';
+import { useEditor } from '../../editor/store.ts';
 import { Check, ChevronDown, Hexagon, Minus, Plus, X } from 'lucide-react';
 
 export const MIXED = '\u0000mixed';

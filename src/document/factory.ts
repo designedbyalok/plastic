@@ -1,7 +1,7 @@
-import { slugifyClassName } from './css';
-import { createId } from './ids';
-import type { Declarations, DesignDocument, DocNode, NodeId } from './types';
-import { EMPTY_SHEET } from './css';
+import { slugifyClassName } from './css.ts';
+import { createId } from './ids.ts';
+import type { Declarations, DesignDocument, DocNode, NodeId } from './types.ts';
+import { EMPTY_SHEET } from './css.ts';
 
 /**
  * A declarative description of markup to create, used by insert templates and importers.

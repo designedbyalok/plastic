@@ -10,13 +10,13 @@
  * See docs/ARCHITECTURE.md (rendering).
  */
 import { useLayoutEffect, useRef } from 'react';
-import { serializeStyleSheet, serializeTokenSheet } from '../document/css';
-import { rootOf } from '../document/tree';
-import type { NodeId } from '../document/types';
-import { useEditor } from '../editor/store';
-import { domElement, onRerenderRequest, registerHost } from './dom';
-import { DomRenderer } from './renderer';
-import { finishTextEditing } from './textEditing';
+import { serializeStyleSheet, serializeTokenSheet } from '../document/css.ts';
+import { rootOf } from '../document/tree.ts';
+import type { NodeId } from '../document/types.ts';
+import { useEditor } from '../editor/store.ts';
+import { domElement, onRerenderRequest, registerHost } from './dom.ts';
+import { DomRenderer } from './renderer.ts';
+import { finishTextEditing } from './textEditing.ts';
 
 /**
  * Editor-only rules, placed *before* the design CSS and wrapped in :where() (zero specificity)

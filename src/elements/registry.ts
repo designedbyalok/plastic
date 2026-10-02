@@ -2,8 +2,8 @@
  * What the editor knows about each HTML element: a friendly label, which controls the inspector
  * shows, and which tags it can be swapped with. Unknown tags still work as generic elements.
  */
-import { getElement, textContent } from '../document/tree';
-import type { DesignDocument, ElementNode, NodeId } from '../document/types';
+import { getElement, textContent } from '../document/tree.ts';
+import type { DesignDocument, ElementNode, NodeId } from '../document/types.ts';
 
 export type AttrGroup = 'semantics' | 'content' | 'behavior';
 

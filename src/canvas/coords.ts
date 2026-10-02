@@ -8,7 +8,7 @@
  * screen = world * zoom + (viewport.x, viewport.y). The zoom is applied as one CSS transform on
  * the world layer, so element styles are never rewritten when zooming.
  */
-import type { Point } from '../document/types';
+import type { Point } from '../document/types.ts';
 
 export interface Viewport {
   readonly x: number;

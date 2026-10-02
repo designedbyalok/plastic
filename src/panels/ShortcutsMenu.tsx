@@ -1,7 +1,7 @@
 /** Keyboard shortcuts, behind a button at the bottom of the tool rail. */
 import { Keyboard } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import { useEditor } from '../editor/store';
+import { useEditor } from '../editor/store.ts';
 
 const GROUPS: readonly { title: string; items: readonly [string, readonly string[]][] }[] = [
   {

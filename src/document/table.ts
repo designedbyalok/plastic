@@ -1,8 +1,8 @@
 /** Table-specific structure edits. Rows/cells clone their neighbours' tag, class and attributes. */
-import { createId } from './ids';
-import { removeNodes } from './ops';
-import { elementChildren, getElement } from './tree';
-import type { DesignDocument, DocNode, ElementNode, NodeId } from './types';
+import { createId } from './ids.ts';
+import { removeNodes } from './ops.ts';
+import { elementChildren, getElement } from './tree.ts';
+import type { DesignDocument, DocNode, ElementNode, NodeId } from './types.ts';
 
 export interface TableShape {
   readonly headerRows: readonly ElementNode[];

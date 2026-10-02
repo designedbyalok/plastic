@@ -4,10 +4,10 @@
  */
 import { CirclePlus, Frame, Hand, Heading, Image, MousePointer2, Square, Type } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { INSERTABLES, insertable } from '../elements/insertables';
-import { useEditor, type Tool } from '../editor/store';
-import { INSERT_ICONS } from './icons';
-import { ShortcutsMenu } from './ShortcutsMenu';
+import { INSERTABLES, insertable } from '../elements/insertables.ts';
+import { useEditor, type Tool } from '../editor/store.ts';
+import { INSERT_ICONS } from './icons.tsx';
+import { ShortcutsMenu } from './ShortcutsMenu.tsx';
 
 /** Elements that get their own rail button; everything else is in the Insert menu. */
 const RAIL_ITEMS = new Set(['container', 'text', 'heading', 'image']);

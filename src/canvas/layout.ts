@@ -1,9 +1,9 @@
 /** Questions about live CSS layout, answered by asking the browser rather than re-implementing it. */
-import { getElement, isRoot, subtreeIds } from '../document/tree';
-import type { DesignDocument, ElementNode, NodeId } from '../document/types';
-import { elementSpec } from '../elements/registry';
-import { clientRectOf, domElement, elementsAtPoint, isOutOfFlow, styleOf, toScreenRect } from './dom';
-import type { Line } from './gestureStore';
+import { getElement, isRoot, subtreeIds } from '../document/tree.ts';
+import type { DesignDocument, ElementNode, NodeId } from '../document/types.ts';
+import { elementSpec } from '../elements/registry.ts';
+import { clientRectOf, domElement, elementsAtPoint, isOutOfFlow, styleOf, toScreenRect } from './dom.ts';
+import type { Line } from './gestureStore.ts';
 
 export interface FlowInsertion {
   readonly index: number;

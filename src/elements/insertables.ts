@@ -2,9 +2,9 @@
  * Insert templates. Each produces real markup with a sensible starting style; composites
  * (field, checkbox, table) are built from the same semantic elements a developer would write.
  */
-import { instantiate, emptyDocument, type NodeSpec } from '../document/factory';
-import { insertRoot, setFrame } from '../document/ops';
-import type { DesignDocument } from '../document/types';
+import { instantiate, emptyDocument, type NodeSpec } from '../document/factory.ts';
+import { insertRoot, setFrame } from '../document/ops.ts';
+import type { DesignDocument } from '../document/types.ts';
 
 export interface Insertable {
   readonly id: string;

@@ -4,14 +4,14 @@
  * any zoom. Positions are measured from the live DOM every frame.
  */
 import { useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { getParentId, isRoot } from '../document/tree';
-import type { NodeId } from '../document/types';
-import { layerName } from '../elements/registry';
-import { activeRoots, useEditor } from '../editor/store';
-import type { Rect } from './coords';
-import { domElement, hostOf, screenRectOf, styleOf, toScreenRect } from './dom';
-import { startFrameMove, startResize, type Handle } from './gestures';
-import { useGesture } from './gestureStore';
+import { getParentId, isRoot } from '../document/tree.ts';
+import type { NodeId } from '../document/types.ts';
+import { layerName } from '../elements/registry.ts';
+import { activeRoots, useEditor } from '../editor/store.ts';
+import type { Rect } from './coords.ts';
+import { domElement, hostOf, screenRectOf, styleOf, toScreenRect } from './dom.ts';
+import { startFrameMove, startResize, type Handle } from './gestures.ts';
+import { useGesture } from './gestureStore.ts';
 
 interface Measured {
   readonly selection: { id: NodeId; rect: Rect }[];

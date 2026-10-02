@@ -5,7 +5,7 @@
  */
 import { Asterisk, Bot, Check, Code, Copy, Ellipsis, Loader, Minus, MousePointerClick, Plus, Rocket, SquareCode, SquareTerminal, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { useEditor } from '../editor/store';
+import { useEditor } from '../editor/store.ts';
 
 interface Setup {
   command: string;

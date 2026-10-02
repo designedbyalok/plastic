@@ -3,14 +3,14 @@
  * artboards (real DOM) and a screen-space overlay. Pointer input is routed to gestures.
  */
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
-import { canEditText } from '../editor/commands';
-import { activeRoots, useEditor } from '../editor/store';
-import { ArtboardHost } from './ArtboardHost';
-import { zoomAround } from './coords';
-import { nodeIdAt, setViewportElement, toScreen } from './dom';
-import { insertAt, startFrameDraw, startPan, startSelectGesture } from './gestures';
-import { Overlay } from './Overlay';
-import { finishTextEditing, useTextEditing } from './textEditing';
+import { canEditText } from '../editor/commands.ts';
+import { activeRoots, useEditor } from '../editor/store.ts';
+import { ArtboardHost } from './ArtboardHost.tsx';
+import { zoomAround } from './coords.ts';
+import { nodeIdAt, setViewportElement, toScreen } from './dom.ts';
+import { insertAt, startFrameDraw, startPan, startSelectGesture } from './gestures.ts';
+import { Overlay } from './Overlay.tsx';
+import { finishTextEditing, useTextEditing } from './textEditing.ts';
 
 export function Canvas() {
   const ref = useRef<HTMLDivElement>(null);

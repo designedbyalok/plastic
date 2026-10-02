@@ -2,15 +2,15 @@
  * Editor commands: user intents that may need live layout measurements before producing a
  * pure document edit. Shortcuts, the tool rail, the inspector and (later) an agent API all call these.
  */
-import { fitRect, screenToWorld, unionRects, zoomAround, type Rect } from '../canvas/coords';
-import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf, styleOf } from '../canvas/dom';
-import { instantiate } from '../document/factory';
-import { duplicateNodes, insertRoot, removeNodes, setFrame, setStyleOnNodes, stripPosition, wrapInStack } from '../document/ops';
-import { getElement, getParentId, hasOnlyTextChildren, isRoot, topmostIds } from '../document/tree';
-import type { DesignDocument, NodeId } from '../document/types';
-import { frameSpec } from '../elements/insertables';
-import { elementSpec } from '../elements/registry';
-import { activeRoots, useEditor } from './store';
+import { fitRect, screenToWorld, unionRects, zoomAround, type Rect } from '../canvas/coords.ts';
+import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf, styleOf } from '../canvas/dom.ts';
+import { instantiate } from '../document/factory.ts';
+import { duplicateNodes, insertRoot, removeNodes, setFrame, setStyleOnNodes, stripPosition, wrapInStack } from '../document/ops.ts';
+import { getElement, getParentId, hasOnlyTextChildren, isRoot, topmostIds } from '../document/tree.ts';
+import type { DesignDocument, NodeId } from '../document/types.ts';
+import { frameSpec } from '../elements/insertables.ts';
+import { elementSpec } from '../elements/registry.ts';
+import { activeRoots, useEditor } from './store.ts';
 
 const px = (n: number) => `${Math.round(n)}px`;
 const state = () => useEditor.getState();

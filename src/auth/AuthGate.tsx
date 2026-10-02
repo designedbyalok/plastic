@@ -1,7 +1,7 @@
 /** Shows the sign-in screen until there's a session, on deployments that have accounts. */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { authClient, detectBackend, type Backend } from './client';
-import { SignIn } from './SignIn';
+import { authClient, detectBackend, type Backend } from './client.ts';
+import { SignIn } from './SignIn.tsx';
 
 export interface Account {
   readonly name: string;

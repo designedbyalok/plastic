@@ -3,16 +3,16 @@
  * its name is the document's <title> and its thumbnail is the design itself.
  */
 import { Clock, Cloud, FileUp, Folder, Layers3, LayoutGrid, List, LogOut, Minus, Plus, Search } from 'lucide-react';
-import { useAccount } from '../auth/AuthGate';
+import { useAccount } from '../auth/AuthGate.tsx';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react';
-import { fileHref, linkClick, navigate } from '../app/router';
-import type { DesignDocument } from '../document/types';
-import { createProject } from '../editor/persistence';
-import { STYLES_FILE, TOKENS_FILE, parseProject } from '../serialization';
-import { browserFiles, connectWorkspace, type ProjectSummary, type Workspace } from '../serialization/storage';
-import { DropOverlay, ImportDialog, isFigmaFile, useFileDrop, type ImportState } from './FigmaImport';
-import { Thumbnail } from './Thumbnail';
-import { editedAgo } from './time';
+import { fileHref, linkClick, navigate } from '../app/router.ts';
+import type { DesignDocument } from '../document/types.ts';
+import { createProject } from '../editor/persistence.ts';
+import { STYLES_FILE, TOKENS_FILE, parseProject } from '../serialization/index.ts';
+import { browserFiles, connectWorkspace, type ProjectSummary, type Workspace } from '../serialization/storage.ts';
+import { DropOverlay, ImportDialog, isFigmaFile, useFileDrop, type ImportState } from './FigmaImport.tsx';
+import { Thumbnail } from './Thumbnail.tsx';
+import { editedAgo } from './time.ts';
 import './home.css';
 
 type View = 'grid' | 'list';
@@ -137,12 +137,12 @@ export function Home() {
     }
     const workspace = await connectWorkspace();
     if (!workspace.importFigma) {
-      setImportState({ status: 'error', name: file.name, message: 'Importing needs the Plastic dev server (bun run dev), which converts the file on disk.' });
+      setImportState({ status: 'error', name: file.name, message: 'Sign in to import Figma files, or run Plastic locally (bun run dev).' });
       return;
     }
     setImportState({ status: 'importing', name: file.name });
     try {
-      const result = await workspace.importFigma(file);
+      const result = await workspace.importFigma(file, (progress) => setImportState({ status: 'importing', name: file.name, progress }));
       setSelected(result.id);
       setImportState({ status: 'done', result });
       void refresh();

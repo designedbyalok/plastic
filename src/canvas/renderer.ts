@@ -5,9 +5,9 @@
  * so what you see on the canvas is the browser rendering the actual design, not a copy of it.
  * Immutable updates mean an unchanged node object needs no attribute patching.
  */
-import { ID_ATTR, SVG_NS, childLayout, isUnsafeAttribute } from '../document/markup';
-import type { DesignDocument, DocNode, ElementNode, NodeId } from '../document/types';
-import { registerElement, unregisterElement } from './dom';
+import { ID_ATTR, SVG_NS, childLayout, isUnsafeAttribute } from '../document/markup.ts';
+import type { DesignDocument, DocNode, ElementNode, NodeId } from '../document/types.ts';
+import { registerElement, unregisterElement } from './dom.ts';
 
 export class DomRenderer {
   private readonly dom = new Map<NodeId, Node>();

@@ -3,11 +3,11 @@
  * written back shortly after they happen, and edits made to the files by anything else
  * (an editor, git checkout, a coding agent) are loaded in as an undoable change.
  */
-import { parseProject, sameFiles, serializeProject, type ProjectFiles } from '../serialization';
-import { connectWorkspace, type ProjectStorage } from '../serialization/storage';
-import { setTitle } from '../document/ops';
-import { starterDocument } from '../elements/insertables';
-import { editorMeta, useEditor } from './store';
+import { parseProject, sameFiles, serializeProject, type ProjectFiles } from '../serialization/index.ts';
+import { connectWorkspace, type ProjectStorage } from '../serialization/storage.ts';
+import { setTitle } from '../document/ops.ts';
+import { starterDocument } from '../elements/insertables.ts';
+import { editorMeta, useEditor } from './store.ts';
 
 const AUTOSAVE_MS = 400;
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { SceneGraph } from '@open-pencil/scene-graph';
 import { describe, expect, it } from 'vitest';
-import { convertGraph } from '../server/figma/convert';
+import { convertGraph } from '../src/figma/convert.ts';
 import { parseProject } from '../src/serialization';
 
 const white = { r: 1, g: 1, b: 1, a: 1 };

@@ -1,6 +1,6 @@
 /** Transient visuals drawn by the overlay while a gesture is in progress (screen space). */
 import { create } from 'zustand';
-import type { Rect } from './coords';
+import type { Rect } from './coords.ts';
 
 export interface Line {
   readonly x1: number;

@@ -3,9 +3,9 @@
  * `editingTextId` is set. The document only changes once, on commit.
  */
 import { useEffect } from 'react';
-import { setText } from '../document/ops';
-import { useEditor } from '../editor/store';
-import { domElement, requestRerender } from './dom';
+import { setText } from '../document/ops.ts';
+import { useEditor } from '../editor/store.ts';
+import { domElement, requestRerender } from './dom.ts';
 
 let finishActive: ((commit: boolean) => void) | null = null;
 

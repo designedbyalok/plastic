@@ -2,7 +2,7 @@
  * Undo/redo over immutable document snapshots. Structural sharing makes a snapshot cheap
  * (only changed nodes are new objects), so history stores whole documents, not inverse ops.
  */
-import type { DesignDocument, NodeId } from '../document/types';
+import type { DesignDocument, NodeId } from '../document/types.ts';
 
 export interface Snapshot {
   readonly doc: DesignDocument;

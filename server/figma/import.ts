@@ -1,18 +1,15 @@
 /** Import a .fig file into the workspace as a new Plastic project. */
 import type { ProjectStore } from '../projectStore.ts';
-import { convertFigFile, type ImportReport } from './convert.ts';
+import { convertFigFile, titleFromFileName, type ImportReport } from '../../src/figma/convert.ts';
+import { ensureDom } from '../mcp/dom.ts';
 
 export interface ImportResult {
   readonly id: string;
   readonly report: ImportReport;
 }
 
-/** "Marketing site (Copy).fig" → "Marketing site (Copy)". */
-export function titleFromFileName(name: string): string {
-  return name.replace(/\.fig$/i, '').trim() || 'Imported from Figma';
-}
-
 export async function importFigma(store: ProjectStore, bytes: Uint8Array, fileName: string): Promise<ImportResult> {
+  ensureDom();
   const conversion = await convertFigFile(bytes, titleFromFileName(fileName));
   const id = await store.uniqueId(conversion.title);
   // Assets first, so the editor never opens pages whose images are still being written.

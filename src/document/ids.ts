@@ -1,4 +1,4 @@
-import type { NodeId } from './types';
+import type { NodeId } from './types.ts';
 
 const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
 

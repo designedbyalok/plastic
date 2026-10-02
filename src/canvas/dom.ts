@@ -8,9 +8,9 @@
  *  - computed styles come from the element's own window (`styleOf`),
  *  - never use `instanceof` on design nodes (it fails across realms); check `nodeType` instead.
  */
-import { ID_ATTR } from '../document/markup';
-import type { NodeId, Point } from '../document/types';
-import type { Rect } from './coords';
+import { ID_ATTR } from '../document/markup.ts';
+import type { NodeId, Point } from '../document/types.ts';
+import type { Rect } from './coords.ts';
 
 const elements = new Map<NodeId, Element>();
 /** Artboard iframes by root id. */

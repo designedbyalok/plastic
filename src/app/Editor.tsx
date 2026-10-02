@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Canvas } from '../canvas/Canvas';
-import { zoomToFit } from '../editor/commands';
-import { openProject } from '../editor/persistence';
-import { useShortcuts } from '../editor/shortcuts';
-import { useEditor } from '../editor/store';
-import { CodePanel } from '../panels/CodePanel';
-import { Inspector } from '../panels/inspector/Inspector';
-import { LayersPanel } from '../panels/LayersPanel';
-import { ToolRail } from '../panels/ToolRail';
-import { ConnectAgents } from '../panels/ConnectAgents';
-import { linkClick } from './router';
+import { Canvas } from '../canvas/Canvas.tsx';
+import { zoomToFit } from '../editor/commands.ts';
+import { openProject } from '../editor/persistence.ts';
+import { useShortcuts } from '../editor/shortcuts.ts';
+import { useEditor } from '../editor/store.ts';
+import { CodePanel } from '../panels/CodePanel.tsx';
+import { Inspector } from '../panels/inspector/Inspector.tsx';
+import { LayersPanel } from '../panels/LayersPanel.tsx';
+import { ToolRail } from '../panels/ToolRail.tsx';
+import { ConnectAgents } from '../panels/ConnectAgents.tsx';
+import { linkClick } from './router.ts';
 
 type Status = 'opening' | 'open' | 'missing';
 

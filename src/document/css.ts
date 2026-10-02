@@ -4,7 +4,7 @@
  * A deliberately small parser: single-class rules become editable declarations, everything
  * else is preserved verbatim. Comments are not preserved (documented limitation).
  */
-import type { Declarations, StyleSheet, TokenSheet } from './types';
+import type { Declarations, StyleSheet, TokenSheet } from './types.ts';
 
 export const EMPTY_SHEET: StyleSheet = { rules: {}, preserved: '', preservedAfter: '' };
 

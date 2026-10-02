@@ -1,14 +1,14 @@
 /** Sections driven by element semantics: identity, content, behavior, table structure. */
 import { Minus, Plus, Unlink, X } from 'lucide-react';
 import { useState } from 'react';
-import { isValidClassName } from '../../document/css';
-import { detachClass, renameClass, setAttribute, setSelectOptions, setTag, setText } from '../../document/ops';
-import { addTableColumn, addTableRow, removeTableColumn, removeTableRow, tableShape } from '../../document/table';
-import { closestElement, elementChildren, nodesWithClass, textChildren, textContent } from '../../document/tree';
-import type { DesignDocument, ElementNode } from '../../document/types';
-import { elementSpec, kindLabel, swappableTags, type AttrGroup, type AttrSpec } from '../../elements/registry';
-import { useEditor } from '../../editor/store';
-import { Checkbox, LabeledRow, Row, Section, Select, TextInput } from './fields';
+import { isValidClassName } from '../../document/css.ts';
+import { detachClass, renameClass, setAttribute, setSelectOptions, setTag, setText } from '../../document/ops.ts';
+import { addTableColumn, addTableRow, removeTableColumn, removeTableRow, tableShape } from '../../document/table.ts';
+import { closestElement, elementChildren, nodesWithClass, textChildren, textContent } from '../../document/tree.ts';
+import type { DesignDocument, ElementNode } from '../../document/types.ts';
+import { elementSpec, kindLabel, swappableTags, type AttrGroup, type AttrSpec } from '../../elements/registry.ts';
+import { useEditor } from '../../editor/store.ts';
+import { Checkbox, LabeledRow, Row, Section, Select, TextInput } from './fields.tsx';
 
 const apply = (label: string, recipe: (doc: DesignDocument) => DesignDocument, coalesce?: string) =>
   useEditor.getState().apply(label, recipe, coalesce ? { coalesce } : {});

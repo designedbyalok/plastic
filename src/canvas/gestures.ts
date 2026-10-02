@@ -2,18 +2,18 @@
  * Pointer gestures on the canvas. Each gesture reads live layout from the DOM once at the
  * start, then produces document edits inside a transaction so the whole drag is one undo step.
  */
-import { canEditText, createFrame } from '../editor/commands';
-import { activeRoots, useEditor } from '../editor/store';
-import { instantiate, withRootStyle } from '../document/factory';
-import { insertChild, insertRoot, moveNode, setFrame, setStyleOnNodes } from '../document/ops';
-import { getElement, getParentId, isRoot, topmostIds } from '../document/tree';
-import type { DesignDocument, NodeId, Point } from '../document/types';
-import { FRAME_SIZE, insertable } from '../elements/insertables';
-import { elementSpec } from '../elements/registry';
-import { rectFromPoints, rectsIntersect, screenToWorld, type Rect } from './coords';
-import { clientRectOf, domElement, isOutOfFlow, nodeIdAt, screenRectOf, styleOf, toScreen } from './dom';
-import { useGesture } from './gestureStore';
-import { containerAt, findDropTarget, flowInsertion, insertsInFlow, type DropTarget } from './layout';
+import { canEditText, createFrame } from '../editor/commands.ts';
+import { activeRoots, useEditor } from '../editor/store.ts';
+import { instantiate, withRootStyle } from '../document/factory.ts';
+import { insertChild, insertRoot, moveNode, setFrame, setStyleOnNodes } from '../document/ops.ts';
+import { getElement, getParentId, isRoot, topmostIds } from '../document/tree.ts';
+import type { DesignDocument, NodeId, Point } from '../document/types.ts';
+import { FRAME_SIZE, insertable } from '../elements/insertables.ts';
+import { elementSpec } from '../elements/registry.ts';
+import { rectFromPoints, rectsIntersect, screenToWorld, type Rect } from './coords.ts';
+import { clientRectOf, domElement, isOutOfFlow, nodeIdAt, screenRectOf, styleOf, toScreen } from './dom.ts';
+import { useGesture } from './gestureStore.ts';
+import { containerAt, findDropTarget, flowInsertion, insertsInFlow, type DropTarget } from './layout.ts';
 
 const px = (n: number) => `${Math.round(n)}px`;
 const editor = () => useEditor.getState();

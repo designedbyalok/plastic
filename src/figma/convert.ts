@@ -20,13 +20,12 @@ import { parseFigFile } from '@open-pencil/core/io/formats/fig';
 import { renderNodesToSVG, vectorNetworkToSVGPaths } from '@open-pencil/core/io/formats/svg';
 import type { Fill, SceneGraph, SceneNode, Stroke, Variable, VectorNetwork } from '@open-pencil/scene-graph';
 import { computeDescendantVisualBounds } from '@open-pencil/scene-graph/geometry';
-import { slugifyClassName } from '../../src/document/css.ts';
-import { emptyDocument } from '../../src/document/factory.ts';
-import { createId } from '../../src/document/ids.ts';
-import type { Declarations, DesignDocument, DocNode, ElementNode, NodeId, Page, Point } from '../../src/document/types.ts';
-import { parseHTML } from '../../src/serialization/html.ts';
-import { serializeProject } from '../../src/serialization/index.ts';
-import { ensureDom } from '../mcp/dom.ts';
+import { slugifyClassName } from '../document/css.ts';
+import { emptyDocument } from '../document/factory.ts';
+import { createId } from '../document/ids.ts';
+import type { Declarations, DesignDocument, DocNode, ElementNode, NodeId, Page, Point } from '../document/types.ts';
+import { parseHTML } from '../serialization/html.ts';
+import { serializeProject } from '../serialization/index.ts';
 import { backgroundCss, blendMode, colorCss, effectDecls, fillLayer, imageExtension, px, round, withOpacity, type Layer } from './paint.ts';
 
 export interface FontUse {
@@ -56,6 +55,11 @@ export interface Conversion {
   /** Binary files by path inside the project, e.g. "assets/3f2a….png". */
   readonly assets: Record<string, Uint8Array>;
   readonly report: ImportReport;
+}
+
+/** "Marketing site (Copy).fig" → "Marketing site (Copy)". */
+export function titleFromFileName(name: string): string {
+  return name.replace(/\.fig$/i, '').trim() || 'Imported from Figma';
 }
 
 export async function convertFigFile(bytes: Uint8Array, title: string): Promise<Conversion> {
@@ -906,8 +910,8 @@ function pageFileName(name: string, index: number, taken: Set<string>): string {
   return file;
 }
 
+/** Needs a global DOMParser (browsers have one; the server installs jsdom's). */
 export function convertGraph(graph: SceneGraph, title: string): Conversion {
-  ensureDom();
   const c = new Converter(graph);
   const pages: Page[] = [];
   const frames: Record<NodeId, Point> = {};

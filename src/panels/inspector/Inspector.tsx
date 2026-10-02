@@ -1,15 +1,15 @@
 import { ChevronDown, Pipette } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { zoomBy, zoomTo, zoomToFit, zoomToSelection } from '../../editor/commands';
-import { activeRoots, useEditor } from '../../editor/store';
-import { getElement } from '../../document/tree';
-import { setPageCanvas } from '../../document/pages';
-import type { ElementNode } from '../../document/types';
-import { elementSpec } from '../../elements/registry';
-import { AttributesSection, BehaviorSection, ContentSection, ElementSection, TableSection } from './ElementSections';
+import { zoomBy, zoomTo, zoomToFit, zoomToSelection } from '../../editor/commands.ts';
+import { activeRoots, useEditor } from '../../editor/store.ts';
+import { getElement } from '../../document/tree.ts';
+import { setPageCanvas } from '../../document/pages.ts';
+import type { ElementNode } from '../../document/types.ts';
+import { elementSpec } from '../../elements/registry.ts';
+import { AttributesSection, BehaviorSection, ContentSection, ElementSection, TableSection } from './ElementSections.tsx';
 import {
   BorderSection, ConstraintsSection, CssSection, FillSection, LayoutSection, MarginSection, OpacitySection, RadiusSection, ShadowSection, TextSection,
-} from './StyleSections';
+} from './StyleSections.tsx';
 
 export function Inspector() {
   const selection = useEditor((s) => s.selection);

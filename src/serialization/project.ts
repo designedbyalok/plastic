@@ -2,7 +2,7 @@
  * project.json: editor metadata only. Deleting it loses canvas placement, page names and order,
  * and layer names, never the design itself.
  */
-import type { NodeId, Point } from '../document/types';
+import type { NodeId, Point } from '../document/types.ts';
 
 export const PROJECT_FORMAT = 'plastic';
 export const PROJECT_VERSION = 2;

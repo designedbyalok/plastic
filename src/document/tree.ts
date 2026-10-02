@@ -1,4 +1,4 @@
-import type { DesignDocument, ElementNode, NodeId, Page, TextNode } from './types';
+import type { DesignDocument, ElementNode, NodeId, Page, TextNode } from './types.ts';
 
 const parentCache = new WeakMap<object, Map<NodeId, NodeId>>();
 

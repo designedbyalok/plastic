@@ -2,7 +2,7 @@
  * Design tokens are CSS custom properties. Their kind comes from the name prefix (the Tailwind
  * v4 theme namespaces, which Paper also uses), so tokens.css stays plain, readable CSS.
  */
-import type { DesignDocument } from './types';
+import type { DesignDocument } from './types.ts';
 
 export type TokenKind = 'color' | 'spacing' | 'radius' | 'font' | 'text' | 'font-weight' | 'leading' | 'tracking' | 'opacity' | 'shadow' | 'other';
 

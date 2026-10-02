@@ -1,7 +1,7 @@
 /** Sign in or create an account (email and password, plus GitHub/Google when configured). */
 import { Layers3, Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { authClient } from './client';
+import { authClient } from './client.ts';
 import './auth.css';
 
 type Mode = 'sign-in' | 'sign-up';

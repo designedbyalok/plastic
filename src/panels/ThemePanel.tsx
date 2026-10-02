@@ -7,9 +7,9 @@ import {
   ALargeSmall, Baseline, Bold, ChevronDown, ChevronRight, Hexagon, Layers2, MoveDiagonal, Plus, Space, SquareDashed, TriangleAlert, Type, X, type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type FocusEvent } from 'react';
-import { OTHER_GROUP, TOKEN_GROUPS, TOKEN_NAME, removeToken, renameToken, setToken, tokenKind, tokenUsage, uniqueTokenName, type TokenGroup, type TokenKind } from '../document/tokens';
-import { useEditor } from '../editor/store';
-import { missingFamily } from '../app/fonts';
+import { OTHER_GROUP, TOKEN_GROUPS, TOKEN_NAME, removeToken, renameToken, setToken, tokenKind, tokenUsage, uniqueTokenName, type TokenGroup, type TokenKind } from '../document/tokens.ts';
+import { useEditor } from '../editor/store.ts';
+import { missingFamily } from '../app/fonts.ts';
 
 const editor = useEditor.getState;
 

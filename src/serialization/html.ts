@@ -1,7 +1,7 @@
 /** DesignDocument nodes <-> index.html. */
-import { createId } from '../document/ids';
-import { BOOLEAN_ATTRS, ID_ATTR, SVG_NS, VOID_TAGS, childLayout } from '../document/markup';
-import type { DesignDocument, DocNode, ElementNode, NodeId, Page } from '../document/types';
+import { createId } from '../document/ids.ts';
+import { BOOLEAN_ATTRS, ID_ATTR, SVG_NS, VOID_TAGS, childLayout } from '../document/markup.ts';
+import type { DesignDocument, DocNode, ElementNode, NodeId, Page } from '../document/types.ts';
 
 const INDENT = '  ';
 

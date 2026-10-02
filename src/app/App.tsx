@@ -1,7 +1,7 @@
-import { AuthGate } from '../auth/AuthGate';
-import { Home } from '../home/Home';
-import { Editor } from './Editor';
-import { parseRoute, usePathname } from './router';
+import { AuthGate } from '../auth/AuthGate.tsx';
+import { Home } from '../home/Home.tsx';
+import { Editor } from './Editor.tsx';
+import { parseRoute, usePathname } from './router.ts';
 
 export function App() {
   const route = parseRoute(usePathname());

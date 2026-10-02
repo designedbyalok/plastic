@@ -1,8 +1,8 @@
 /** Read-only view of exactly what gets saved. The files on disk are the editable source. */
 import { useMemo, useState } from 'react';
-import { PROJECT_FILE, STYLES_FILE, TOKENS_FILE, serializeProject } from '../serialization';
-import { serializeHTML } from '../serialization/html';
-import { editorMeta, useEditor } from '../editor/store';
+import { PROJECT_FILE, STYLES_FILE, TOKENS_FILE, serializeProject } from '../serialization/index.ts';
+import { serializeHTML } from '../serialization/html.ts';
+import { editorMeta, useEditor } from '../editor/store.ts';
 
 /** Tab "page" shows the page on the canvas; the others are shared files. */
 type Tab = 'page' | typeof STYLES_FILE | typeof TOKENS_FILE | typeof PROJECT_FILE;

@@ -5,12 +5,12 @@
  */
 import { CircleCheck, FileUp, Loader2, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { isFontAvailable } from '../app/fonts';
-import type { FigmaImportResult } from '../serialization/storage';
+import { isFontAvailable } from '../app/fonts.ts';
+import type { FigmaImportResult } from '../serialization/storage.ts';
 
 export type ImportState =
   | { readonly status: 'idle' }
-  | { readonly status: 'importing'; readonly name: string }
+  | { readonly status: 'importing'; readonly name: string; readonly progress?: string }
   | { readonly status: 'done'; readonly result: FigmaImportResult }
   | { readonly status: 'error'; readonly name: string; readonly message: string };
 
@@ -103,7 +103,7 @@ export function ImportDialog({ state, onClose, onOpen }: { state: Exclude<Import
               <div id="import-title" className="import-title">
                 Importing {state.name}
               </div>
-              <div className="import-subtitle">Converting pages, auto layout, text and images…</div>
+              <div className="import-subtitle">{state.progress ?? 'Converting pages, auto layout, text and images…'}</div>
             </div>
           </div>
         )}

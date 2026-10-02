@@ -4,10 +4,10 @@
  * Every visual edit goes through one of these, which keeps undo/redo trivial (snapshots of
  * immutable data) and gives future agents/MCP tools the same vocabulary the UI uses.
  */
-import { createId } from './ids';
-import { takenClassNames, uniqueClassName } from './factory';
-import { getElement, getParentId, isRoot, nodesWithClass, pageOf, subtreeIds } from './tree';
-import type { Declarations, DesignDocument, DocNode, ElementNode, NodeId, Point } from './types';
+import { createId } from './ids.ts';
+import { takenClassNames, uniqueClassName } from './factory.ts';
+import { getElement, getParentId, isRoot, nodesWithClass, pageOf, subtreeIds } from './tree.ts';
+import type { Declarations, DesignDocument, DocNode, ElementNode, NodeId, Point } from './types.ts';
 
 type MutableNodes = Record<NodeId, DocNode>;
 

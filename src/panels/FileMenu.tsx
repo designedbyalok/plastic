@@ -4,9 +4,9 @@
  */
 import { Check, Layers3 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { fileHref, navigate } from '../app/router';
-import { duplicateOpenProject } from '../editor/persistence';
-import { useEditor } from '../editor/store';
+import { fileHref, navigate } from '../app/router.ts';
+import { duplicateOpenProject } from '../editor/persistence.ts';
+import { useEditor } from '../editor/store.ts';
 
 export function FileMenu() {
   const [open, setOpen] = useState(false);

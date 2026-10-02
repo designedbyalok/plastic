@@ -2,7 +2,7 @@
  * HTML rules shared by the serializer and the canvas renderer, so the editor's DOM and the
  * saved index.html are built the same way.
  */
-import type { DesignDocument, ElementNode } from './types';
+import type { DesignDocument, ElementNode } from './types.ts';
 
 /** Stable node identity in saved HTML. The only editor-specific attribute we write. */
 export const ID_ATTR = 'data-pl-id';

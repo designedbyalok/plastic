@@ -8,19 +8,19 @@ import {
   LayoutGrid, RotateCwSquare, SlidersVertical, Space, Strikethrough, TextAlignCenter, TextAlignEnd, TextAlignStart, TriangleAlert, Type, Underline, X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { domElement, isOutOfFlow, styleOf } from '../../canvas/dom';
-import { setDeclaration, setFrame, setStyleOnNodes } from '../../document/ops';
-import { getElement, getParentId, isRoot } from '../../document/tree';
-import type { ElementNode, NodeId } from '../../document/types';
-import { elementSpec } from '../../elements/registry';
-import { tokenKind, tokenReference, tokenVar, type TokenKind } from '../../document/tokens';
-import { addFlexOrWrap, setFreePositioning } from '../../editor/commands';
-import { useEditor } from '../../editor/store';
-import { missingFamily } from '../../app/fonts';
+import { domElement, isOutOfFlow, styleOf } from '../../canvas/dom.ts';
+import { setDeclaration, setFrame, setStyleOnNodes } from '../../document/ops.ts';
+import { getElement, getParentId, isRoot } from '../../document/tree.ts';
+import type { ElementNode, NodeId } from '../../document/types.ts';
+import { elementSpec } from '../../elements/registry.ts';
+import { tokenKind, tokenReference, tokenVar, type TokenKind } from '../../document/tokens.ts';
+import { addFlexOrWrap, setFreePositioning } from '../../editor/commands.ts';
+import { useEditor } from '../../editor/store.ts';
+import { missingFamily } from '../../app/fonts.ts';
 import {
   Checkbox, ColorInput, CssInput, CssSelect, CssSlider, MIXED, Row, Section, Segmented, Select, TextInput, TokenSlot, type Choice,
   clearStyles, computedValue, setStyle, useAnyDeclared, useDeclared,
-} from './fields';
+} from './fields.tsx';
 
 type Ids = { ids: readonly NodeId[] };
 

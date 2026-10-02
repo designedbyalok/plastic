@@ -1,15 +1,15 @@
 import { ChevronDown, ChevronRight, File, PanelLeft, Plus, X } from 'lucide-react';
 import { useState } from 'react';
-import { setName, setTitle } from '../document/ops';
-import { addPage, nextPageName, removePage, renamePage } from '../document/pages';
-import { elementChildren, getElement } from '../document/tree';
-import type { NodeId, Page } from '../document/types';
-import { kindLabel, layerName } from '../elements/registry';
-import { activeRoots, useEditor } from '../editor/store';
-import { iconFor } from './icons';
-import { ThemePanel } from './ThemePanel';
-import { PanelResizer } from './PanelResizer';
-import { FileMenu } from './FileMenu';
+import { setName, setTitle } from '../document/ops.ts';
+import { addPage, nextPageName, removePage, renamePage } from '../document/pages.ts';
+import { elementChildren, getElement } from '../document/tree.ts';
+import type { NodeId, Page } from '../document/types.ts';
+import { kindLabel, layerName } from '../elements/registry.ts';
+import { activeRoots, useEditor } from '../editor/store.ts';
+import { iconFor } from './icons.tsx';
+import { ThemePanel } from './ThemePanel.tsx';
+import { PanelResizer } from './PanelResizer.tsx';
+import { FileMenu } from './FileMenu.tsx';
 
 export function LayersPanel() {
   const title = useEditor((s) => s.doc.title);

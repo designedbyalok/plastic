@@ -1,7 +1,7 @@
 /** Page edits. A page is one HTML file; its file name never changes after creation (stable diffs). */
-import { FIRST_PAGE_FILE } from './factory';
-import { removeNodes } from './ops';
-import type { DesignDocument } from './types';
+import { FIRST_PAGE_FILE } from './factory.ts';
+import { removeNodes } from './ops.ts';
+import type { DesignDocument } from './types.ts';
 
 function pageFileFor(doc: DesignDocument, name: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'page';

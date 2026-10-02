@@ -7,10 +7,10 @@
  *    never in undo history.
  */
 import { create } from 'zustand';
-import type { DesignDocument, NodeId } from '../document/types';
-import { starterDocument } from '../elements/insertables';
-import type { Viewport } from '../canvas/coords';
-import { EMPTY_HISTORY, record, redo, undo, type History } from './history';
+import type { DesignDocument, NodeId } from '../document/types.ts';
+import { starterDocument } from '../elements/insertables.ts';
+import type { Viewport } from '../canvas/coords.ts';
+import { EMPTY_HISTORY, record, redo, undo, type History } from './history.ts';
 
 export type Tool =
   | { readonly kind: 'select' }

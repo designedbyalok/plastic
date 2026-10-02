@@ -3,8 +3,8 @@
  * with artboards placed as on the canvas, then scaled to fit. No screenshots to keep in sync.
  */
 import { useEffect, useMemo, useRef } from 'react';
-import type { DesignDocument } from '../document/types';
-import { serializeNode } from '../serialization/html';
+import type { DesignDocument } from '../document/types.ts';
+import { serializeNode } from '../serialization/html.ts';
 
 const PADDING = 12;
 /** Viewport used for laying out roots whose width depends on it (before measuring). */

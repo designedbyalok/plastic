@@ -2,8 +2,8 @@ import {
   AlignLeft, Box, Code, Columns3, Frame, Heading, Image, Link, List, MousePointer2, RectangleHorizontal, Rows3,
   Square, SquareCheck, SquareChevronDown, Table, TextCursorInput, FormInput, Type, type LucideIcon,
 } from 'lucide-react';
-import type { ElementNode } from '../document/types';
-import { elementSpec } from '../elements/registry';
+import type { ElementNode } from '../document/types.ts';
+import { elementSpec } from '../elements/registry.ts';
 
 export const INSERT_ICONS: Record<string, LucideIcon> = {
   container: Square,
