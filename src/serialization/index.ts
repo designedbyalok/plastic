@@ -1,4 +1,4 @@
-import { extractRootTokens, parseStyleSheet, parseTokenSheet, serializeStyleSheet, serializeTokenSheet } from '../document/css.ts';
+import { extractStyleTokens, parseStyleSheet, parseTokenSheet, serializeStyleSheet, serializeTokenSheet } from '../document/css.ts';
 import { FIRST_PAGE_FILE } from '../document/factory.ts';
 import type { DesignDocument, NodeId, Page, Point } from '../document/types.ts';
 import { parseHTML, serializeHTML } from './html.ts';
@@ -74,9 +74,9 @@ export function parseProject(files: ProjectFiles): { doc: DesignDocument; meta: 
   let tokens = parseTokenSheet(files[TOKENS_FILE] ?? '');
   if (files[TOKENS_FILE] === undefined) {
     // Older projects kept `:root` variables in styles.css; they become tokens.
-    const moved = extractRootTokens(styles.preserved);
-    tokens = { values: moved.tokens, preserved: '' };
-    styles = { ...styles, preserved: moved.rest };
+    const moved = extractStyleTokens(styles);
+    tokens = moved.tokens;
+    styles = moved.styles;
   }
 
   const frames: Record<NodeId, Point> = {};

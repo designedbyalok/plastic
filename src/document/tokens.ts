@@ -2,6 +2,7 @@
  * Design tokens are CSS custom properties. Their kind comes from the name prefix (the Tailwind
  * v4 theme namespaces, which Paper also uses), so tokens.css stays plain, readable CSS.
  */
+import { parseStyleSheet, parseTokenSheet, serializeStyleSheet, serializeTokenSheet } from './css.ts';
 import type { DesignDocument } from './types.ts';
 
 export type TokenKind = 'color' | 'spacing' | 'radius' | 'font' | 'text' | 'font-weight' | 'leading' | 'tracking' | 'opacity' | 'shadow' | 'other';
@@ -98,18 +99,13 @@ function replaceVar(text: string, from: string, to: string): string {
  */
 export function renameToken(doc: DesignDocument, from: string, to: string): DesignDocument {
   if (from === to || !TOKEN_NAME.test(to) || to in doc.tokens.values || !(from in doc.tokens.values)) return doc;
+  const tokenRoot = parseTokenSheet(serializeTokenSheet(doc.tokens));
   const values: Record<string, string> = {};
-  for (const [name, value] of Object.entries(doc.tokens.values)) values[name === from ? to : name] = replaceVar(value, from, to);
-  const rules: Record<string, Record<string, string>> = {};
-  for (const [cls, decls] of Object.entries(doc.styles.rules)) {
-    const next: Record<string, string> = {};
-    for (const [prop, value] of Object.entries(decls)) next[prop] = replaceVar(value, from, to);
-    rules[cls] = next;
-  }
+  for (const [name, value] of Object.entries(tokenRoot.values)) values[name === from ? to : name] = replaceVar(value, from, to);
   return {
     ...doc,
-    tokens: { values, preserved: replaceVar(doc.tokens.preserved, from, to) },
-    styles: { rules, preserved: replaceVar(doc.styles.preserved, from, to), preservedAfter: replaceVar(doc.styles.preservedAfter, from, to) },
+    tokens: { ...parseTokenSheet(replaceVar(serializeTokenSheet(tokenRoot), from, to)), values },
+    styles: parseStyleSheet(replaceVar(serializeStyleSheet(doc.styles), from, to)),
   };
 }
 

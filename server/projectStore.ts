@@ -2,6 +2,7 @@
  * Projects on disk: workspace/<id>/ holds one .html per page, styles.css, tokens.css and
  * project.json. Shared by the dev server (editor saves) and the MCP server (agent edits).
  */
+import { Mutex } from 'async-mutex';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
@@ -42,7 +43,17 @@ export function sameProjectFiles(a: ProjectFiles, b: ProjectFiles): boolean {
   return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
 }
 
+export class ProjectConflictError extends Error {
+  constructor(readonly files: ProjectFiles) { super('Project changed elsewhere.'); }
+}
+
 export class ProjectStore {
+  private readonly locks = new Map<string, Mutex>();
+  private lock(id: string): Mutex {
+    let mutex = this.locks.get(id);
+    if (!mutex) this.locks.set(id, mutex = new Mutex());
+    return mutex;
+  }
   constructor(readonly root: string) {}
 
   dirOf(id: string): string {
@@ -51,6 +62,10 @@ export class ProjectStore {
   }
 
   async read(id: string): Promise<ProjectFiles | null> {
+    return this.lock(id).runExclusive(() => this.readUnlocked(id));
+  }
+
+  private async readUnlocked(id: string): Promise<ProjectFiles | null> {
     const dir = this.dirOf(id);
     const names = (await fsp.readdir(dir).catch(() => [] as string[])).filter((n) => PROJECT_FILE_NAME.test(n));
     if (!names.some((n) => n.endsWith('.html'))) return null;
@@ -67,14 +82,37 @@ export class ProjectStore {
   }
 
   /** Write a project's files; pages that no longer exist (deleted .html files) are removed. */
-  async write(id: string, files: ProjectFiles): Promise<void> {
+  async write(id: string, files: ProjectFiles, expected?: ProjectFiles): Promise<void> {
+    await this.lock(id).runExclusive(async () => {
+      if (expected) {
+        const current = await this.readUnlocked(id);
+        if (!current || !sameProjectFiles(expected, current)) throw new ProjectConflictError(current ?? {});
+      }
+      await this.writeUnlocked(id, files);
+    });
+  }
+
+  /** Agent edits hold the lock across read, model operation and write. */
+  async edit(id: string, recipe: (files: ProjectFiles) => ProjectFiles): Promise<void> {
+    await this.lock(id).runExclusive(async () => {
+      const files = await this.readUnlocked(id);
+      if (!files) throw new Error(`No file "${id}".`);
+      await this.writeUnlocked(id, recipe(files));
+    });
+  }
+
+  private async writeUnlocked(id: string, files: ProjectFiles): Promise<void> {
     const dir = this.dirOf(id);
     await fsp.mkdir(dir, { recursive: true });
     for (const [name, text] of Object.entries(files)) {
       if (!PROJECT_FILE_NAME.test(name)) continue;
       const target = path.join(dir, name);
       const current = await fsp.readFile(target, 'utf8').catch(() => null);
-      if (current !== text) await fsp.writeFile(target, text, 'utf8');
+      if (current !== text) {
+        const temp = `${target}.${crypto.randomUUID()}.tmp`;
+        try { await fsp.writeFile(temp, text, 'utf8'); await fsp.rename(temp, target); }
+        finally { await fsp.rm(temp, { force: true }); }
+      }
     }
     for (const name of await fsp.readdir(dir).catch(() => [] as string[])) {
       if (name.endsWith('.html') && PROJECT_FILE_NAME.test(name) && !(name in files)) await fsp.rm(path.join(dir, name));

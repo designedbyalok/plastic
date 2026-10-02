@@ -44,7 +44,7 @@ describe('page HTML', () => {
     const reopened = parseProject(files);
     expect(reopened.doc.pages).toEqual(doc.pages);
     expect(shape(reopened.doc, root)).toEqual(shape(doc, root));
-    expect(reopened.doc.styles).toEqual(doc.styles);
+    expect(reopened.doc.styles).toMatchObject(doc.styles);
     expect(reopened.doc.frames).toEqual(doc.frames);
     expect(reopened.meta.viewport).toEqual(meta.viewport);
     // Saving again is stable (no drift between saves → clean git diffs).

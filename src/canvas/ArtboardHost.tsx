@@ -183,6 +183,7 @@ export function ArtboardHost({ id }: { id: NodeId }) {
         ref={frameRef}
         className="artboard-frame"
         title={`Artboard ${id}`}
+        sandbox="allow-same-origin"
         tabIndex={-1}
         style={{ pointerEvents: editingHere ? 'auto' : 'none' }}
       />

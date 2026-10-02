@@ -32,12 +32,13 @@ export type DocNode = ElementNode | TextNode;
 export type Declarations = Readonly<Record<string, string>>;
 
 export interface StyleSheet {
+  /** Original ordered CSS. PostCSS patches edits without flattening the cascade. */
+  readonly source?: string;
   /** Single-class rules (`.name { … }`): the part of styles.css the inspector edits. */
   readonly rules: Readonly<Record<string, Declarations>>;
   /**
-   * Everything else in styles.css (at-rules, complex selectors), kept verbatim and on the same
-   * side of the class rules as in the file, because cascade order matters: `:root` variables
-   * usually come first, `@media` overrides must come after the rules they override.
+   * Compatibility views of non-class CSS. Ordered source is authoritative when present;
+   * these fields let legacy/generated documents continue to construct sheets directly.
    */
   readonly preserved: string;
   readonly preservedAfter: string;
@@ -50,6 +51,7 @@ export interface StyleSheet {
  * tracking-, opacity-, shadow-.
  */
 export interface TokenSheet {
+  readonly source?: string;
   readonly values: Readonly<Record<string, string>>;
   /** Everything else in tokens.css (e.g. a dark-mode override block), kept verbatim. */
   readonly preserved: string;

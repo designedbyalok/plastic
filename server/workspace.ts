@@ -26,7 +26,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin, ViteDevServer } from 'vite';
 import { importFigma } from './figma/import.ts';
 import { LibraryStore } from './library.ts';
-import { ASSET_TYPES, PROJECT_ID, ProjectStore, isProjectFiles, sameProjectFiles, type ProjectFiles } from './projectStore.ts';
+import { ASSET_TYPES, PROJECT_ID, ProjectStore, ProjectConflictError, isProjectFiles, sameProjectFiles, type ProjectFiles } from './projectStore.ts';
 import { agentSetup, installWithCli } from './agents.ts';
 import { handleMcpRequest, isLocalRequest } from './mcp/http.ts';
 
@@ -45,9 +45,9 @@ export function plasticWorkspace(): Plugin {
   const listProjects = () => store.list();
   const uniqueId = (title: string) => store.uniqueId(title);
   /** Editor saves: remembered so the watcher doesn't echo them back as external edits. */
-  async function writeFiles(id: string, files: ProjectFiles): Promise<void> {
+  async function writeFiles(id: string, files: ProjectFiles, expected?: ProjectFiles): Promise<void> {
+    await store.write(id, files, expected);
     known.set(id, files);
-    await store.write(id, files);
   }
 
   function watch(server: ViteDevServer): void {
@@ -164,9 +164,16 @@ export function plasticWorkspace(): Plugin {
       return json(res, 200, { location: path.join(location, id), files });
     }
     if (req.method === 'PUT') {
-      const files = JSON.parse(await readBody(req)) as unknown;
-      if (!isProjectFiles(files)) return json(res, 400, { error: 'Expected { "<name>.html|css|json": "…" } with at least one page' });
-      await writeFiles(id, files);
+      if (!isLocalRequest(req)) return json(res, 403, { error: 'Local requests only.' });
+      if (!String(req.headers['content-type']).startsWith('application/json')) return json(res, 415, { error: 'Expected JSON.' });
+      const body = JSON.parse(await readBody(req)) as { files?: unknown; expected?: unknown };
+      const files = body.files ?? body;
+      if (!isProjectFiles(files) || (body.expected !== undefined && !isProjectFiles(body.expected))) return json(res, 400, { error: 'Expected project files.' });
+      try { await writeFiles(id, files, body.expected as ProjectFiles | undefined); }
+      catch (error) {
+        if (error instanceof ProjectConflictError) return json(res, 409, { files: error.files });
+        throw error;
+      }
       await library.recordEdit();
       return json(res, 204);
     }

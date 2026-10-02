@@ -5,6 +5,7 @@
  * immutable data) and gives future agents/MCP tools the same vocabulary the UI uses.
  */
 import { createId } from './ids.ts';
+import { renameStyleClass } from './css.ts';
 import { takenClassNames, uniqueClassName } from './factory.ts';
 import { getElement, getParentId, isRoot, nodesWithClass, pageOf, subtreeIds } from './tree.ts';
 import type { Declarations, DesignDocument, DocNode, ElementNode, NodeId, Point } from './types.ts';
@@ -229,14 +230,12 @@ export function setStyleOnNodes(doc: DesignDocument, ids: readonly NodeId[], pro
 /** Rename a class everywhere (rule and every element using it), keeping rule order. */
 export function renameClass(doc: DesignDocument, from: string, to: string): DesignDocument {
   if (from === to || takenClassNames(doc).has(to)) return doc;
-  const rules: Record<string, Declarations> = {};
-  for (const [name, decls] of Object.entries(doc.styles.rules)) rules[name === from ? to : name] = decls;
   const nodes: MutableNodes = { ...doc.nodes };
   for (const id of nodesWithClass(doc, from)) {
     const el = nodes[id] as ElementNode;
     nodes[id] = { ...el, classes: el.classes.map((c) => (c === from ? to : c)) };
   }
-  return { ...doc, nodes, styles: { ...doc.styles, rules } };
+  return { ...doc, nodes, styles: renameStyleClass(doc.styles, from, to) };
 }
 
 /** Give one element its own copy of a shared primary class. */

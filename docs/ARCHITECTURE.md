@@ -150,7 +150,7 @@ Canvas (viewport, overflow hidden) ← receives every pointer event
 - **Whitespace fidelity.** The serializer writes element-only children one per line; the renderer
   inserts a single collapsible space between those same children. Inline layouts therefore look
   identical in the editor and in the exported file.
-- **The design is inert while editing.** Capture-phase listeners in each artboard document cancel
+- **The design is inert while editing. Artboards use `sandbox="allow-same-origin"` without script permission, including for nested browsing contexts.** Capture-phase listeners in each artboard document cancel
   focus, clicks, form submission and dragging. Event-handler attributes and `javascript:` URLs
   are kept in the document but never applied to the live DOM; `<script>` is not imported.
 
@@ -192,7 +192,7 @@ convert pointer deltas with `delta / zoom` at the boundary; sizes come from
 - **Coalescing**: edits with the same key within 1.2 s merge (typing in one inspector field is
   one step).
 - Labels ("Set padding", "Wrap in stack") are kept for the UI and, later, for agent logs.
-- External file changes (an agent or text editor) arrive as one undoable "External change".
+- External file changes (an agent or text editor) arrive as one undoable "External change". They wait during gestures and inline text edits. Three-way merging combines independent element, attribute, text, CSS declaration, token and metadata edits within files. Overlapping values keep the active editor’s unsaved value; autosave resumes automatically without a conflict panel. Incoming changes remain undoable.
 
 ## 8. Serialization strategy
 
@@ -228,7 +228,7 @@ workspace/demo/
 - **styles.css**: single-class rules are parsed into editable declarations; anything else
   (`:root` variables, `@media`, complex selectors) is preserved verbatim, **on the same side of
   the class rules as in the file**: `:root`/`@font-face` before them, `@media` overrides after
-  them, so saving never changes the cascade. Comments are not yet preserved.
+  them, so saving never changes the cascade. PostCSS preserves ordered source, comments, duplicate fallback declarations and importance; visual edits patch changed declarations in place.
 - **project.json is optional.** Deleting it loses only canvas placement and names; artboards
   without a stored position are laid out left to right.
 - **Storage** is an interface (`serialization/storage.ts`): a `Workspace` lists, creates and

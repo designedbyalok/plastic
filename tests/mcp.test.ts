@@ -1,3 +1,4 @@
+import { parseStyleSheet } from '../src/document/css.ts';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -65,7 +66,7 @@ describe('Plastic MCP server', () => {
     // Reading back returns exactly what was saved: semantics, classes, ids and CSS.
     const page = await call<{ html: string; outline: string; css: string; tokensCss: string }>('get_page', { file: 'agent-login' });
     expect(page.html).toContain('<button class="cta" type="submit"');
-    expect(page.css).toContain('.cta {\n  background: var(--color-primary);');
+    expect(parseStyleSheet(page.css).rules.cta?.background).toBe('var(--color-primary)');
     expect(page.tokensCss).toContain('--color-primary: #4f46e5;');
 
     const buttonId = /<button.cta[^\n]*data-pl-id=(\S+)/.exec(page.outline)![1]!;

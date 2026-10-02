@@ -3,10 +3,12 @@
  * written back shortly after they happen, and edits made to the files by anything else
  * (an editor, git checkout, a coding agent) are loaded in as an undoable change.
  */
-import { parseProject, sameFiles, serializeProject, type ProjectFiles } from '../serialization/index.ts';
+import { parseProject, serializeProject, type ProjectFiles } from '../serialization/index.ts';
 import { connectWorkspace, type ProjectStorage } from '../serialization/storage.ts';
 import { setTitle } from '../document/ops.ts';
 import { starterDocument } from '../elements/insertables.ts';
+import { ProjectSync } from './projectSync.ts';
+import { finishTextEditing } from '../canvas/textEditing.ts';
 import { editorMeta, useEditor } from './store.ts';
 
 const AUTOSAVE_MS = 400;
@@ -14,55 +16,33 @@ const AUTOSAVE_MS = 400;
 const MAX_SAVE_WAIT_MS = 10_000;
 
 let storage: ProjectStorage | null = null;
-let lastWritten: ProjectFiles | null = null;
+let sync: ProjectSync | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
-
-const same = sameFiles;
-
 let firstPending = 0;
+let opening = 0;
 
 function schedule(delay = storage?.saveDelayMs ?? AUTOSAVE_MS): void {
   clearTimeout(timer);
   const now = Date.now();
   if (!firstPending) firstPending = now;
-  const wait = Math.max(0, Math.min(delay, firstPending + MAX_SAVE_WAIT_MS - now));
-  timer = setTimeout(() => {
-    firstPending = 0;
-    void saveNow();
-  }, wait);
+  timer = setTimeout(
+    () => {
+      timer = undefined;
+      firstPending = 0;
+      void saveNow();
+    },
+    Math.max(0, Math.min(delay, firstPending + MAX_SAVE_WAIT_MS - now)),
+  );
 }
 
 export async function saveNow(): Promise<void> {
   const state = useEditor.getState();
-  if (!storage) return;
+  if (!sync) return;
   if (state.tx || state.editingTextId) return schedule();
-  const files = serializeProject(state.doc, editorMeta(state));
-  const revision = state.revision;
-  if (same(files, lastWritten)) {
-    state.setSaveState('saved', revision);
-    return;
-  }
-  state.setSaveState('saving');
   try {
-    await storage.save(files);
-    lastWritten = files;
-    useEditor.getState().setSaveState('saved', revision);
+    await sync.save();
   } catch (error) {
     console.error(error);
-    useEditor.getState().setSaveState('error');
-  }
-}
-
-function applyExternal(files: ProjectFiles): void {
-  const state = useEditor.getState();
-  if (state.tx) return;
-  try {
-    const { doc } = parseProject(files);
-    lastWritten = files;
-    state.apply('External change', (current) => ({ ...doc, frames: { ...current.frames, ...doc.frames } }));
-    useEditor.getState().setSaveState('saved', useEditor.getState().revision);
-  } catch (error) {
-    console.error('Could not load external change', error);
   }
 }
 
@@ -76,25 +56,69 @@ export interface OpenedProject {
 
 /** Open a project into the editor and keep it in sync with its files. */
 export async function openProject(id: string): Promise<OpenedProject> {
+  const ticket = ++opening;
   const workspace = await connectWorkspace();
   const project = workspace.open(id);
   const files = await project.load();
-  if (!files) return { found: false, restoredViewport: false, stop: () => {} };
-
+  if (!files || ticket !== opening) return { found: false, restoredViewport: false, stop: () => {} };
   const { doc, meta } = parseProject(files);
   useEditor.getState().load(doc, { viewport: meta.viewport, collapsed: meta.collapsed, activePage: meta.activePage });
   storage = project;
   useEditor.setState({ assetBase: project.assetBase });
-  lastWritten = files;
   useEditor.getState().setSaveState('saved', useEditor.getState().revision, project.location);
-
-  const unsubscribe = useEditor.subscribe((s, prev) => {
-    if (s.revision !== prev.revision || (prev.tx && !s.tx)) schedule();
+  const normalized = (input: ProjectFiles) => {
+    const parsed = parseProject(input);
+    return serializeProject(parsed.doc, parsed.meta);
+  };
+  let applying = false;
+  const coordinator = new ProjectSync(project, normalized(files), {
+    normalize: normalized,
+    dirty: () => {
+      if (sync === coordinator) schedule();
+    },
+    read: () => {
+      const state = useEditor.getState();
+      return {
+        files: serializeProject(state.doc, editorMeta(state)),
+        revision: state.revision,
+        busy: !!state.tx || !!state.editingTextId,
+      };
+    },
+    apply: (incoming) => {
+      if (sync !== coordinator) return;
+      applying = true;
+      try {
+        const parsed = parseProject(incoming);
+        useEditor.getState().apply('External change', () => parsed.doc);
+      } finally {
+        applying = false;
+      }
+      schedule();
+    },
+    status: (status, revision) => {
+      if (sync === coordinator) useEditor.getState().setSaveState(status, revision);
+    },
   });
-  const offExternal = project.onExternalChange(applyExternal);
-  // Leaving the tab saves right away instead of waiting out the autosave delay.
+  sync = coordinator;
+  const unsubscribe = useEditor.subscribe((state, previous) => {
+    if (applying) return;
+    if ((previous.tx && !state.tx) || (previous.editingTextId && !state.editingTextId)) coordinator.drain();
+    if (
+      state.revision !== previous.revision ||
+      (previous.tx && !state.tx) ||
+      (previous.editingTextId && !state.editingTextId)
+    )
+      schedule();
+  });
+  const offExternal = project.onExternalChange((incoming) => {
+    try {
+      coordinator.receive(normalized(incoming));
+    } catch (error) {
+      console.error('Could not load external change', error);
+    }
+  });
   const onHide = () => {
-    if (document.visibilityState === 'hidden' && timer !== undefined) {
+    if (document.visibilityState === 'hidden') {
       clearTimeout(timer);
       firstPending = 0;
       void saveNow();
@@ -105,11 +129,15 @@ export async function openProject(id: string): Promise<OpenedProject> {
     unsubscribe();
     offExternal();
     document.removeEventListener('visibilitychange', onHide);
+    if (sync !== coordinator) return;
     clearTimeout(timer);
-    // Serializes synchronously, so the flushed content is this project's even if another opens next.
-    void saveNow().finally(() => {
-      if (storage === project) storage = null;
-    });
+    firstPending = 0;
+    finishTextEditing(true);
+    if (useEditor.getState().tx) useEditor.getState().commit('Finish edit');
+    void coordinator.save().catch(console.error);
+    coordinator.close();
+    sync = null;
+    storage = null;
   };
   return { found: true, restoredViewport: !!meta.viewport, stop };
 }
@@ -117,7 +145,11 @@ export async function openProject(id: string): Promise<OpenedProject> {
 /** Create a project with one empty artboard; resolves with its id. */
 export async function createProject(title = 'Untitled', folderId: string | null = null): Promise<string> {
   const workspace = await connectWorkspace();
-  const files = serializeProject(setTitle(starterDocument(), title), { viewport: null, collapsed: [], activePage: null });
+  const files = serializeProject(setTitle(starterDocument(), title), {
+    viewport: null,
+    collapsed: [],
+    activePage: null,
+  });
   return workspace.create(title, files, { folderId });
 }
 

@@ -13,13 +13,14 @@ import { linkClick } from './router.ts';
 // The code editor (CodeMirror) loads when the Code panel is first opened.
 const CodePanel = lazy(() => import('../panels/CodePanel.tsx').then((m) => ({ default: m.CodePanel })));
 
-type Status = 'opening' | 'open' | 'missing';
+type Status = 'opening' | 'open' | 'missing' | 'error';
 
 export function Editor({ projectId }: { projectId: string }) {
   const codeOpen = useEditor((s) => s.codeOpen);
   const agentsOpen = useEditor((s) => s.agentsOpen);
   const title = useEditor((s) => s.doc.title);
   const [status, setStatus] = useState<Status>('opening');
+  const [openError, setOpenError] = useState('');
   useShortcuts();
 
   useEffect(() => {
@@ -30,18 +31,33 @@ export function Editor({ projectId }: { projectId: string }) {
     let stop: (() => void) | undefined;
     let cancelled = false;
     setStatus('opening');
+    setOpenError('');
     void openProject(projectId).then((opened) => {
       if (cancelled) return opened.stop();
       stop = opened.stop;
       setStatus(opened.found ? 'open' : 'missing');
       // No saved viewport: frame the artboards once they have been laid out.
       if (opened.found && !opened.restoredViewport) requestAnimationFrame(() => requestAnimationFrame(zoomToFit));
+    }).catch((error: unknown) => {
+      if (cancelled) return;
+      setOpenError(error instanceof Error ? error.message : 'Could not open this project.');
+      setStatus('error');
     });
     return () => {
       cancelled = true;
       stop?.();
     };
   }, [projectId]);
+
+  if (status === 'error') {
+    return (
+      <div className="missing-file" role="alert">
+        <p>{openError}</p>
+        <button type="button" onClick={() => location.reload()}>Try again</button>
+        <a href="/" onClick={linkClick}>Back to files</a>
+      </div>
+    );
+  }
 
   if (status === 'missing') {
     return (

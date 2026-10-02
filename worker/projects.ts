@@ -1,9 +1,9 @@
 /**
  * Cloud projects, designed to stay inside Cloudflare's free allowances:
  *
- * - The project row in D1 holds a version (R2 etag) per file, so listing and opening never list
+ * - The project row in D1 holds a version (immutable content hash) per file, so listing and opening never list
  *   R2 (a "Class A" operation) — they're one indexed D1 query.
- * - File contents move as raw bodies streamed to/from R2. The Worker never parses or builds big
+ * - File contents move as raw bodies uploaded/downloaded through R2. The Worker never parses or builds big
  *   JSON, which keeps every request far below the free plan's CPU limit.
  * - File URLs carry their version (?v=), so browsers cache them forever: thumbnails and unchanged
  *   files are downloaded once.
@@ -34,6 +34,9 @@ const FILE_TYPES: Record<string, string> = { html: 'text/html; charset=utf-8', c
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 500;
 const LOCATION = 'Your account';
+const REVISION = /^[a-f0-9]{32,64}$/;
+const revisionKey = (prefix: string, name: string, version: string) => `${prefix}revisions/${name}/${version}`;
+
 const IMMUTABLE = 'private, max-age=31536000, immutable';
 
 type Versions = Record<string, string>;
@@ -169,18 +172,34 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
     if (method === 'DELETE') return deleteProject(env, owner, id);
     if (method !== 'GET') return error(405, 'Method not allowed.');
     const row = await getRow(env, owner, id);
-    return json({ location: LOCATION, files: row ? await backfill(env, owner, row) : null });
+    return json({ location: LOCATION, owner, files: row ? await backfill(env, owner, row) : null });
   }
 
   if (path.length === 3 && path[1] === 'files') {
     const name = path[2]!;
     if (!FILE_NAME.test(name)) return error(404, 'Not found.');
     if (method === 'GET') {
-      const object = await env.FILES.get(prefix + name);
-      if (!object) return error(404, 'Not found.');
-      const versioned = new URL(request.url).searchParams.has('v');
+      const requested = new URL(request.url).searchParams.get('v');
+      if (requested !== null && !REVISION.test(requested)) return error(400, 'Invalid revision.');
+      const row = await getRow(env, owner, id);
+      if (!row) return error(404, 'No such file.');
+      const version = requested ?? parseVersions(row.files)[name];
+      let object = version ? await env.FILES.get(revisionKey(prefix, name, version)) : null;
+      // Existing projects used mutable keys. Only serve legacy bytes if their etag matches.
+      if (!object) {
+        const legacy = await env.FILES.get(prefix + name);
+        if (legacy && (!version || legacy.etag === version)) object = legacy;
+      }
+      if (!object) return error(404, 'No such revision.');
       return new Response(object.body, {
-        headers: { 'content-type': FILE_TYPES[extension(name)]!, 'cache-control': versioned ? IMMUTABLE : 'no-store', etag: object.httpEtag, 'x-content-type-options': 'nosniff' },
+        headers: {
+          'content-type': FILE_TYPES[extension(name)]!,
+          'cache-control': requested ? IMMUTABLE : 'no-store',
+          etag: object.httpEtag,
+          'x-content-type-options': 'nosniff',
+          // HTML may be inspected/downloaded on the app origin without executing design code.
+          ...(extension(name) === 'html' ? { 'content-security-policy': 'sandbox allow-same-origin' } : {}),
+        },
       });
     }
     if (method === 'PUT') {
@@ -188,28 +207,42 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
       if (!Number.isFinite(size)) return error(411, 'Content-Length is required.');
       if (size > MAX_FILE_BYTES) return error(413, 'Files can be up to 25 MB.');
       if (!(await getRow(env, owner, id))) return error(404, 'No such file.');
-      // Streamed straight into R2: no parsing, almost no CPU.
-      const object = await env.FILES.put(prefix + name, request.body, { httpMetadata: { contentType: FILE_TYPES[extension(name)] } });
-      return json({ version: object.etag });
+      const bytes = await request.arrayBuffer();
+      if (bytes.byteLength > MAX_FILE_BYTES) return error(413, 'Files can be up to 25 MB.');
+      const hash = await crypto.subtle.digest('SHA-256', bytes);
+      const version = Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
+      await env.FILES.put(revisionKey(prefix, name, version), bytes, { httpMetadata: { contentType: FILE_TYPES[extension(name)] } });
+      return json({ version });
     }
     return error(405, 'Method not allowed.');
   }
 
   if (path.length === 2 && path[1] === 'commit') {
     if (method !== 'POST') return error(405, 'Method not allowed.');
-    const body = await readBody<{ files?: unknown; title?: unknown; notify?: unknown }>(request);
+    const body = await readBody<{ files?: unknown; title?: unknown; notify?: unknown; base?: unknown }>(request);
     if (!body || !isVersions(body.files) || !Object.keys(body.files).some((n) => n.endsWith('.html'))) return error(400, 'Expected { files: { name: version }, title? } with at least one page.');
     const row = await getRow(env, owner, id);
     if (!row) return error(404, 'No such file.');
     const before = parseVersions(row.files);
+    if (body.base !== undefined && (!isVersions(body.base) || JSON.stringify(Object.entries(body.base).sort()) !== JSON.stringify(Object.entries(before).sort()))) return error(409, 'Project changed elsewhere.');
     const files = body.files;
+    if (!Object.values(files).every((v) => REVISION.test(v))) return error(400, 'Invalid revision.');
+    // Changed references must actually exist before publishing the new manifest.
+    for (const [name, version] of Object.entries(files)) {
+      if (before[name] === version) continue;
+      const object = await env.FILES.head(revisionKey(prefix, name, version));
+      if (!object) {
+        const legacy = await env.FILES.head(prefix + name);
+        if (!legacy || legacy.etag !== version) return error(400, 'Missing file revision.');
+      }
+    }
     const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : row.title;
     const now = Date.now();
-    await env.DB.prepare('update project set files = ?, title = ?, updated_at = ? where owner_id = ? and id = ?').bind(JSON.stringify(files), title, now, owner, id).run();
+    const committed = await env.DB.prepare('update project set files = ?, title = ?, updated_at = ? where owner_id = ? and id = ? and files = ?').bind(JSON.stringify(files), title, now, owner, id, row.files).run();
+    if (committed.meta.changes !== 1) return error(409, 'Project changed elsewhere.');
     await recordEdit(env, owner);
-    // Files that are gone (e.g. a deleted page) are removed from R2.
-    const removed = Object.keys(before).filter((n) => !(n in files));
-    if (removed.length) await env.FILES.delete(removed.map((n) => prefix + n));
+    // Historical revisions are retained so cached URLs and recovery snapshots stay valid.
+    // Permanent project deletion removes the entire prefix, including revisions.
     // Editors with a live connection announce their own saves over it (much cheaper); the
     // server only notifies the room for saves made without one.
     if (body.notify === true) {

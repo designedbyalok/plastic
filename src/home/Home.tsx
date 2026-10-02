@@ -87,6 +87,7 @@ const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes(F
 
 export function Home({ route }: { route: HomeRoute }) {
   const [files, setFiles] = useState<FileEntry[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [location, setLocation] = useState('workspace');
@@ -108,16 +109,21 @@ export function Home({ route }: { route: HomeRoute }) {
   const refresh = useCallback(async () => {
     // Refreshes can overlap (an action and a file-watcher event); only the newest one lands.
     const seq = ++latest.current;
-    const workspace = await connectWorkspace();
-    setLocation(workspace.location);
-    setKind(workspace.kind);
-    setCanImport(!!workspace.importFigma);
-    const [list, folderList, person] = await Promise.all([workspace.list(), workspace.folders().catch(() => []), workspace.profile().catch(() => null)]);
-    if (seq !== latest.current) return;
-    setFiles(list.map((p) => toEntry(p, workspace)).filter((f): f is FileEntry => f !== null));
-    setFolders(folderList);
-    setProfile(person);
-    if (workspace.kind === 'cloud') setBrowserCount((await browserFiles.list()).length);
+    try {
+      const workspace = await connectWorkspace();
+      setLocation(workspace.location);
+      setKind(workspace.kind);
+      setCanImport(!!workspace.importFigma);
+      const [list, folderList, person] = await Promise.all([workspace.list(), workspace.folders().catch(() => []), workspace.profile().catch(() => null)]);
+      if (seq !== latest.current) return;
+      setFiles(list.map((p) => toEntry(p, workspace)).filter((f): f is FileEntry => f !== null));
+      setFolders(folderList);
+      setProfile(person);
+      if (workspace.kind === 'cloud') setBrowserCount((await browserFiles.list()).length);
+      setLoadError(null);
+    } catch (error) {
+      if (seq === latest.current) setLoadError(error instanceof Error ? error.message : 'Could not load your files.');
+    }
   }, []);
 
   useEffect(() => {
@@ -125,7 +131,7 @@ export function Home({ route }: { route: HomeRoute }) {
     let off = () => {};
     void connectWorkspace().then((workspace) => {
       off = workspace.onChange(() => void refresh());
-    });
+    }).catch((error: unknown) => setLoadError(error instanceof Error ? error.message : 'Could not connect to your workspace.'));
     return () => off();
   }, [refresh]);
 
@@ -289,6 +295,7 @@ export function Home({ route }: { route: HomeRoute }) {
         onDropFile={(id, target) => void run((w) => (target === 'archive' ? w.place(id, { archived: true }) : w.place(id, { folderId: null, archived: false })))}
       />
       <main className="home-main">
+        {loadError && <div className="home-empty" role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Try again</button></div>}
         {route.name === 'profile' && !searching ? (
           <section className="home-files" aria-label="Profile">
             <ProfileView profile={profile} onSaved={() => void refresh()} />

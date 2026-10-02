@@ -4,6 +4,7 @@
  * anywhere else (a static build) the browser's localStorage is used. Tauri will add a native
  * implementation behind the same interfaces.
  */
+import { StorageConflictError } from './conflict.ts';
 import { authClient, detectBackend } from '../auth/client.ts';
 import { PROJECT_FILE_NAME, isPageFile, type ProjectFiles } from './index.ts';
 
@@ -223,6 +224,7 @@ class DevServerWorkspace implements Workspace {
 
   open(id: string): ProjectStorage {
     const endpoint = `/__plastic/project/${encodeURIComponent(id)}`;
+    let saved: ProjectFiles | null = null;
     return {
       id,
       location: `${this.location}/${id}`,
@@ -231,16 +233,22 @@ class DevServerWorkspace implements Workspace {
         const response = await fetch(endpoint);
         if (!response.ok) return null;
         const data = (await response.json()) as { files?: unknown };
-        return isFiles(data.files) ? pickFiles(data.files) : null;
+        saved = isFiles(data.files) ? pickFiles(data.files) : null;
+        return saved;
       },
       async save(files) {
-        const response = await fetch(endpoint, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(files) });
+        const response = await fetch(endpoint, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ files, expected: saved }) });
+        if (response.status === 409) {
+          const incoming = (await response.json()) as { files: ProjectFiles };
+          saved = incoming.files; throw new StorageConflictError(incoming.files);
+        }
         if (!response.ok) throw new Error(`Save failed: ${response.status}`);
+        saved = files;
       },
       onExternalChange(listener) {
         return onHot(PROJECT_CHANGED_EVENT, (data) => {
           const v = data as { id?: unknown; files?: unknown };
-          if (v.id === id && isFiles(v.files)) listener(pickFiles(v.files));
+          if (v.id === id && isFiles(v.files)) { saved = pickFiles(v.files); listener(saved); }
         });
       },
     };
@@ -469,7 +477,7 @@ class CloudWorkspace implements Workspace {
     const known = this.texts.get(key);
     if (known !== undefined) return known;
     const response = await fetch(`${this.endpoint(id)}/files/${encodeURIComponent(name)}?v=${encodeURIComponent(version)}`);
-    if (!response.ok) return null;
+    if (!response.ok) throw new Error(`Could not load ${name}: ${response.status}`);
     const text = await response.text();
     this.texts.set(key, text);
     return text;
@@ -482,7 +490,7 @@ class CloudWorkspace implements Workspace {
   }
 
   /** Upload the files that differ from `saved`, then commit the full version map. */
-  async write(id: string, files: ProjectFiles, saved: { files: ProjectFiles; versions: Versions } | null, options: { client?: string; notify?: boolean } = {}): Promise<Versions> {
+  async write(id: string, files: ProjectFiles, saved: { files: ProjectFiles; versions: Versions } | null, options: { client?: string; notify?: boolean | (() => boolean) } = {}): Promise<Versions> {
     const versions: Versions = {};
     const changed = Object.keys(files).filter((n) => !saved || saved.files[n] !== files[n] || !saved.versions[n]);
     for (const name of Object.keys(files)) if (!changed.includes(name)) versions[name] = saved!.versions[name]!;
@@ -505,7 +513,7 @@ class CloudWorkspace implements Workspace {
     const response = await fetch(`${this.endpoint(id)}/commit`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(options.client ? { 'x-plastic-client': options.client } : {}) },
-      body: JSON.stringify({ files: versions, title, notify: options.notify ?? true }),
+      body: JSON.stringify({ files: versions, title, notify: typeof options.notify === 'function' ? options.notify() : options.notify ?? true, base: saved?.versions ?? {} }),
     });
     if (!response.ok) throw new Error(`Save failed: ${response.status}`);
     return versions;
@@ -643,7 +651,8 @@ class CloudWorkspace implements Workspace {
     const fetchVersions = async (): Promise<Versions | null> => {
       const response = await fetch(endpoint);
       if (!response.ok) return null;
-      return ((await response.json()) as { files?: Versions | null }).files ?? null;
+      const data = (await response.json()) as { files?: Versions | null; owner?: string };
+      return data.files ?? null;
     };
 
     return {
@@ -660,11 +669,22 @@ class CloudWorkspace implements Workspace {
         return files;
       },
       async save(files) {
-        const live = socket?.readyState === WebSocket.OPEN;
-        const versions = await workspace.write(id, files, saved, { client, notify: !live });
+        let versions: Versions;
+        try { versions = await workspace.write(id, files, saved, { client, notify: () => socket?.readyState !== WebSocket.OPEN }); }
+        catch (error) {
+          if (error instanceof Error && error.message === 'Save failed: 409') {
+            const latest = await fetchVersions();
+            if (latest) {
+              const incoming = await workspace.files(id, latest);
+              saved = { files: incoming, versions: latest };
+              throw new StorageConflictError(incoming);
+            }
+          }
+          throw error;
+        }
         saved = { files, versions };
         // Tell the other editors over our own connection (1/20 the cost of a server call).
-        if (live) socket!.send(JSON.stringify({ type: 'changed', files: versions }));
+        if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'changed', files: versions }));
       },
       /** Edits saved elsewhere (another tab or device) arrive over a WebSocket to the file's room. */
       onExternalChange(listener) {
@@ -698,7 +718,7 @@ class CloudWorkspace implements Workspace {
           socket = ws;
           ws.onopen = () => {
             // After a disconnect, catch up on anything saved meanwhile (one small request).
-            if (!caughtUp) queue = queue.then(async () => apply(await fetchVersions()));
+            if (!caughtUp) queue = queue.then(async () => apply(await fetchVersions())).catch((error) => { caughtUp = false; console.error(error); });
             caughtUp = true;
             attempts = 0;
             heartbeat = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send('ping'), 45_000);
@@ -713,7 +733,7 @@ class CloudWorkspace implements Workspace {
             }
             if (message.type !== 'changed' || !message.files) return;
             const versions = Object.fromEntries(Object.entries(message.files).filter(([n, v]) => PROJECT_FILE_NAME.test(n) && typeof v === 'string'));
-            queue = queue.then(() => apply(versions));
+            queue = queue.then(() => apply(versions)).catch((error) => { caughtUp = false; console.error(error); });
           };
           ws.onclose = () => {
             clearInterval(heartbeat);

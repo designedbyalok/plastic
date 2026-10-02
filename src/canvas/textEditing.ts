@@ -39,8 +39,10 @@ function begin(id: string): void {
     // Keyboard focus was inside the artboard iframe; hand it back so shortcuts work again.
     window.focus();
     const store = useEditor.getState();
-    store.setEditingText(null);
+    // Commit the text while external updates are still queued; releasing editing first
+    // would let synchronization replace the document before this text is recorded.
     if (commit && text !== original) store.apply('Edit text', (d) => setText(d, id, text));
+    store.setEditingText(null);
     requestRerender();
   };
   const onKey = (e: KeyboardEvent) => {

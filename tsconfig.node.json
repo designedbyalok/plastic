@@ -23,6 +23,7 @@
     "vite.config.ts",
     "server",
     "tests/mcp.test.ts",
-    "tests/library.test.ts"
+    "tests/library.test.ts",
+    "tests/project-store.test.ts"
   ]
 }

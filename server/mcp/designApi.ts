@@ -37,15 +37,15 @@ export class DesignApi {
     return parseProject(files);
   }
 
-  private async save(file: string, { doc, meta }: Open): Promise<void> {
-    await this.store.write(file, serializeProject(doc, meta));
-  }
-
   /** Open, edit, save. */
   private async edit<T>(file: string, fn: (doc: DesignDocument) => { doc: DesignDocument; result: T }): Promise<T> {
-    const opened = await this.open(file);
-    const { doc, result } = fn(opened.doc);
-    await this.save(file, { doc, meta: opened.meta });
+    let result!: T;
+    await this.store.edit(file, (files) => {
+      const opened = parseProject(files);
+      const edited = fn(opened.doc);
+      result = edited.result;
+      return serializeProject(edited.doc, opened.meta);
+    });
     return result;
   }
 
@@ -300,12 +300,7 @@ export class DesignApi {
 /** Merge class rules from agent CSS; anything that isn't a single-class rule is appended. */
 function mergeCss(doc: DesignDocument, css: string | undefined): DesignDocument {
   if (!css?.trim()) return doc;
-  const sheet = parseStyleSheet(css);
-  const rules: Record<string, Declarations> = { ...doc.styles.rules };
-  for (const [name, decls] of Object.entries(sheet.rules)) rules[name] = { ...rules[name], ...decls };
-  const extra = [sheet.preserved, sheet.preservedAfter].filter((s) => s.trim()).join('\n\n');
-  const preservedAfter = [doc.styles.preservedAfter, extra].filter((s) => s.trim()).join('\n\n');
-  return { ...doc, styles: { ...doc.styles, rules, preservedAfter } };
+  return { ...doc, styles: parseStyleSheet(`${serializeStyleSheet(doc.styles)}\n${css}`) };
 }
 
 function nextArtboardX(doc: DesignDocument, page: Page): number {

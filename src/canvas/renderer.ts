@@ -15,6 +15,8 @@ export class DomRenderer {
   /** Whitespace between block-formatted children, mirroring the serializer's line breaks. */
   private readonly spacers = new Map<NodeId, Text[]>();
   private root: Node | null = null;
+  private lastNodes: DesignDocument['nodes'] | null = null;
+  private lastRootId: NodeId | null = null;
 
   private readonly document: Document;
 
@@ -24,6 +26,13 @@ export class DomRenderer {
   }
 
   render(doc: DesignDocument, rootId: NodeId): void {
+    // CSS/token/metadata edits need browser layout, but never a DOM tree reconciliation.
+    // Changes in other artboards likewise leave this subtree's immutable nodes untouched.
+    if (rootId === this.lastRootId && this.lastNodes && (
+      doc.nodes === this.lastNodes || this.subtreeUnchanged(doc)
+    )) { this.lastNodes = doc.nodes; return; }
+    this.lastNodes = doc.nodes;
+    this.lastRootId = rootId;
     const seen = new Set<NodeId>();
     const root = this.sync(doc, rootId, false, seen);
     if (root !== this.root) {
@@ -43,6 +52,7 @@ export class DomRenderer {
   /** Forget cached state so the next render re-patches every node. */
   invalidate(): void {
     this.rendered.clear();
+    this.lastNodes = null;
   }
 
   dispose(): void {
@@ -52,6 +62,13 @@ export class DomRenderer {
     this.rendered.clear();
     this.spacers.clear();
     this.root = null;
+    this.lastNodes = null;
+    this.lastRootId = null;
+  }
+
+  private subtreeUnchanged(doc: DesignDocument): boolean {
+    for (const [id, node] of this.rendered) if (doc.nodes[id] !== node) return false;
+    return true;
   }
 
   private sync(doc: DesignDocument, id: NodeId, inSvg: boolean, seen: Set<NodeId>): Node | null {
