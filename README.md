@@ -1,0 +1,52 @@
+# Plastic
+
+A visual editor for real interfaces. Designs are HTML and CSS — rendered by the browser, edited
+visually, saved as plain files you own.
+
+```html
+<form class="login-form">
+  <h2 class="heading">Sign in</h2>
+  <label class="field">Email<input class="input" type="email" placeholder="you@example.com" required></label>
+  <button class="button" type="submit">Continue</button>
+</form>
+```
+
+That is what the editor saves — not a scene graph that has to be translated into code later.
+
+## Run
+
+```bash
+npm install
+npm run dev
+```
+
+Open the printed URL. The project is saved continuously to `workspace/demo/`
+(`index.html`, `styles.css`, `project.json`). Edit those files with anything — a text editor,
+git, a coding agent — and the open editor updates (as an undoable change).
+
+Use a different folder with `PLASTIC_PROJECT=path/to/project npm run dev`.
+
+```bash
+npm test           # model, serialization, history
+npm run typecheck
+npm run build
+```
+
+## Try the first workflow
+
+1. **F**, then drag on the canvas: a frame (artboard).
+2. **H**, click in the frame, type "Sign in", Enter.
+3. **I** and click: an input. **B** and click: a button.
+4. Drag a marquee over the three on the frame's background, press **⇧A**: they are wrapped in a
+   vertical flex stack (direction and gap inferred).
+5. In the inspector change **Gap** and **Padding**; set **Tag** to `<form>`.
+6. Select the input: change **Type** to `email`, the **Placeholder**, tick **Required**.
+7. Toggle **</>** in the toolbar to see the exact files being written.
+8. Reload the page: everything comes back from disk.
+
+Shortcuts are listed in the inspector when nothing is selected.
+
+## Docs
+
+- [Architecture](docs/ARCHITECTURE.md) — document model, rendering, coordinates, undo,
+  serialization, and what comes next.

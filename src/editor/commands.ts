@@ -1,0 +1,219 @@
+/**
+ * Editor commands: user intents that may need live layout measurements before producing a
+ * pure document edit. Shortcuts, toolbar buttons and (later) an agent API all call these.
+ */
+import { fitRect, screenToWorld, unionRects, zoomAround, type Rect } from '../canvas/coords';
+import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf } from '../canvas/dom';
+import { instantiate } from '../document/factory';
+import { duplicateNodes, insertChild, removeNodes, setFrame, setStyleOnNodes, stripPosition, wrapInStack } from '../document/ops';
+import { getElement, getParentId, hasOnlyTextChildren, isRoot, topmostIds } from '../document/tree';
+import type { DesignDocument, NodeId } from '../document/types';
+import { frameSpec } from '../elements/insertables';
+import { elementSpec } from '../elements/registry';
+import { useEditor } from './store';
+
+const px = (n: number) => `${Math.round(n)}px`;
+const state = () => useEditor.getState();
+
+export function deleteSelection(): void {
+  const { selection, doc } = state();
+  if (!selection.length) return;
+  const parent = selection.length === 1 ? getParentId(doc, selection[0]!) : null;
+  state().apply('Delete', (d) => removeNodes(d, selection), { select: parent ? [parent] : [] });
+}
+
+export function duplicateSelection(): void {
+  const { selection, doc } = state();
+  const ids = topmostIds(doc, selection);
+  if (!ids.length) return;
+  let created: NodeId[] = [];
+  state().apply('Duplicate', (d) => {
+    const result = duplicateNodes(d, ids);
+    created = result.ids;
+    return result.doc;
+  });
+  state().select(created);
+}
+
+/** "Add auto layout": wrap selected siblings in a flex stack, inferring direction and gap. */
+export function wrapSelectionInStack(): void {
+  const { selection, doc, viewport } = state();
+  const ids = topmostIds(doc, selection).filter((id) => !isRoot(doc, id));
+  const first = ids[0];
+  if (!first) return;
+  const parentId = getParentId(doc, first);
+  const parentEl = domElement(parentId);
+  const items = ids
+    .filter((id) => getParentId(doc, id) === parentId)
+    .map((id) => ({ id, rect: screenRectOf(id) }))
+    .filter((i): i is { id: NodeId; rect: Rect } => !!i.rect);
+  if (!items.length || !parentEl) return;
+
+  const xs = items.map((i) => i.rect.x + i.rect.width / 2);
+  const ys = items.map((i) => i.rect.y + i.rect.height / 2);
+  const direction = items.length > 1 && Math.max(...xs) - Math.min(...xs) > Math.max(...ys) - Math.min(...ys) ? 'row' : 'column';
+  items.sort((a, b) => (direction === 'row' ? a.rect.x - b.rect.x : a.rect.y - b.rect.y));
+
+  const gaps = items.slice(1).map((item, i) => {
+    const prev = items[i]!.rect;
+    return direction === 'row' ? item.rect.x - (prev.x + prev.width) : item.rect.y - (prev.y + prev.height);
+  });
+  const averageGap = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length / viewport.zoom : 12;
+  const gap = Math.max(0, Math.round(Number.isFinite(averageGap) ? averageGap : 12));
+
+  const allFree = items.every((i) => isOutOfFlow(domElement(i.id)));
+  let placement = null;
+  if (allFree) {
+    const union = unionRects(items.map((i) => i.rect))!;
+    const parentRect = screenRectOf(parentId!)!;
+    placement = {
+      x: (union.x - parentRect.x) / viewport.zoom - parentEl.clientLeft,
+      y: (union.y - parentRect.y) / viewport.zoom - parentEl.clientTop,
+    };
+  }
+  let stackId: NodeId | null = null;
+  state().apply('Wrap in stack', (d) => {
+    const result = wrapInStack(d, items.map((i) => i.id), { direction, gap: Math.min(gap, 64), placement });
+    stackId = result.id;
+    return result.doc;
+  });
+  if (stackId) state().select([stackId]);
+}
+
+/** Switch between free positioning and layout positioning without the element jumping. */
+export function setFreePositioning(ids: readonly NodeId[], free: boolean): void {
+  if (free) {
+    const offsets = ids.map((id) => {
+      const el = domElement(id);
+      return { id, left: el?.offsetLeft ?? 0, top: el?.offsetTop ?? 0 };
+    });
+    state().apply('Free position', (d) => {
+      let next = d;
+      for (const o of offsets) {
+        const parentId = getParentId(next, o.id);
+        const parentEl = domElement(parentId);
+        if (parentId && parentEl && getComputedStyle(parentEl).position === 'static') {
+          next = setStyleOnNodes(next, [parentId], 'position', 'relative');
+        }
+        next = setStyleOnNodes(next, [o.id], 'position', 'absolute');
+        next = setStyleOnNodes(next, [o.id], 'left', px(o.left));
+        next = setStyleOnNodes(next, [o.id], 'top', px(o.top));
+      }
+      return next;
+    });
+  } else {
+    state().apply('Layout position', (d) => ids.reduce((next: DesignDocument, id) => stripPosition(next, id), d));
+  }
+}
+
+export function nudgeSelection(dx: number, dy: number): void {
+  const { selection, doc } = state();
+  const ids = topmostIds(doc, selection);
+  if (!ids.length) return;
+  const roots = ids.filter((id) => isRoot(doc, id));
+  const free = ids.filter((id) => !isRoot(doc, id) && isOutOfFlow(domElement(id)));
+  const starts = free.map((id) => {
+    const cs = getComputedStyle(domElement(id)!);
+    return { id, left: parseFloat(cs.left) || 0, top: parseFloat(cs.top) || 0 };
+  });
+  state().apply(
+    'Nudge',
+    (d) => {
+      let next = d;
+      for (const id of roots) {
+        const f = next.frames[id] ?? { x: 0, y: 0 };
+        next = setFrame(next, id, { x: f.x + dx, y: f.y + dy });
+      }
+      for (const s of starts) {
+        next = setStyleOnNodes(next, [s.id], 'left', px(s.left + dx));
+        next = setStyleOnNodes(next, [s.id], 'top', px(s.top + dy));
+      }
+      return next;
+    },
+    { coalesce: `nudge:${ids.join(',')}` },
+  );
+}
+
+export function selectParent(): void {
+  const { selection, doc } = state();
+  const first = selection[0];
+  if (!first) return;
+  const parent = getParentId(doc, first);
+  state().select(parent ? [parent] : []);
+}
+
+export function canEditText(doc: DesignDocument, id: NodeId): boolean {
+  const el = getElement(doc, id);
+  return !!el && elementSpec(el.tag).editableText && hasOnlyTextChildren(doc, el);
+}
+
+/** Enter: edit text, or step into the first child. */
+export function enterSelection(): void {
+  const { selection, doc } = state();
+  const id = selection[0];
+  const el = getElement(doc, id);
+  if (!id || !el) return;
+  if (canEditText(doc, id)) {
+    state().setEditingText(id);
+    return;
+  }
+  const child = el.children.find((c) => doc.nodes[c]?.kind === 'element');
+  if (child) state().select([child]);
+}
+
+export function createFrame(rect: Rect): void {
+  let id: NodeId = '';
+  state().apply('Add frame', (d) => {
+    const made = instantiate(d, frameSpec(rect.width, rect.height));
+    id = made.id;
+    return setFrame(insertChild(made.doc, null, d.roots.length, made.id), made.id, { x: rect.x, y: rect.y });
+  });
+  state().select([id]);
+}
+
+// --- viewport -------------------------------------------------------------------------------
+
+function screenSize() {
+  const el = getViewportElement();
+  return { width: el?.clientWidth ?? window.innerWidth, height: el?.clientHeight ?? window.innerHeight };
+}
+
+export function zoomBy(factor: number): void {
+  const { viewport } = state();
+  const size = screenSize();
+  state().setViewport(zoomAround(viewport, { x: size.width / 2, y: size.height / 2 }, viewport.zoom * factor));
+}
+
+export function zoomTo(zoom: number): void {
+  const { viewport } = state();
+  const size = screenSize();
+  state().setViewport(zoomAround(viewport, { x: size.width / 2, y: size.height / 2 }, zoom));
+}
+
+function worldRectOf(screenRect: Rect): Rect {
+  const { viewport } = state();
+  const p = screenToWorld({ x: screenRect.x, y: screenRect.y }, viewport);
+  return { x: p.x, y: p.y, width: screenRect.width / viewport.zoom, height: screenRect.height / viewport.zoom };
+}
+
+export function zoomToFit(): void {
+  const { doc } = state();
+  const rects = doc.roots
+    .map((id) => hostOf(id))
+    .filter((h): h is HTMLElement => !!h)
+    .map((h) => {
+      const r = h.getBoundingClientRect();
+      const origin = getViewportElement()?.getBoundingClientRect();
+      return worldRectOf({ x: r.left - (origin?.left ?? 0), y: r.top - (origin?.top ?? 0), width: r.width, height: r.height });
+    });
+  const union = unionRects(rects);
+  if (union) state().setViewport(fitRect(union, screenSize()));
+}
+
+export function zoomToSelection(): void {
+  const { selection } = state();
+  const rects = selection.map(screenRectOf).filter((r): r is Rect => !!r).map(worldRectOf);
+  const union = unionRects(rects);
+  if (union) state().setViewport(fitRect(union, screenSize(), 96, 4));
+  else zoomToFit();
+}
