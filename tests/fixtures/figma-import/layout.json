@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "id": "layout",
+  "source": {
+    "kind": "synthetic",
+    "path": "layout.scene.json"
+  },
+  "frames": [
+    {
+      "id": "card",
+      "sourceId": "card",
+      "width": 320,
+      "height": 200,
+      "reference": {
+        "kind": "synthetic-html",
+        "path": "layout.reference.html"
+      },
+      "maxDiffRatio": 0.001,
+      "nodes": [
+        {
+          "sourceId": "card",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 320,
+            "height": 200
+          },
+          "display": "flex"
+        },
+        {
+          "sourceId": "button",
+          "bounds": {
+            "x": 24,
+            "y": 64,
+            "width": 272,
+            "height": 44
+          },
+          "display": "flex"
+        },
+        {
+          "sourceId": "badge",
+          "bounds": {
+            "x": 290,
+            "y": 10,
+            "width": 20,
+            "height": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": "type",
+      "sourceId": "type",
+      "width": 320,
+      "height": 160,
+      "reference": {
+        "kind": "synthetic-html",
+        "path": "type.reference.html"
+      },
+      "maxDiffRatio": 0.001,
+      "nodes": [
+        {
+          "sourceId": "regular",
+          "bounds": {
+            "x": 24,
+            "y": 24,
+            "width": 272,
+            "height": 28
+          },
+          "text": "Regular 400",
+          "fontWeight": "400"
+        },
+        {
+          "sourceId": "medium",
+          "bounds": {
+            "x": 24,
+            "y": 64,
+            "width": 272,
+            "height": 28
+          },
+          "text": "Medium 500",
+          "fontWeight": "500"
+        }
+      ]
+    }
+  ]
+}

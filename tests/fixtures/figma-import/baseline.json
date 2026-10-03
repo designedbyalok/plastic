@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "browser": "149.0.7827.55",
+  "passed": true,
+  "runs": [
+    {
+      "schemaVersion": 1,
+      "id": "layout",
+      "sourceKind": "synthetic",
+      "sourceHash": "1348d695b583f96864d234c87bd9984e22e3b3210a9d8be022353e831c7bb055",
+      "fontHashes": [
+        {
+          "family": "Inter",
+          "style": "normal",
+          "weight": "100 900",
+          "sha256": "4856691bfc15c1547fa00f89d6a6dfa172aaa7dbb41f7ae638e73ed5040b24a0"
+        }
+      ],
+      "comparison": {
+        "threshold": 0.1,
+        "includeAA": false,
+        "geometryTolerancePx": 0.75
+      },
+      "importerVersion": "1.1.0",
+      "timing": {
+        "decodeMs": 0,
+        "conversionMs": 2.3808329999999387
+      },
+      "diagnostics": [],
+      "frames": [
+        {
+          "id": "card",
+          "referenceKind": "synthetic-html",
+          "passed": true,
+          "referenceHash": "dbdaaea4411a3d5a1eb3ab68382b2b8afa9245eff2ca8d2571d849effd8d033f",
+          "diffPixels": 0,
+          "diffRatio": 0,
+          "maxDiffRatio": 0.001,
+          "geometry": [
+            {
+              "sourceId": "card",
+              "passed": true,
+              "expected": {
+                "sourceId": "card",
+                "bounds": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 320,
+                  "height": 200
+                },
+                "display": "flex"
+              },
+              "actual": {
+                "bounds": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 320,
+                  "height": 200
+                },
+                "text": "Import Fidelity Continue ",
+                "fontWeight": "400",
+                "display": "flex"
+              }
+            },
+            {
+              "sourceId": "button",
+              "passed": true,
+              "expected": {
+                "sourceId": "button",
+                "bounds": {
+                  "x": 24,
+                  "y": 64,
+                  "width": 272,
+                  "height": 44
+                },
+                "display": "flex"
+              },
+              "actual": {
+                "bounds": {
+                  "x": 24,
+                  "y": 64,
+                  "width": 272,
+                  "height": 44
+                },
+                "text": "Continue",
+                "fontWeight": "400",
+                "display": "flex"
+              }
+            },
+            {
+              "sourceId": "badge",
+              "passed": true,
+              "expected": {
+                "sourceId": "badge",
+                "bounds": {
+                  "x": 290,
+                  "y": 10,
+                  "width": 20,
+                  "height": 20
+                }
+              },
+              "actual": {
+                "bounds": {
+                  "x": 290,
+                  "y": 10,
+                  "width": 20,
+                  "height": 20
+                },
+                "text": "",
+                "fontWeight": "400",
+                "display": "block"
+              }
+            }
+          ],
+          "errors": []
+        },
+        {
+          "id": "type",
+          "referenceKind": "synthetic-html",
+          "passed": true,
+          "referenceHash": "bcfce30ddf8e9bc5aaaf698015bdaa2732072faa7ba25a2125d8b6d5e20b785f",
+          "diffPixels": 0,
+          "diffRatio": 0,
+          "maxDiffRatio": 0.001,
+          "geometry": [
+            {
+              "sourceId": "regular",
+              "passed": true,
+              "expected": {
+                "sourceId": "regular",
+                "bounds": {
+                  "x": 24,
+                  "y": 24,
+                  "width": 272,
+                  "height": 28
+                },
+                "text": "Regular 400",
+                "fontWeight": "400"
+              },
+              "actual": {
+                "bounds": {
+                  "x": 24,
+                  "y": 24,
+                  "width": 272,
+                  "height": 28
+                },
+                "text": "Regular 400",
+                "fontWeight": "400",
+                "display": "block"
+              }
+            },
+            {
+              "sourceId": "medium",
+              "passed": true,
+              "expected": {
+                "sourceId": "medium",
+                "bounds": {
+                  "x": 24,
+                  "y": 64,
+                  "width": 272,
+                  "height": 28
+                },
+                "text": "Medium 500",
+                "fontWeight": "500"
+              },
+              "actual": {
+                "bounds": {
+                  "x": 24,
+                  "y": 64,
+                  "width": 272,
+                  "height": 28
+                },
+                "text": "Medium 500",
+                "fontWeight": "500",
+                "display": "block"
+              }
+            }
+          ],
+          "errors": []
+        }
+      ]
+    }
+  ]
+}

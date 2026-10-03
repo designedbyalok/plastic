@@ -4,6 +4,7 @@
  * anywhere else (a static build) the browser's localStorage is used. Tauri will add a native
  * implementation behind the same interfaces.
  */
+import type { ImportReport } from '../figma/convert.ts';
 import { readProjectJson } from './project.ts';
 import { StorageConflictError } from './conflict.ts';
 import { authClient, detectBackend } from '../auth/client.ts';
@@ -129,15 +130,7 @@ export interface FigmaFontUse {
 
 export interface FigmaImportResult {
   readonly id: string;
-  readonly report: {
-    readonly title: string;
-    readonly pages: readonly { readonly name: string; readonly file: string; readonly artboards: number }[];
-    readonly layers: number;
-    readonly fonts: readonly FigmaFontUse[];
-    readonly images: number;
-    readonly tokens: number;
-    readonly warnings: readonly string[];
-  };
+  readonly report: ImportReport;
 }
 
 const PROJECT_CHANGED_EVENT = 'plastic:project-changed';

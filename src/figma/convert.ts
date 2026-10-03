@@ -16,6 +16,7 @@
  *   image fills         → files in assets/
  *   vectors and icons   → inline <svg>, rendered by OpenPencil's SVG exporter
  */
+import { FIGMA_IMPORTER_VERSION, type ImportTrace, type ImportDiagnostic } from './provenance.ts';
 import { parseFigFile } from '@open-pencil/core/io/formats/fig';
 import { renderNodesToSVG, vectorNetworkToSVGPaths } from '@open-pencil/core/io/formats/svg';
 import type { Fill, SceneGraph, SceneNode, Stroke, Variable, VectorNetwork } from '@open-pencil/scene-graph';
@@ -46,6 +47,9 @@ export interface ImportReport {
   readonly images: number;
   readonly tokens: number;
   readonly warnings: readonly string[];
+  readonly importerVersion?: string;
+  readonly diagnostics?: readonly ImportDiagnostic[];
+  readonly timing?: { readonly decodeMs: number; readonly conversionMs: number };
 }
 
 export interface Conversion {
@@ -55,6 +59,7 @@ export interface Conversion {
   /** Binary files by path inside the project, e.g. "assets/3f2a….png". */
   readonly assets: Record<string, Uint8Array>;
   readonly report: ImportReport;
+  readonly trace: ImportTrace;
 }
 
 /** "Marketing site (Copy).fig" → "Marketing site (Copy)". */
@@ -64,12 +69,14 @@ export function titleFromFileName(name: string): string {
 
 export async function convertFigFile(bytes: Uint8Array, title: string): Promise<Conversion> {
   const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const decodeStarted = performance.now();
   let graph: SceneGraph;
   try {
     graph = await parseFigFile(buffer);
   } catch (error) {
     throw new Error(`Not a readable Figma file (${error instanceof Error ? error.message : String(error)}).`);
   }
+  const decodeMs = performance.now() - decodeStarted;
   // Big files convert for seconds: pause between layers so the page keeps responding.
   const steps = convertSteps(graph, title);
   let last = performance.now();
@@ -81,7 +88,7 @@ export async function convertFigFile(bytes: Uint8Array, title: string): Promise<
     }
     step = steps.next();
   }
-  return step.value;
+  return { ...step.value, report: { ...step.value.report, timing: { ...step.value.report.timing!, decodeMs } } };
 }
 
 // --- conversion ------------------------------------------------------------------------------
@@ -109,6 +116,27 @@ class Converter {
   readonly names: Record<NodeId, string> = {};
   readonly assets: Record<string, Uint8Array> = {};
   readonly warnings = new Set<string>();
+  page = '';
+  readonly trace: ImportTrace = { schemaVersion: 1, importerVersion: FIGMA_IMPORTER_VERSION, source: 'figma', nodes: [], diagnostics: [] };
+
+  private observe(n: SceneNode, plasticId: NodeId, disposition: 'converted' | 'flattened' = 'converted'): void {
+    const original = this.graph.getNode(n.id) ?? n;
+    this.trace.nodes.push({ sourceId: n.source?.id ?? n.id, sceneId: n.id, plasticId, page: this.page, name: n.name, type: n.type,
+      bounds: { x: original.x, y: original.y, width: Math.max(0, original.width), height: Math.max(0, original.height) }, disposition });
+  }
+
+  private diagnostic(n: SceneNode, code: ImportDiagnostic['code'], property: string, message: string, severity: ImportDiagnostic['severity'] = 'warning'): void {
+    this.trace.diagnostics.push({ sourceId: n.source?.id ?? n.id, sourceName: n.name, code, property, message, severity });
+  }
+
+  private flattenedChildren(n: SceneNode, id: NodeId): void {
+    for (const childId of n.childIds) {
+      const child = this.graph.getNode(childId);
+      if (!child) continue;
+      this.observe(child, id, 'flattened');
+      this.flattenedChildren(child, id);
+    }
+  }
   /** Classes by base name + declarations, so repeated identical layers (instances) share one. */
   private readonly classByKey = new Map<string, string>();
   private readonly taken = new Set<string>();
@@ -325,6 +353,11 @@ class Converter {
 
   private convert(n: SceneNode, parent: SceneNode | null, insideInstance: boolean): NodeId | null {
     if (n.isMask && parent) return null; // handled by the parent (see maskedChildren)
+    for (const fill of n.fills) {
+      if (fill.visible && fill.type === 'IMAGE' && fill.imageHash && !this.graph.images.get(fill.imageHash)?.length)
+        this.diagnostic(n, 'missing-image', 'fills', 'The source image is not embedded; this fill cannot be reproduced.');
+    }
+    if (n.type === 'INSTANCE') this.diagnostic(n, 'instance-expanded', 'component', 'Instance expanded into editable layers; its Figma component link is not retained.', 'info');
     const inInstance = insideInstance || n.type === 'INSTANCE';
     const d: Record<string, string> = {};
     this.place(n, parent, d);
@@ -346,6 +379,13 @@ class Converter {
       id = this.element(tag, n.name, d, children, {}, n.name);
     }
     if (!n.visible) this.hide(id, n.name);
+    this.observe(n, id);
+    if (this.isGraphic(n) || (n.type === 'TEXT' && n.textPathData)) {
+      this.flattenedChildren(n, id);
+      if (n.childIds.length || n.type === 'TEXT') this.diagnostic(n, 'vector-flattened', 'children', 'Content rendered as SVG; source descendants are not separate editable layers.', 'info');
+    } else if (n.type !== 'TEXT' && !SHAPE_TYPES.has(n.type) && !CONTAINER_TYPES.has(n.type)) {
+      this.diagnostic(n, 'unsupported-node', 'type', `Node type ${n.type} uses the generic box conversion.`);
+    }
     return id;
   }
 
@@ -380,7 +420,10 @@ class Converter {
   }
 
   private maskBox(mask: SceneNode, parent: SceneNode, masked: SceneNode[], insideInstance: boolean): NodeId {
-    if (!SHAPE_TYPES.has(mask.type)) this.warnings.add('Vector masks on images or text are approximated by their bounding box.');
+    if (!SHAPE_TYPES.has(mask.type)) {
+      this.warnings.add('Vector masks on images or text are approximated by their bounding box.');
+      this.diagnostic(mask, 'mask-approximation', 'mask', 'Vector mask approximated by its bounding box.');
+    }
     const d: Record<string, string> = {};
     this.place({ ...mask, layoutPositioning: 'ABSOLUTE' } as SceneNode, parent, d);
     d.overflow = 'hidden';
@@ -389,7 +432,9 @@ class Converter {
     // Children were positioned relative to the parent; shift them into the mask's box.
     const shifted = masked.map((c) => ({ ...c, x: c.x - mask.x, y: c.y - mask.y, layoutPositioning: 'ABSOLUTE' }) as SceneNode);
     const children = shifted.map((c) => this.convert(c, { ...mask, layoutMode: 'NONE', childIds: [] } as SceneNode, insideInstance)).filter((c): c is NodeId => !!c);
-    return this.element('div', mask.name || 'mask', d, children, {}, mask.name);
+    const id = this.element('div', mask.name || 'mask', d, children, {}, mask.name);
+    this.observe(mask, id);
+    return id;
   }
 
   // --- placement -----------------------------------------------------------------------------
@@ -1026,6 +1071,7 @@ export function convertGraph(graph: SceneGraph, title: string): Conversion {
 
 /** The conversion, yielding after each top-level layer (see convertFigFile). */
 function* convertSteps(graph: SceneGraph, title: string): Generator<void, Conversion, void> {
+  const started = performance.now();
   const c = new Converter(graph);
   const pages: Page[] = [];
   const frames: Record<NodeId, Point> = {};
@@ -1034,6 +1080,7 @@ function* convertSteps(graph: SceneGraph, title: string): Generator<void, Conver
 
   for (const [index, canvas] of graph.getPages().entries()) {
     const file = pageFileName(canvas.name, index, fileNames);
+    c.page = file;
     const roots: NodeId[] = [];
     for (const childId of canvas.childIds) {
       const n = graph.getNode(childId);
@@ -1053,6 +1100,7 @@ function* convertSteps(graph: SceneGraph, title: string): Generator<void, Conver
   const modes = c.modesCss();
   const doc: DesignDocument = {
     ...base,
+    importTrace: c.trace,
     title,
     nodes: c.nodes,
     pages,
@@ -1066,6 +1114,7 @@ function* convertSteps(graph: SceneGraph, title: string): Generator<void, Conver
     title,
     files,
     assets: c.assets,
+    trace: c.trace,
     report: {
       title,
       pages: report,
@@ -1074,6 +1123,9 @@ function* convertSteps(graph: SceneGraph, title: string): Generator<void, Conver
       images: Object.keys(c.assets).length,
       tokens: Object.keys(c.tokens).length,
       warnings: [...c.warnings],
+      importerVersion: FIGMA_IMPORTER_VERSION,
+      diagnostics: c.trace.diagnostics,
+      timing: { decodeMs: 0, conversionMs: performance.now() - started },
     },
   };
 }

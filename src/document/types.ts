@@ -5,6 +5,7 @@
  * Everything here is plain, immutable data. Nothing in this folder imports React or the
  * editor; it can be used by a CLI, an MCP server, or an importer just as well.
  */
+import type { ImportTrace } from '../figma/provenance.ts';
 
 export type NodeId = string;
 
@@ -93,6 +94,8 @@ export interface FileThumbnail {
 }
 
 export interface DesignDocument {
+  /** Immutable observations at import time; current edits may differ. */
+  readonly importTrace?: ImportTrace;
   readonly thumbnail?: FileThumbnail;
   /** Reusable structure links; ordinary HTML/CSS remains the rendered source. */
   readonly components?: ComponentLibrary;

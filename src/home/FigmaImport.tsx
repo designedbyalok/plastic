@@ -206,6 +206,16 @@ function Report({ result, onClose, onOpen }: { result: FigmaImportResult; onClos
         </section>
       )}
 
+      {report.diagnostics && report.diagnostics.length > 0 && (
+        <details className="import-section">
+          <summary>Conversion Details ({report.diagnostics.length})</summary>
+          <ul className="import-warnings">
+            {report.diagnostics.slice(0, 50).map((d, i) => <li key={i}><strong>{d.sourceName}</strong> · {d.message}</li>)}
+          </ul>
+          {report.diagnostics.length > 50 && <p className="import-note">Showing the first 50 observations. All observations are retained with the file.</p>}
+        </details>
+      )}
+
       <div className="import-actions">
         <button type="button" className="import-button" onClick={onClose}>
           Close

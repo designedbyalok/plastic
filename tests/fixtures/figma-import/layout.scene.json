@@ -1,0 +1,260 @@
+{
+  "nodes": [
+    {
+      "key": "card",
+      "type": "FRAME",
+      "parent": "page",
+      "props": {
+        "name": "Card",
+        "width": 320,
+        "height": 200,
+        "layoutMode": "VERTICAL",
+        "primaryAxisSizing": "FIXED",
+        "counterAxisSizing": "FIXED",
+        "itemSpacing": 12,
+        "paddingTop": 24,
+        "paddingRight": 24,
+        "paddingBottom": 24,
+        "paddingLeft": 24,
+        "fills": [
+          {
+            "type": "SOLID",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            },
+            "opacity": 1,
+            "visible": true
+          }
+        ],
+        "clipsContent": true
+      }
+    },
+    {
+      "key": "title",
+      "type": "TEXT",
+      "parent": "card",
+      "props": {
+        "name": "Title",
+        "text": "Import Fidelity",
+        "fontFamily": "Inter",
+        "fontWeight": 500,
+        "fontSize": 20,
+        "lineHeight": 28,
+        "width": 200,
+        "height": 28,
+        "textAutoResize": "WIDTH_AND_HEIGHT",
+        "fills": [
+          {
+            "type": "SOLID",
+            "color": {
+              "r": 0.1,
+              "g": 0.1,
+              "b": 0.1,
+              "a": 1
+            },
+            "opacity": 1,
+            "visible": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "button",
+      "type": "FRAME",
+      "parent": "card",
+      "props": {
+        "name": "Button",
+        "width": 272,
+        "height": 44,
+        "layoutMode": "HORIZONTAL",
+        "primaryAxisSizing": "FIXED",
+        "counterAxisSizing": "FIXED",
+        "primaryAxisAlign": "CENTER",
+        "counterAxisAlign": "CENTER",
+        "layoutAlignSelf": "STRETCH",
+        "fills": [
+          {
+            "type": "SOLID",
+            "color": {
+              "r": 0.2,
+              "g": 0.4,
+              "b": 0.8,
+              "a": 1
+            },
+            "opacity": 1,
+            "visible": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "label",
+      "type": "TEXT",
+      "parent": "button",
+      "props": {
+        "name": "Label",
+        "text": "Continue",
+        "fontFamily": "Inter",
+        "fontWeight": 400,
+        "fontSize": 14,
+        "lineHeight": 20,
+        "width": 60,
+        "height": 20,
+        "textAutoResize": "WIDTH_AND_HEIGHT",
+        "fills": [
+          {
+            "type": "SOLID",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            },
+            "opacity": 1,
+            "visible": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "badge",
+      "type": "ELLIPSE",
+      "parent": "card",
+      "props": {
+        "name": "Badge",
+        "layoutPositioning": "ABSOLUTE",
+        "x": 290,
+        "y": 10,
+        "width": 20,
+        "height": 20,
+        "fills": [
+          {
+            "type": "SOLID",
+            "color": {
+              "r": 0.2,
+              "g": 0.4,
+              "b": 0.8,
+              "a": 1
+            },
+            "opacity": 1,
+            "visible": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "type",
+      "type": "FRAME",
+      "parent": "page",
+      "props": {
+        "name": "Typography",
+        "width": 320,
+        "height": 160,
+        "fills": [
+          {
+            "type": "SOLID",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            },
+            "opacity": 1,
+            "visible": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "regular",
+      "type": "TEXT",
+      "parent": "type",
+      "props": {
+        "name": "Regular",
+        "x": 24,
+        "y": 24,
+        "width": 272,
+        "height": 28,
+        "text": "Regular 400",
+        "fontFamily": "Inter",
+        "fontWeight": 400,
+        "fontSize": 20,
+        "lineHeight": 28,
+        "textAutoResize": "NONE",
+        "fills": [
+          {
+            "type": "SOLID",
+            "color": {
+              "r": 0.1,
+              "g": 0.1,
+              "b": 0.1,
+              "a": 1
+            },
+            "opacity": 1,
+            "visible": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "medium",
+      "type": "TEXT",
+      "parent": "type",
+      "props": {
+        "name": "Medium",
+        "x": 24,
+        "y": 64,
+        "width": 272,
+        "height": 28,
+        "text": "Medium 500",
+        "fontFamily": "Inter",
+        "fontWeight": 500,
+        "fontSize": 20,
+        "lineHeight": 28,
+        "textAutoResize": "NONE",
+        "fills": [
+          {
+            "type": "SOLID",
+            "color": {
+              "r": 0.1,
+              "g": 0.1,
+              "b": 0.1,
+              "a": 1
+            },
+            "opacity": 1,
+            "visible": true
+          }
+        ]
+      }
+    },
+    {
+      "key": "hidden",
+      "type": "RECTANGLE",
+      "parent": "type",
+      "props": {
+        "name": "Hidden",
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 160,
+        "visible": false,
+        "fills": [
+          {
+            "type": "SOLID",
+            "color": {
+              "r": 1,
+              "g": 0,
+              "b": 0,
+              "a": 1
+            },
+            "opacity": 1,
+            "visible": true
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{font-family:Inter,system-ui,sans-serif;color:var(--figma-color-text,#eee);background:var(--figma-color-bg,#292929);font-size:12px}*{box-sizing:border-box}body{margin:0;padding:20px}h1{font-size:17px;font-weight:500;margin:0 0 8px}p{line-height:1.5;color:var(--figma-color-text-secondary,#aaa)}label{display:block;margin:16px 0 6px}input,button{font:inherit;color:inherit;border:1px solid var(--figma-color-border,#4a4a4a);border-radius:6px;background:var(--figma-color-bg-secondary,#383838);padding:8px;width:100%}input[type=file]{padding:6px}button{cursor:pointer;margin-top:12px;font-weight:500}button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visible{outline:2px solid var(--figma-color-border-selected,#699bff);outline-offset:2px}#selection{font-weight:500;margin-top:16px}#status{min-height:34px;margin-bottom:0;word-break:break-word}#source-note,#fonts{font-size:11px;margin:6px 0}#fonts{max-height:40px;overflow:auto}
+</style></head><body>
+<h1>Plastic Reference Export</h1>
+<p>Capture selected top-level frames as Figma PNGs and node data. Everything stays in a local bundle.</p>
+<div id="selection">Select Top-Level Frames</div>
+<button id="capture" disabled>Capture References</button>
+<label for="source">Matching Figma Local Copy</label><input id="source" type="file" accept=".fig">
+<p id="source-note">Save a local copy from this file, then attach it here.</p>
+<label for="name">Bundle Name</label><input id="name" value="figma-reference" maxlength="80" pattern="[a-z0-9-]+">
+<p id="fonts"></p>
+<button id="download" disabled>Download Reference Bundle</button>
+<p id="status" role="status" aria-live="polite">Ready.</p>
+<!-- BUNDLED_SCRIPT -->
+</body></html>

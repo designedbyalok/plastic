@@ -49,6 +49,7 @@ export function serializeProject(
   if (options.syncComponents !== false) doc = synchronizeComponents(doc);
   const roots = doc.pages.flatMap((p) => p.roots);
   const project: ProjectJson = {
+    ...(doc.importTrace ? { importTrace: doc.importTrace } : {}),
     ...(doc.thumbnail && doc.nodes[doc.thumbnail.frame]?.kind === 'element' ? { thumbnail: doc.thumbnail } : {}),
     ...(doc.components ? { components: doc.components } : {}),
     format: PROJECT_FORMAT,
@@ -137,6 +138,7 @@ function* readProjectFiles(files: ProjectFiles): Generator<void, ParsedProject, 
     tokens,
     frames,
     names: pick(project.layers.names, Object.keys(nodes)),
+    ...(project.importTrace ? { importTrace: project.importTrace } : {}),
     ...(project.layers.locked?.some((id) => nodes[id]) ? { locked: project.layers.locked.filter((id) => nodes[id]) } : {}),
   };
   const activePage = pages.some((p) => p.file === project.canvas.activePage) ? project.canvas.activePage : null;

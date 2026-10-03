@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "bun run emails:build && bun run typecheck && vite build && bun run site:build",
     "emails:build": "node scripts/build-emails.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.worker.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.worker.json && bun run reference:typecheck",
     "test": "vitest run",
     "preview": "vite preview",
     "mcp": "bun server/mcp/stdio.ts",
@@ -17,7 +17,12 @@
     "db:migrate:remote": "wrangler d1 migrations apply plastic --remote",
     "deploy": "bun run build && wrangler deploy",
     "site:dev": "astro dev --root site",
-    "site:build": "astro build --root site"
+    "site:build": "astro build --root site",
+    "benchmark:figma": "bun scripts/figma/benchmark.mjs",
+    "reference:build": "bun scripts/figma/build-plugin.mjs",
+    "reference:typecheck": "tsc -p plugins/figma-reference-export/tsconfig.json",
+    "reference:unpack": "bun scripts/figma/unpack.mjs",
+    "reference:check": "bun run reference:build && bun scripts/figma/check-plugin.mjs"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",
@@ -62,6 +67,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261002.1",
+    "@figma/plugin-typings": "^1.140.0",
     "@iconify-json/lucide": "^1.2.139",
     "@iconify-json/simple-icons": "^1.2.98",
     "@types/culori": "^4.0.1",
@@ -72,6 +78,10 @@
     "@vitejs/plugin-react": "^6.1.1",
     "astro": "^7.3.5",
     "astro-icon": "^1.2.0",
+    "fflate": "^0.8.3",
+    "pixelmatch": "7.1.0",
+    "playwright": "1.58.2",
+    "pngjs": "7.0.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^5.0.3",

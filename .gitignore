@@ -6,3 +6,7 @@ workspace
 .dev.vars
 .wrangler
 .astro
+
+artifacts/figma-import/
+
+plugins/figma-reference-export/dist/

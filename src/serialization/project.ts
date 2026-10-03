@@ -2,6 +2,7 @@
  * project.json: editor metadata only. Deleting it loses canvas placement, page names and order,
  * and layer names, never the design itself.
  */
+import { readImportTrace, type ImportTrace } from '../figma/provenance.ts';
 import type { ComponentLibrary, FileThumbnail, NodeId, Point, RulerGuide } from '../document/types.ts';
 
 export const PROJECT_FORMAT = 'plastic';
@@ -21,6 +22,7 @@ export interface PageMeta {
 }
 
 export interface ProjectJson {
+  readonly importTrace?: ImportTrace;
   readonly thumbnail?: FileThumbnail;
   readonly components?: ComponentLibrary;
   readonly format: typeof PROJECT_FORMAT;
@@ -102,9 +104,11 @@ export function readProjectJson(text: string): ProjectJson {
 
   const components = readComponents(raw.components);
   const thumbnail = readThumbnail(raw.thumbnail);
+  const importTrace = readImportTrace(raw.importTrace);
   return {
     ...base,
     ...(thumbnail ? { thumbnail } : {}),
+    ...(importTrace ? { importTrace } : {}),
     ...(components ? { components } : {}),
     pages,
     canvas: { viewport, activePage, frames },
