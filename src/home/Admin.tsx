@@ -1,10 +1,13 @@
 /**
  * Waitlist and invites (admins only; the server checks ADMIN_EMAILS on every request).
  * People join from the landing page; inviting someone emails them a sign-up link, and only
- * invited emails can create an account.
+ * invited emails can create an account. Click a person to see what their account costs to run.
+ *
+ * Refreshing only reloads the data: the page stays put and the list shows skeleton rows.
  */
 import { Check, Copy, Mail, Megaphone, RefreshCw, Send, UserPlus } from 'lucide-react';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
+import { MemberPanel } from './MemberPanel.tsx';
 
 type Filter = 'waiting' | 'invited' | 'joined' | 'all';
 
@@ -85,18 +88,26 @@ export function AdminView() {
   const [manualLink, setManualLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [direct, setDirect] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<string | null>(null);
+  /** Only the latest request may update the list (switching filters quickly can't show stale rows). */
+  const request = useRef(0);
 
   const refresh = useCallback(async () => {
+    const id = ++request.current;
+    setLoading(true);
     setError(null);
     try {
-      setPage(await load(filter));
+      const next = await load(filter);
+      if (id === request.current) setPage(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (id === request.current) setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (id === request.current) setLoading(false);
     }
   }, [filter]);
 
   useEffect(() => {
-    setPage(null);
     void refresh();
   }, [refresh]);
 
@@ -167,8 +178,8 @@ export function AdminView() {
           <h1 className="home-title">Waitlist</h1>
           <p className="admin-lede">Plastic is invite-only. Invited people get an email with a sign-up link; only invited emails can create an account.</p>
         </div>
-        <button type="button" className="profile-button" onClick={() => void refresh()} aria-label="Refresh">
-          <RefreshCw size={13} strokeWidth={1.75} />
+        <button type="button" className="profile-button" onClick={() => void refresh()} disabled={loading} aria-label="Refresh">
+          <RefreshCw size={13} strokeWidth={1.75} className={loading ? 'admin-spin' : undefined} />
           Refresh
         </button>
       </header>
@@ -227,7 +238,7 @@ export function AdminView() {
         {FILTERS.map((f) => (
           <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} className={`admin-filter${filter === f.id ? ' is-active' : ''}`} onClick={() => setFilter(f.id)}>
             {f.label}
-            {page && <span className="admin-count">{page.counts[f.count]}</span>}
+            {page ? <span className="admin-count">{page.counts[f.count]}</span> : <span className="admin-count shimmer" aria-hidden="true" />}
           </button>
         ))}
       </div>
@@ -237,12 +248,11 @@ export function AdminView() {
           {error}
         </p>
       )}
-      {!error && page && page.entries.length === 0 && <p className="home-empty">{filter === 'waiting' ? 'Nobody is waiting right now.' : 'Nobody here yet.'}</p>}
-      {!error && !page && <p className="home-empty">Loading…</p>}
+      {!error && !loading && page && page.entries.length === 0 && <p className="home-empty">{filter === 'waiting' ? 'Nobody is waiting right now.' : 'Nobody here yet.'}</p>}
 
-      {page && page.entries.length > 0 && (
+      {!error && (loading || (page && page.entries.length > 0)) && (
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table className="admin-table" aria-busy={loading}>
             <thead>
               <tr>
                 <th scope="col">Person</th>
@@ -256,50 +266,85 @@ export function AdminView() {
               </tr>
             </thead>
             <tbody>
-              {page.entries.map((entry) => (
-                <tr key={entry.email}>
-                  <td>
-                    <div className="admin-person">{entry.name ?? entry.email}</div>
-                    {entry.name && <div className="admin-sub">{entry.email}</div>}
-                  </td>
-                  <td>{entry.role ? ROLE_LABELS[entry.role] ?? entry.role : '—'}</td>
-                  <td>{entry.teamSize ?? '—'}</td>
-                  <td className="admin-usecase" title={entry.useCase ?? undefined}>
-                    {entry.useCase ?? '—'}
-                  </td>
-                  <td>
-                    <div>{date.format(entry.createdAt)}</div>
-                    <div className="admin-sub">from {entry.source}</div>
-                  </td>
-                  <td className="admin-status">
-                    {entry.joined ? (
-                      <span className="admin-badge is-joined">
-                        <Check size={12} strokeWidth={2} />
-                        Joined
-                      </span>
-                    ) : entry.invitedAt ? (
-                      <button type="button" className="profile-button" disabled={busy !== null} onClick={() => void send(entry.email, true)} title={`Invited ${date.format(entry.invitedAt)}`}>
-                        <Send size={12} strokeWidth={1.75} />
-                        {busy === entry.email ? 'Sending…' : 'Resend'}
-                      </button>
-                    ) : (
-                      <button type="button" className="profile-button is-primary" disabled={busy !== null} onClick={() => void send(entry.email)}>
-                        <UserPlus size={12} strokeWidth={1.75} />
-                        {busy === entry.email ? 'Inviting…' : 'Invite'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {loading
+                ? Array.from({ length: Math.min(Math.max(page?.entries.length ?? 5, 3), 8) }, (_, i) => <SkeletonRow key={i} />)
+                : page!.entries.map((entry) => (
+                    <tr key={entry.email} className={`admin-row${selected === entry.email ? ' is-selected' : ''}`} onClick={() => setSelected(entry.email)}>
+                      <td>
+                        <button type="button" className="admin-person-button" onClick={() => setSelected(entry.email)} aria-label={`Show details for ${entry.email}`}>
+                          <div className="admin-person">{entry.name ?? entry.email}</div>
+                          {entry.name && <div className="admin-sub">{entry.email}</div>}
+                        </button>
+                      </td>
+                      <td>{entry.role ? ROLE_LABELS[entry.role] ?? entry.role : '—'}</td>
+                      <td>{entry.teamSize ?? '—'}</td>
+                      <td className="admin-usecase" title={entry.useCase ?? undefined}>
+                        {entry.useCase ?? '—'}
+                      </td>
+                      <td>
+                        <div>{date.format(entry.createdAt)}</div>
+                        <div className="admin-sub">from {entry.source}</div>
+                      </td>
+                      <td className="admin-status" onClick={stop}>
+                        {entry.joined ? (
+                          <span className="admin-badge is-joined">
+                            <Check size={12} strokeWidth={2} />
+                            Joined
+                          </span>
+                        ) : entry.invitedAt ? (
+                          <button type="button" className="profile-button" disabled={busy !== null} onClick={() => void send(entry.email, true)} title={`Invited ${date.format(entry.invitedAt)}`}>
+                            <Send size={12} strokeWidth={1.75} />
+                            {busy === entry.email ? 'Sending…' : 'Resend'}
+                          </button>
+                        ) : (
+                          <button type="button" className="profile-button is-primary" disabled={busy !== null} onClick={() => void send(entry.email)}>
+                            <UserPlus size={12} strokeWidth={1.75} />
+                            {busy === entry.email ? 'Inviting…' : 'Invite'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
             </tbody>
           </table>
         </div>
       )}
-      {page?.next && (
+      {!loading && page?.next && (
         <button type="button" className="profile-button admin-more" onClick={() => void more()}>
           Show more
         </button>
       )}
+      {selected && <MemberPanel email={selected} onClose={() => setSelected(null)} />}
     </div>
+  );
+}
+
+/** Row actions (invite, resend) don't also open the details panel. */
+const stop = (e: MouseEvent) => e.stopPropagation();
+
+function SkeletonRow() {
+  return (
+    <tr className="admin-skeleton" aria-hidden="true">
+      <td>
+        <span className="shimmer" style={{ width: 150 }} />
+        <span className="shimmer is-small" style={{ width: 110 }} />
+      </td>
+      <td>
+        <span className="shimmer" style={{ width: 64 }} />
+      </td>
+      <td>
+        <span className="shimmer" style={{ width: 36 }} />
+      </td>
+      <td>
+        <span className="shimmer" style={{ width: 200 }} />
+      </td>
+      <td>
+        <span className="shimmer" style={{ width: 84 }} />
+        <span className="shimmer is-small" style={{ width: 70 }} />
+      </td>
+      <td className="admin-status">
+        <span className="shimmer is-button" />
+      </td>
+    </tr>
   );
 }

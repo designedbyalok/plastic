@@ -11,6 +11,7 @@
  *   POST /api/waitlist     → join the waitlist (public); /api/admin/* → waitlist and invites
  *                             for ADMIN_EMAILS (see waitlist.ts)
  *   GET/POST /api/unsubscribe → release-notes opt-out (see releaseNotes.ts)
+ *   PUT/DELETE /api/profile/avatar, GET /api/avatars/* → profile photos (see avatar.ts)
  *   GET  /, /changelog, /download → the public site for visitors (see site.ts)
  */
 import { serveFilePreview, servePreviewImage } from './previews.ts';
@@ -23,6 +24,7 @@ import { activity, handleFolders } from './library.ts';
 import { serveSite } from './site.ts';
 import { handleAdmin, joinWaitlist } from './waitlist.ts';
 import { handleUnsubscribe } from './releaseNotes.ts';
+import { handleAvatarUpload, serveAvatar } from './avatar.ts';
 
 export { ProjectRoom } from './live.ts';
 
@@ -42,6 +44,8 @@ export default {
     // Emails go out after the response (waitUntil), so joining and inviting stay fast.
     if (url.pathname === '/api/waitlist') return emailContext.run(context, () => joinWaitlist(request, env));
     if (url.pathname === '/api/unsubscribe') return handleUnsubscribe(request, env);
+    const avatar = /^\/api\/avatars\/([^/]+)\/([^/]+)$/.exec(url.pathname);
+    if (avatar) return serveAvatar(request, env, avatar[1]!, avatar[2]!);
     if (url.pathname === '/api/health') {
       // Asked once per page load; the answer only changes on deploy, so let browsers reuse it.
       return Response.json({ auth: true, providers: providers(env) }, { headers: { 'cache-control': 'public, max-age=600' } });
@@ -50,7 +54,7 @@ export default {
       if (!env.BETTER_AUTH_SECRET) return json({ error: 'BETTER_AUTH_SECRET is not set.' }, 500);
       return emailContext.run(context, () => getAuth(env).handler(request));
     }
-    const scoped = ['/api/projects', '/api/folders', '/api/activity', '/api/admin'].find((p) => url.pathname === p || url.pathname.startsWith(`${p}/`));
+    const scoped = ['/api/projects', '/api/folders', '/api/activity', '/api/admin', '/api/profile'].find((p) => url.pathname === p || url.pathname.startsWith(`${p}/`));
     if (scoped) {
       if (!env.BETTER_AUTH_SECRET) return json({ error: 'BETTER_AUTH_SECRET is not set.' }, 500);
       const session = await getAuth(env).api.getSession({
@@ -66,6 +70,8 @@ export default {
       }
       const path = url.pathname.split('/').slice(3).filter(Boolean).map(decodeURIComponent);
       if (scoped === '/api/folders') return handleFolders(request, env, session.user.id, path);
+      if (scoped === '/api/profile')
+        return path.join('/') === 'avatar' ? handleAvatarUpload(request, env, session.user.id) : json({ error: 'Not found' }, 404);
       if (scoped === '/api/admin') return emailContext.run(context, () => handleAdmin(request, env, session.user, path));
       if (scoped === '/api/activity')
         return request.method === 'GET' ? activity(env, session.user.id) : json({ error: 'Method not allowed.' }, 405);

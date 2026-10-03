@@ -419,6 +419,30 @@ html.is-resizing-panel * {
   opacity: 0.6;
 }
 
+/* The layer's icon zooms the canvas to it (like Figma and Paper); it looks the same until hovered. */
+.layer-icon-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: 0 -3px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.layer-icon-button:hover {
+  background: rgb(var(--ink) / 0.08);
+}
+
+.layer-icon-button:hover .layer-icon {
+  opacity: 1;
+}
+
 .layer-name {
   flex: 1;
   min-width: 0;
@@ -1726,6 +1750,78 @@ textarea.insp-input {
   appearance: none;
 }
 
+/* App range slider (same look as the inspector's): a light fill on a faint track, plain white
+   knob, no accent color. The filled span runs from --from to --to (0% to the value by default;
+   a centered control like rotation fills outward from the middle). */
+.ui-range {
+  --from: 0%;
+  --to: 0%;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+.ui-range::-webkit-slider-runnable-track {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    to right,
+    rgb(var(--ink) / 0.1) var(--from),
+    rgb(var(--ink) / 0.25) var(--from) var(--to),
+    rgb(var(--ink) / 0.1) var(--to)
+  );
+}
+
+.ui-range::-moz-range-track {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    to right,
+    rgb(var(--ink) / 0.1) var(--from),
+    rgb(var(--ink) / 0.25) var(--from) var(--to),
+    rgb(var(--ink) / 0.1) var(--to)
+  );
+}
+
+.ui-range::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px #00000080;
+  appearance: none;
+  transition: scale 0.12s ease;
+}
+
+.ui-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px #00000080;
+}
+
+.ui-range:hover::-webkit-slider-thumb,
+.ui-range:active::-webkit-slider-thumb {
+  scale: 1.15;
+}
+
+.ui-range:focus-visible {
+  outline: none;
+}
+
+.ui-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgb(var(--ink) / 0.25), 0 1px 2px #00000080;
+}
+
+.ui-range:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgb(var(--ink) / 0.25), 0 1px 2px #00000080;
+}
+
 .insp-chip {
   display: inline-flex;
   align-items: center;
@@ -2900,3 +2996,101 @@ textarea.insp-input {
 @keyframes ai-reading-glow { 50% { outline-color: #dac4ff; box-shadow: 0 0 0 2px #c1b3ff20, 0 0 20px #c1b3ff30; } }
 @keyframes ai-reading-scan { from { transform: translateY(-30%); } to { transform: translateY(30%); } }
 @media (prefers-reduced-motion: reduce) { .ai-reading-frame, .ai-reading-sweep::after { animation: none; } .ai-reading-sweep::after { display: none; } }
+
+/* "Update available" after a deploy (UpdatePrompt.tsx). */
+.update-prompt {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  width: min(340px, calc(100vw - 32px));
+  padding: 20px;
+  border-radius: 16px;
+  corner-shape: superellipse(1.3);
+  background: var(--ui-panel);
+  box-shadow: var(--ui-popover-shadow);
+  color: var(--ui-text);
+  animation: update-in 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes update-in {
+  from {
+    translate: 0 12px;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-prompt {
+    animation: none;
+  }
+}
+
+.update-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  corner-shape: superellipse(1.3);
+  background: var(--ui-raised);
+  color: var(--ui-icon);
+}
+
+.update-title {
+  margin: 16px 0 4px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.update-body {
+  margin: 0;
+  color: var(--ui-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.update-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.update-primary,
+.update-secondary {
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  corner-shape: superellipse(1.3);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.update-primary {
+  flex: 1;
+  background: var(--ui-invert);
+  color: var(--ui-invert-text);
+}
+
+.update-primary:hover:not(:disabled) {
+  background: var(--ui-invert-hover);
+}
+
+.update-secondary {
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
+  color: var(--ui-text);
+}
+
+.update-secondary:hover:not(:disabled) {
+  background: var(--ui-raised);
+}
+
+.update-primary:disabled,
+.update-secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

@@ -2,8 +2,9 @@
  * Profile: who you are (name, @username) and what you've been doing — edits per day over the
  * last year, as a heat map or weekly bars, with streaks.
  */
-import { Check, Pencil, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Camera, Check, ImageUp, Loader2, Pencil, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AvatarEditor, prepareSource } from './AvatarEditor.tsx';
 import { useAccount } from '../auth/AuthGate.tsx';
 import { connectWorkspace, dayKey, type Activity, type Profile as ProfileData } from '../serialization/storage.ts';
 import { displayName } from './AccountMenu.tsx';
@@ -12,7 +13,8 @@ import { Logo } from '../app/Logo.tsx';
 
 const WEEKS = 53;
 const DAY_MS = 86_400_000;
-const USERNAME = /^[a-zA-Z0-9_.]{3,30}$/;
+/** Same rules as the server (worker/auth.ts): it re-checks everything, including reserved names. */
+const USERNAME_CHARS = /[^a-zA-Z0-9_.]/g;
 type Mode = 'daily' | 'weekly';
 
 interface Day {
@@ -102,7 +104,13 @@ export function ProfileView({ profile, onSaved }: { profile: ProfileData | null;
         )}
       </div>
       <div className="profile-identity">
-        {account || profile?.name ? <Avatar name={name} fallback={profile?.email ?? account?.email} size={96} /> : <Logo size={96} />}
+        {account ? (
+          <ProfilePhoto name={name} fallback={profile?.email ?? account.email} image={profile?.image ?? account.image} onChanged={onSaved} />
+        ) : profile?.name ? (
+          <Avatar name={name} fallback={profile?.email} size={96} />
+        ) : (
+          <Logo size={96} />
+        )}
         {editing ? (
           <ProfileForm
             profile={profile}
@@ -215,7 +223,8 @@ function ProfileForm({ profile, fallbackName, onCancel, onSaved }: { profile: Pr
   const [username, setUsername] = useState(profile?.username ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const usernameValid = !username || USERNAME.test(username);
+  const availability = useUsernameAvailability(username, profile?.username ?? null);
+  const usernameValid = !username || availability.state === 'available' || availability.state === 'current';
 
   const save = async () => {
     if (!usernameValid) return;
@@ -246,11 +255,27 @@ function ProfileForm({ profile, fallbackName, onCancel, onSaved }: { profile: Pr
       </label>
       <label className="profile-field">
         <span>Username</span>
-        <span className={`profile-username${usernameValid ? '' : ' is-invalid'}`}>
-          <span className="profile-at">@</span>
-          <input value={username} maxLength={30} spellCheck={false} autoCapitalize="off" onChange={(e) => setUsername(e.target.value.replace(/^@/, ''))} placeholder="username" />
+        <span className={`profile-username is-${availability.state}`}>
+          <span className="profile-at" aria-hidden="true">
+            @
+          </span>
+          <input
+            value={username}
+            maxLength={30}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoComplete="username"
+            aria-describedby="username-hint"
+            // Only letters, numbers, dots and underscores can be typed or pasted.
+            onChange={(e) => setUsername(e.target.value.replace(USERNAME_CHARS, ''))}
+            placeholder="username"
+          />
+          {availability.state === 'checking' && <Loader2 size={13} strokeWidth={2} className="profile-username-spin" aria-hidden="true" />}
+          {availability.state === 'available' && <Check size={13} strokeWidth={2.25} className="profile-username-ok" aria-hidden="true" />}
         </span>
-        <span className="profile-hint">{usernameValid ? '3–30 letters, numbers, dots or underscores.' : 'Use 3–30 letters, numbers, dots or underscores.'}</span>
+        <span id="username-hint" className={`profile-hint is-${availability.state}`} aria-live="polite">
+          {availability.message}
+        </span>
       </label>
       {error && (
         <p className="profile-error" role="alert">
@@ -268,5 +293,151 @@ function ProfileForm({ profile, fallbackName, onCancel, onSaved }: { profile: Pr
         </button>
       </div>
     </form>
+  );
+}
+
+type Availability = { state: 'empty' | 'invalid' | 'current' | 'checking' | 'available' | 'taken' | 'unknown'; message: string };
+
+/**
+ * Live username check: local rules first (instant), then the server's answer for whether the name
+ * is free (case-insensitive, so "Ada" and "ada" can't both exist). The server re-checks on save.
+ */
+function useUsernameAvailability(username: string, current: string | null): Availability {
+  const [remote, setRemote] = useState<{ name: string; result: Availability } | null>(null);
+  const name = username.trim();
+  const local: Availability | null = !name
+    ? { state: 'empty', message: '3–30 letters, numbers, dots or underscores.' }
+    : name.length < 3
+      ? { state: 'invalid', message: 'Use at least 3 characters.' }
+      : /^\.|\.$|\.\./.test(name)
+        ? { state: 'invalid', message: 'Dots can’t start or end a username, or appear twice in a row.' }
+        : current && name.toLowerCase() === current.toLowerCase()
+          ? { state: 'current', message: 'This is your username.' }
+          : null;
+
+  useEffect(() => {
+    if (local) return;
+    let live = true;
+    const timer = setTimeout(async () => {
+      let result: Availability;
+      try {
+        const response = await fetch('/api/auth/is-username-available', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: name }),
+        });
+        if (response.status === 422) result = { state: 'invalid', message: `@${name} isn’t allowed. Try another.` };
+        else if (!response.ok) throw new Error(String(response.status));
+        else {
+          const { available } = (await response.json()) as { available?: boolean };
+          result = available ? { state: 'available', message: `@${name} is available.` } : { state: 'taken', message: `@${name} is already taken. Try another.` };
+        }
+      } catch {
+        // Can't check right now (or no accounts here): saving still validates on the server.
+        result = { state: 'unknown', message: '3–30 letters, numbers, dots or underscores.' };
+      }
+      if (live) setRemote({ name, result });
+    }, 350);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [name, local === null]);
+
+  if (local) return local;
+  return remote?.name === name ? remote.result : { state: 'checking', message: `Checking @${name}…` };
+}
+
+/** The profile photo, with a camera button to upload (then crop) or remove it. */
+function ProfilePhoto({ name, fallback, image, onChanged }: { name: string; fallback?: string; image?: string | null; onChanged(): void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [source, setSource] = useState<string | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const choose = () => {
+    setMenu(false);
+    input.current?.click();
+  };
+
+  const upload = async (photo: Blob) => {
+    const response = await fetch('/api/profile/avatar', { method: 'PUT', headers: { 'content-type': photo.type }, body: photo });
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) throw new Error(data.error ?? 'Couldn’t save the photo. Try again.');
+    setSource(null);
+    onChanged();
+  };
+
+  const remove = async () => {
+    setMenu(false);
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/profile/avatar', { method: 'DELETE' });
+      if (!response.ok) throw new Error('Couldn’t remove the photo. Try again.');
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="profile-photo">
+      <Avatar name={name} fallback={fallback} image={image} size={96} />
+      {busy && (
+        <span className="profile-photo-busy" aria-hidden="true">
+          <Loader2 size={18} strokeWidth={2} className="profile-username-spin" />
+        </span>
+      )}
+      <button
+        type="button"
+        className="profile-photo-edit"
+        aria-label={image ? 'Change or remove photo' : 'Upload a photo'}
+        title={image ? 'Change photo' : 'Upload a photo'}
+        aria-expanded={image ? menu : undefined}
+        onClick={() => (image ? setMenu(!menu) : choose())}
+        disabled={busy}
+      >
+        <Camera size={14} strokeWidth={1.75} />
+      </button>
+      {menu && (
+        <div className="profile-photo-menu" role="menu">
+          <button type="button" role="menuitem" onClick={choose}>
+            <ImageUp size={14} strokeWidth={1.75} />
+            Change photo
+          </button>
+          <button type="button" role="menuitem" onClick={() => void remove()}>
+            <Trash2 size={14} strokeWidth={1.75} />
+            Remove photo
+          </button>
+        </div>
+      )}
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/*"
+        hidden
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          setError(null);
+          try {
+            setSource(await prepareSource(file));
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          }
+        }}
+      />
+      {error && (
+        <p className="profile-error" role="alert">
+          {error}
+        </p>
+      )}
+      {source && <AvatarEditor source={source} onChooseAnother={choose} onCancel={() => setSource(null)} onSave={upload} />}
+    </div>
   );
 }

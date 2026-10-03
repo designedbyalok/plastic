@@ -36,6 +36,14 @@ function schedule(delay = storage?.saveDelayMs ?? AUTOSAVE_MS): void {
   );
 }
 
+/** Before reloading the page (e.g. to update): finish text editing and any gesture, then save. */
+export async function flushForReload(): Promise<void> {
+  if (!sync) return;
+  finishTextEditing(true);
+  if (useEditor.getState().tx) useEditor.getState().commit('Finish edit');
+  await saveNow();
+}
+
 export async function saveNow(): Promise<void> {
   const state = useEditor.getState();
   const savingStorage = storage;

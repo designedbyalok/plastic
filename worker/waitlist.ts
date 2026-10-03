@@ -6,6 +6,7 @@
  *   GET  /api/admin/waitlist           admin   ?filter=waiting|invited|joined|all&before=<ms> → { entries, next, counts }
  *   POST /api/admin/invite             admin   { email, resend? } → { ok, emailed }
  *   POST /api/admin/release-notes      admin   send the current edition to members who haven't had it → { sent, remaining }
+ *   GET  /api/admin/members/<email>    admin   sign-ins, files, activity and storage for one person (see members.ts)
  *
  * Joining costs one D1 write (a repeat is a no-op) and the answer never reveals whether an email
  * was already listed. Admins are the emails in ADMIN_EMAILS.
@@ -13,6 +14,7 @@
 import type { Env } from './env.ts';
 import { deliverInBackground, sendEmail } from './emails.ts';
 import { RELEASE_NOTES_EDITION, pendingReleaseNotes, sendReleaseNotesBatch } from './releaseNotes.ts';
+import { checkEmail } from './emailCheck.ts';
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const error = (status: number, message: string) => json({ error: message }, status);
@@ -90,6 +92,9 @@ export async function joinWaitlist(request: Request, env: Env): Promise<Response
   if (typeof body.website === 'string' && body.website) return done();
   const email = normalizeEmail(body.email);
   if (!email) return error(400, 'Enter a valid email address.');
+  // Typos, temporary inboxes and domains that take no mail never reach the list (or an email).
+  const problem = await checkEmail(email);
+  if (problem) return json({ error: problem.message, reason: problem.reason, ...('suggestion' in problem ? { suggestion: problem.suggestion } : {}) }, 400);
   const now = Date.now();
   const added = await env.DB.prepare(
     'insert into waitlist (email, name, role, team_size, use_case, source, created_at) values (?, ?, ?, ?, ?, ?, ?) on conflict (email) do nothing',
@@ -170,6 +175,8 @@ export async function handleAdmin(request: Request, env: Env, admin: { email: st
     const body = await readJson(request);
     const email = normalizeEmail(body?.email);
     if (!email) return error(400, 'Enter a valid email address.');
+    const problem = await checkEmail(email);
+    if (problem) return json({ error: problem.message, reason: problem.reason, ...('suggestion' in problem ? { suggestion: problem.suggestion } : {}) }, 400);
     const now = Date.now();
     // Invite someone on the list, or add and invite them directly.
     const changed = await env.DB.prepare(
@@ -188,6 +195,16 @@ export async function handleAdmin(request: Request, env: Env, admin: { email: st
       sendEmail(env, 'invite', email, { actionUrl: signUp.href }, `invite:${email}:${now}`),
     );
     return json({ ok: true, emailed: true });
+  }
+
+  if (path[0] === 'members' && path.length === 2) {
+    if (request.method !== 'GET') return error(405, 'Method not allowed.');
+    const email = normalizeEmail(path[1]);
+    if (!email) return error(400, 'Enter a valid email address.');
+    // Loaded on demand: it reads project storage (projects.ts and live sync), which the
+    // waitlist and auth paths never need.
+    const { memberDetails } = await import('./members.ts');
+    return json(await memberDetails(env, email));
   }
 
   if (path[0] === 'release-notes' && path.length === 1) {

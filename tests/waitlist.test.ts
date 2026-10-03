@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Worker modules are imported by path so the browser typecheck doesn't pull in Worker types.
 const waitlistPath = '../worker/waitlist.ts';
@@ -9,6 +9,14 @@ const { handleAdmin, joinWaitlist, canCreateAccount } = await import(waitlistPat
 const { serveSite } = await import(sitePath);
 
 const ORIGIN = 'https://plastic.test';
+
+/** Mail lookups (DNS over HTTPS) answer "accepts mail"; everything else goes to `rest`. */
+function withMailDns(rest: (url: string, init: RequestInit) => Promise<Response> = async () => Response.json({})) {
+  return vi.fn(async (url: string, init: RequestInit) =>
+    String(url).startsWith('https://cloudflare-dns.com/') ? Response.json({ Status: 0, Answer: [{ type: 15, data: '10 mx.example.com.' }] }) : rest(url, init),
+  );
+}
+beforeEach(() => vi.stubGlobal('fetch', withMailDns()));
 
 /** In-memory SQLite with D1's prepare().bind() API. */
 function db() {
@@ -71,6 +79,17 @@ describe('waitlist', () => {
     expect(database.prepare('select count(*) as n from waitlist').get()).toEqual({ n: 1 });
   });
 
+  it('refuses typos (with the fix), temporary inboxes and domains without mail, before saving anything', async () => {
+    const { env: e, database } = env();
+    const typo = await join(e, { email: 'ada@gmaii.com' });
+    expect(typo.status).toBe(400);
+    expect(await typo.json()).toMatchObject({ reason: 'typo', suggestion: 'ada@gmail.com' });
+    expect((await (await join(e, { email: 'ada@mailinator.com' })).json()).reason).toBe('disposable');
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ Status: 3 })));
+    expect((await (await join(e, { email: 'ada@no-such-domain.test' })).json()).reason).toBe('no-mail');
+    expect(database.prepare('select count(*) as n from waitlist').get()).toEqual({ n: 0 });
+  });
+
   it('redirects plain form posts back to their page, and only to known pages', async () => {
     const { env: e } = env();
     const form = { 'content-type': 'application/x-www-form-urlencoded' };
@@ -86,7 +105,7 @@ describe('thank-you email', () => {
   afterEach(() => vi.unstubAllGlobals());
   const outbox = () => {
     const sent: { to: string[]; subject: string; html: string }[] = [];
-    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => (sent.push(JSON.parse(String(init.body))), Response.json({ id: 'x' }))));
+    vi.stubGlobal('fetch', withMailDns(async (_url, init) => (sent.push(JSON.parse(String(init.body))), Response.json({ id: 'x' }))));
     return sent;
   };
 

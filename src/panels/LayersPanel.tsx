@@ -6,6 +6,7 @@ import { ancestorIds, elementChildren, getElement } from '../document/tree.ts';
 import type { NodeId, Page } from '../document/types.ts';
 import { kindLabel, layerName } from '../elements/registry.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
+import { zoomToLayer } from '../editor/commands.ts';
 import { iconFor } from './icons.tsx';
 import { ThemePanel } from './ThemePanel.tsx';
 import { PanelResizer } from './PanelResizer.tsx';
@@ -339,16 +340,29 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         </button>
-        {doc.components?.definitions[id] || doc.components?.instances[id] ? (
-          <Diamond
-            size={12}
-            strokeWidth={doc.components.definitions[id] ? 2.5 : 1.5}
-            className="layer-icon"
-            aria-label={doc.components.definitions[id] ? 'Main Component' : 'Component Instance'}
-          />
-        ) : (
-          <Icon size={12} strokeWidth={1.75} className="layer-icon" />
-        )}
+        {/* The icon zooms the canvas to this layer (the row press has already selected it). */}
+        <button
+          type="button"
+          className="layer-icon-button"
+          tabIndex={-1}
+          title="Zoom to layer"
+          aria-label={`Zoom to ${name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            zoomToLayer(id);
+          }}
+        >
+          {doc.components?.definitions[id] || doc.components?.instances[id] ? (
+            <Diamond
+              size={12}
+              strokeWidth={doc.components.definitions[id] ? 2.5 : 1.5}
+              className="layer-icon"
+              aria-label={doc.components.definitions[id] ? 'Main Component' : 'Component Instance'}
+            />
+          ) : (
+            <Icon size={12} strokeWidth={1.75} className="layer-icon" />
+          )}
+        </button>
         {renaming ? (
           <input
             className="layer-rename"

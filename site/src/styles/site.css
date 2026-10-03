@@ -509,6 +509,18 @@ section {
   margin: 0;
 }
 
+.form-fix {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 .form-status.is-error {
   color: var(--danger);
 }

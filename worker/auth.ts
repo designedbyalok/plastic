@@ -10,6 +10,18 @@ import { deliverInBackground, emailContext, sendEmail, signInDevice } from './em
 import { canCreateAccount, isAdmin } from './waitlist.ts';
 import { sendReleaseNotes } from './releaseNotes.ts';
 
+/** Names people could mistake for Plastic itself, or that clash with app routes. */
+const RESERVED_USERNAMES = new Set([
+  'admin', 'administrator', 'plastic', 'useplastic', 'support', 'help', 'team', 'staff', 'official', 'security',
+  'billing', 'api', 'www', 'root', 'system', 'settings', 'account', 'profile', 'about', 'login', 'signin', 'signup',
+  'files', 'archive', 'file', 'changelog', 'download', 'mod', 'moderator', 'null', 'undefined', 'anonymous',
+]);
+
+/** Letters, numbers, dots and underscores; no dot at either end or two in a row; not reserved. */
+export function validUsername(username: string): boolean {
+  return /^[a-zA-Z0-9_.]+$/.test(username) && !/^\.|\.$|\.\./.test(username) && !RESERVED_USERNAMES.has(username.toLowerCase());
+}
+
 /** Shown when someone without an invite tries to create an account (any sign-up method). */
 export const INVITE_ONLY_MESSAGE = 'Plastic is invite-only for now. Join the waitlist at useplastic.app and we’ll email you an invite.';
 
@@ -142,8 +154,9 @@ export function createAuth(env: Env) {
         }
       : { databaseHooks: { user: { create: { before: inviteOnly } } } }),
     plugins: [
-      // @handles for profiles: 3–30 characters, letters, numbers, dots and underscores.
-      username({ minUsernameLength: 3, maxUsernameLength: 30 }),
+      // @handles for profiles: 3–30 characters, letters, numbers, dots and underscores. Unique
+      // regardless of case (the plugin compares lowercased names).
+      username({ minUsernameLength: 3, maxUsernameLength: 30, usernameValidator: validUsername }),
       ...(mailEnabled
         ? [
             magicLink({

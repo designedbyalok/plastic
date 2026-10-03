@@ -34,7 +34,7 @@ export function AccountMenu({ profile }: { profile: Profile | null }) {
   return (
     <div className="home-account-anchor" ref={ref}>
       <button type="button" className={`home-account${open ? ' is-open' : ''}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {hasPerson ? <Avatar name={name} fallback={profile?.email ?? account?.email} size={24} /> : <Logo size={24} />}
+        {hasPerson ? <Avatar name={name} fallback={profile?.email ?? account?.email} image={profile?.image ?? account?.image} size={24} /> : <Logo size={24} />}
         <span className="home-account-name" title={handle}>
           {name}
         </span>
@@ -43,7 +43,7 @@ export function AccountMenu({ profile }: { profile: Profile | null }) {
       {open && (
         <div className="home-menu home-account-menu" role="menu">
           <div className="home-account-card">
-            {hasPerson ? <Avatar name={name} fallback={profile?.email ?? account?.email} size={32} /> : <Logo size={32} />}
+            {hasPerson ? <Avatar name={name} fallback={profile?.email ?? account?.email} image={profile?.image ?? account?.image} size={32} /> : <Logo size={32} />}
             <div className="home-account-card-text">
               <div className="home-account-card-name">{name}</div>
               <div className="home-account-card-handle">{handle}</div>

@@ -3,7 +3,7 @@
  * pure document edit. Shortcuts, the tool rail, the inspector and (later) an agent API all call these.
  */
 import { enterVectorEdit, vectorTargetFor } from '../vector/edit.ts';
-import { fitRect, screenToWorld, unionRects, zoomAround, type Rect } from '../canvas/coords.ts';
+import { fitRect, screenToWorld, unionRects, zoomAround, type Rect, type Viewport } from '../canvas/coords.ts';
 import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf, styleOf } from '../canvas/dom.ts';
 import { instantiate } from '../document/factory.ts';
 import { duplicateNodes, insertRoot, removeNodes, setFrame, setStyleOnNodes, stripPosition, wrapInStack } from '../document/ops.ts';
@@ -246,6 +246,47 @@ export function zoomToFit(): void {
     });
   const union = unionRects(rects);
   if (union) state().setViewport(fitRect(union, screenSize()));
+}
+
+let viewportAnimation = 0;
+
+/** Glide the canvas to `target` (zoom eases geometrically, so it feels even at any scale). */
+export function animateViewport(target: Viewport, duration = 300): void {
+  cancelAnimationFrame(viewportAnimation);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    state().setViewport(target);
+    return;
+  }
+  const from = state().viewport;
+  const start = performance.now();
+  const step = (now: number) => {
+    const t = Math.min(1, (now - start) / duration);
+    const e = 1 - (1 - t) ** 3;
+    state().setViewport({
+      x: from.x + (target.x - from.x) * e,
+      y: from.y + (target.y - from.y) * e,
+      zoom: from.zoom * (target.zoom / from.zoom) ** e,
+    });
+    if (t < 1) viewportAnimation = requestAnimationFrame(step);
+  };
+  viewportAnimation = requestAnimationFrame(step);
+}
+
+/**
+ * Bring a layer into view, like Figma's and Paper's zoom to layer: fit it on screen without
+ * zooming past 200% on tiny elements. Hidden or empty elements use their nearest visible parent.
+ */
+export function zoomToLayer(id: NodeId): void {
+  const { doc } = state();
+  let current: NodeId | null = id;
+  while (current) {
+    const rect = screenRectOf(current);
+    if (rect && rect.width > 0 && rect.height > 0) {
+      animateViewport(fitRect(worldRectOf(rect), screenSize(), 96, 2));
+      return;
+    }
+    current = getParentId(doc, current);
+  }
 }
 
 export function zoomToSelection(): void {

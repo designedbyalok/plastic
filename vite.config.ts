@@ -18,8 +18,24 @@ function openPencilWorkerFix(): Plugin {
   };
 }
 
+/**
+ * Every production build gets an id, compiled into the app (__PLASTIC_BUILD__) and written to
+ * /version.json. Open tabs compare the two to offer "Update available" after a deploy; the file
+ * is a static asset, so checking it never runs the Worker or costs a request.
+ */
+function buildVersion(): Plugin {
+  const id = Date.now().toString(36);
+  return {
+    name: 'plastic-build-version',
+    config: (_, { command }) => ({ define: { __PLASTIC_BUILD__: JSON.stringify(command === 'build' && !process.env.VITEST ? id : 'dev') } }),
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ build: id }) });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [openPencilWorkerFix(), react(), process.env.VITEST ? null : plasticWorkspace()],
+  plugins: [openPencilWorkerFix(), react(), buildVersion(), process.env.VITEST ? null : plasticWorkspace()],
   worker: { format: 'es' },
   build: {
     rolldownOptions: {

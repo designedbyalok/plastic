@@ -111,7 +111,23 @@ const graph = [
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify(data),
             });
-            const body = (await response.json().catch(() => ({}))) as { error?: string };
+            const body = (await response.json().catch(() => ({}))) as { error?: string; suggestion?: string };
+            if (!response.ok && body.suggestion && status) {
+              // A likely typo ("gmaii.com"): offer the fix in one click; it fills the field and resends.
+              const suggestion = body.suggestion;
+              const fix = document.createElement('button');
+              fix.type = 'button';
+              fix.className = 'form-fix';
+              fix.textContent = suggestion;
+              fix.addEventListener('click', () => {
+                const input = form.querySelector<HTMLInputElement>('input[name="email"]');
+                if (input) input.value = suggestion;
+                form.requestSubmit();
+              });
+              status.classList.add('is-error');
+              status.replaceChildren('Check the spelling. Did you mean ', fix, '?');
+              return;
+            }
             if (!response.ok) throw new Error(body.error ?? 'Something went wrong. Please try again.');
             form.classList.add('is-joined');
             if (status) status.textContent = '';
