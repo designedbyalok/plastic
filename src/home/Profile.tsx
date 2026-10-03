@@ -9,6 +9,7 @@ import { useAccount } from '../auth/AuthGate.tsx';
 import { connectWorkspace, dayKey, type Activity, type Profile as ProfileData } from '../serialization/storage.ts';
 import { displayName } from './AccountMenu.tsx';
 import { Avatar } from './Avatar.tsx';
+import { ProfileActivitySkeleton } from '../app/Skeleton.tsx';
 import { Logo } from '../app/Logo.tsx';
 
 const WEEKS = 53;
@@ -135,6 +136,7 @@ export function ProfileView({ profile, onSaved }: { profile: ProfileData | null;
         )}
       </div>
 
+      {!activity ? <ProfileActivitySkeleton /> : <>
       <dl className="profile-stats">
         <Stat label="Files" value={activity ? number.format(activity.files) : '–'} />
         <Stat label="Edits This Year" value={activity ? number.format(stats.edits) : '–'} />
@@ -157,6 +159,7 @@ export function ProfileView({ profile, onSaved }: { profile: ProfileData | null;
         {mode === 'daily' ? <Heatmap weeks={weeks} /> : <WeeklyBars weeks={weeks} />}
         <Months weeks={weeks} />
       </section>
+      </>}
     </div>
   );
 }

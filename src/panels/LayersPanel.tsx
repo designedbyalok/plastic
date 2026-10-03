@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Diamond, EyeOff, File, Lock, PanelLeft, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Diamond, Eye, EyeOff, File, Lock, LockOpen, PanelLeft, Plus, X } from 'lucide-react';
 import { isHidden, isLocked, toggleHidden, toggleLocked } from '../editor/layerActions.ts';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { setName, setTitle } from '../document/ops.ts';
@@ -215,7 +215,7 @@ function LayersTree() {
       const delta = target.top < bounds.top + inset ? target.top - bounds.top - inset
         : target.bottom > bounds.bottom - inset ? target.bottom - bounds.bottom + inset : 0;
       if (delta) scroller.scrollTo({ top: scroller.scrollTop + delta,
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+        behavior: 'instant' });
     });
     return () => cancelAnimationFrame(raf);
   }, [selectionKey, page]);
@@ -235,6 +235,7 @@ function LayersTree() {
 function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
   const doc = useEditor((s) => s.doc);
   const selected = useEditor((s) => s.selection.includes(id));
+  const readOnly = useEditor((s) => s.readOnly);
   const hovered = useEditor((s) => s.hoverId === id);
   const collapsed = useEditor((s) => !!s.collapsed[id]);
   const [renaming, setRenaming] = useState(false);
@@ -258,6 +259,8 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
   const Icon = iconFor(el, isFlex ? (rule?.['flex-direction'] ?? 'row') : undefined);
   const name = layerName(doc, id);
   const kind = kindLabel(el);
+  const locked = isLocked(doc, id);
+  const hidden = isHidden(doc, id);
   const placementAt = (fraction: number): LayerPlacement => {
     if (!elementSpec(el.tag).acceptsChildren) return fraction < .5 ? 'before' : 'after';
     return fraction < .2 ? 'before' : fraction > .8 ? 'after' : 'inside';
@@ -320,7 +323,7 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
         data-layer-id={id}
         aria-selected={selected}
         aria-expanded={children.length ? !collapsed : undefined}
-        className={`layer-row${isHidden(doc, id) ? ' layer-is-hidden' : ''}${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}${drop ? ` drop-${drop}` : ''}`}
+        className={`layer-row${hidden ? ' layer-is-hidden' : ''}${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}${drop ? ` drop-${drop}` : ''}`}
         style={{ paddingLeft: 4 + depth * 12 }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
@@ -387,19 +390,36 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
         ) : (
           <span className="layer-name">{name}</span>
         )}
-        <span className="layer-tag">&lt;{el.tag}&gt;</span>
-        {isLocked(doc, id) && (
-          <button type="button" className="lp-row-state" title="Locked on the canvas. Click to unlock." aria-label="Unlock layer"
-            onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); toggleLocked([id]); }}>
-            <Lock size={12} strokeWidth={1.75} />
-          </button>
-        )}
-        {isHidden(doc, id) && (
-          <button type="button" className="lp-row-state" title="Hidden. Click to show." aria-label="Show layer"
-            onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); toggleHidden([id]); }}>
-            <EyeOff size={12} strokeWidth={1.75} />
-          </button>
-        )}
+        <button
+          type="button"
+          className={`lp-row-state lp-row-lock${locked ? ' is-locked' : ''}`}
+          title={locked ? 'Unlock Layer' : 'Lock Layer'}
+          aria-label={locked ? 'Unlock Layer' : 'Lock Layer'}
+          aria-pressed={locked}
+          disabled={readOnly}
+          draggable={false}
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onClick={(e) => { e.stopPropagation(); toggleLocked([id]); }}
+        >
+          {locked ? <Lock size={12} strokeWidth={1.75} /> : <LockOpen size={12} strokeWidth={1.75} />}
+        </button>
+        <button
+          type="button"
+          className={`lp-row-state lp-row-visibility${hidden ? ' is-hidden' : ''}`}
+          title={hidden ? 'Show Layer' : 'Hide Layer'}
+          aria-label={hidden ? 'Show Layer' : 'Hide Layer'}
+          aria-pressed={hidden}
+          disabled={readOnly}
+          draggable={false}
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onClick={(e) => { e.stopPropagation(); toggleHidden([id]); }}
+        >
+          {hidden ? <EyeOff size={12} strokeWidth={1.75} /> : <Eye size={12} strokeWidth={1.75} />}
+        </button>
       </div>
       {!collapsed && children.map((child) => <LayerRow key={child.id} id={child.id} depth={depth + 1} />)}
     </>

@@ -8,7 +8,7 @@ import { importClipboardHtml } from '../src/editor/clipboard';
 import { useEditor } from '../src/editor/store';
 import { instantiate } from '../src/document/factory';
 import { shapeSpec } from '../src/vector/shapes';
-import { insertRoot, setFrame, setTitle } from '../src/document/ops';
+import { insertRoot, setFrame, setTitle, setStyleOnNodes } from '../src/document/ops';
 import { docFrom, el } from './helpers';
 
 let root: Root;
@@ -25,6 +25,7 @@ function flushFrames() {
 }
 
 beforeEach(() => {
+  useEditor.setState({ readOnly: false });
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   frames = new Map();
@@ -68,6 +69,62 @@ function mount() {
 }
 
 describe('canvas selection in the layers panel', () => {
+  it('toggles visibility from the row without changing selection and restores its layout on show and undo', () => {
+    const fixture = mount();
+    act(() => useEditor.getState().select([fixture.child]));
+    act(() => useEditor.getState().apply('Set Flex', d => setStyleOnNodes(d, [fixture.parent], 'display', 'flex')));
+    flushFrames();
+    const row = container.querySelector(`[data-layer-id="${fixture.parent}"]`)!;
+    const button = row.querySelector<HTMLButtonElement>('[aria-label="Hide Layer"]')!;
+    act(() => {
+      button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      button.click();
+      button.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    });
+    const cls = el(useEditor.getState().doc, fixture.parent).classes[0]!;
+    expect(useEditor.getState().doc.styles.rules[cls]?.display).toBe('none');
+    expect(useEditor.getState().selection).toEqual([fixture.child]);
+    expect(button.getAttribute('aria-label')).toBe('Show Layer');
+    expect(button.classList.contains('is-hidden')).toBe(true);
+    expect(row.classList.contains('layer-is-hidden')).toBe(true);
+    expect(row.querySelector('.layer-rename')).toBeNull();
+    act(() => button.click());
+    expect(useEditor.getState().doc.styles.rules[cls]?.display).toBe('flex');
+    act(() => useEditor.getState().undo());
+    expect(useEditor.getState().doc.styles.rules[cls]?.display).toBe('none');
+    act(() => useEditor.getState().setReadOnly(true));
+    expect(button.disabled).toBe(true);
+    act(() => button.click());
+    expect(useEditor.getState().doc.styles.rules[cls]?.display).toBe('none');
+  });
+
+  it('replaces element tags with undoable lock actions without changing selection or starting a rename', () => {
+    const fixture = mount();
+    act(() => useEditor.getState().select([fixture.child]));
+    flushFrames();
+    const row = container.querySelector(`[data-layer-id="${fixture.parent}"]`)!;
+    expect(row.querySelector('.layer-tag')).toBeNull();
+    const lock = row.querySelector<HTMLButtonElement>('[aria-label="Lock Layer"]')!;
+    act(() => {
+      lock.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+      lock.click();
+      lock.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    });
+    expect(useEditor.getState().doc.locked).toContain(fixture.parent);
+    expect(useEditor.getState().selection).toEqual([fixture.child]);
+    expect(row.querySelector('.layer-rename')).toBeNull();
+    expect(lock.getAttribute('aria-label')).toBe('Unlock Layer');
+    expect(lock.getAttribute('aria-pressed')).toBe('true');
+    act(() => lock.click());
+    expect(useEditor.getState().doc.locked).not.toContain(fixture.parent);
+    act(() => useEditor.getState().undo());
+    expect(useEditor.getState().doc.locked).toContain(fixture.parent);
+    act(() => useEditor.getState().setReadOnly(true));
+    expect(lock.disabled).toBe(true);
+    act(() => lock.click());
+    expect(useEditor.getState().doc.locked).toContain(fixture.parent);
+  });
+
   it('nests a dragged frame into a collapsed frame, expands it, and restores the tree on undo', () => {
     const fixture = docFrom({ tag: 'main', children: [
       { tag: 'div', className: 'source', children: [{ tag: 'span', children: ['Content'] }] },
@@ -95,7 +152,7 @@ describe('canvas selection in the layers panel', () => {
     act(() => useEditor.getState().undo());
     expect(useEditor.getState().doc).toEqual(fixture.doc);
   });
-  it('expands ancestors, marks the selected row and smoothly reveals it without moving keyboard focus', () => {
+  it('expands ancestors, marks the selected row and instantly reveals it without moving keyboard focus', () => {
     const fixture = mount();
     const input = container.querySelector<HTMLInputElement>('.file-title')!;
     input.focus();
@@ -104,7 +161,7 @@ describe('canvas selection in the layers panel', () => {
     expect(useEditor.getState().collapsed[fixture.root]).toBeUndefined();
     expect(useEditor.getState().collapsed[fixture.parent]).toBeUndefined();
     expect(container.querySelector(`[data-layer-id="${fixture.child}"]`)?.getAttribute('aria-selected')).toBe('true');
-    expect(scroll).toHaveBeenCalledWith({ top: 153, behavior: 'smooth' });
+    expect(scroll).toHaveBeenCalledWith({ top: 153, behavior: 'instant' });
     expect(document.activeElement).toBe(input);
     scroll.mockClear();
     act(() => useEditor.getState().setCollapsed(fixture.root, true));

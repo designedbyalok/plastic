@@ -21,7 +21,7 @@ export function App() {
     <>
       <UpdatePrompt />
       <AuthGate>
-        <Suspense fallback={<AppSkeleton editor={route.name === 'file'} />}>{route.name === 'file' ? <Editor key={route.id} projectId={route.id} /> : <Home route={route} />}</Suspense>
+        <Suspense fallback={<AppSkeleton screen={route.name} />}>{route.name === 'file' ? <Editor key={route.id} projectId={route.id} /> : <Home route={route} />}</Suspense>
       </AuthGate>
     </>
   );

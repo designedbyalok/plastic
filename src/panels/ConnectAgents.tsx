@@ -3,6 +3,7 @@
  * write designs and tokens. One click where the agent offers a CLI or an install link; copyable
  * config for everything else.
  */
+import { PanelSkeleton } from '../app/Skeleton.tsx';
 import { Asterisk, Bot, Check, Code, Copy, Ellipsis, Loader, Minus, MousePointerClick, Plus, Rocket, SquareCode, SquareTerminal, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useEditor } from '../editor/store.ts';
@@ -171,7 +172,7 @@ export function ConnectAgents() {
             ))}
           </nav>
           <div className="agents-steps">
-            {error ? <p className="agents-error">{error}</p> : setup ? <AgentSteps key={agent.id} agent={agent} setup={setup} onRefresh={load} /> : <p className="agents-loading">Checking your agents…</p>}
+            {error ? <p className="agents-error">{error}</p> : setup ? <AgentSteps key={agent.id} agent={agent} setup={setup} onRefresh={load} /> : <PanelSkeleton label="Loading Agent Setup" rows={2} />}
           </div>
         </div>
         <footer className="dialog-footer">

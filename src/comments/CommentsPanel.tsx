@@ -2,6 +2,7 @@
  * The comments list (right panel while the Comment tool is on, as in Figma): every thread in the
  * file, newest activity first. Clicking one goes to its page and opens it beside its pin.
  */
+import { PanelSkeleton } from '../app/Skeleton.tsx';
 import { Check, ListFilter } from 'lucide-react';
 import { useState } from 'react';
 import { useEditor } from '../editor/store.ts';
@@ -42,7 +43,7 @@ export function CommentsPanel() {
         <CommentsFilter resolvedCount={resolvedCount} />
       </header>
       {!loaded ? (
-        <p className="comments-empty">Loading comments…</p>
+        <PanelSkeleton label="Loading Comments" />
       ) : !list.length ? (
         <p className="comments-empty">
           {threads.length ? 'All comments are resolved.' : 'No comments yet. Click anywhere on the canvas to leave one.'}

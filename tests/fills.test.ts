@@ -77,7 +77,7 @@ it('embeds an uploaded image, sets image sizing, and retains undo', async () => 
   Object.defineProperty(input, 'files', { value: [file] });
   await act(async () => {
     input.dispatchEvent(new Event('change', { bubbles: true }));
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await expect.poll(() => css().background, { timeout: 2000 }).toContain('url("data:image/png;base64,');
   });
   expect(css().background).toContain('url("data:image/png;base64,');
   expect(css()['background-size']).toBe('cover');

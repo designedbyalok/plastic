@@ -264,15 +264,15 @@ function PanelSkeleton() {
   const rows = (n: number) =>
     Array.from({ length: n }, (_, i) => (
       <div className="member-row" key={i}>
-        <span className="shimmer" style={{ width: 96 + ((i * 37) % 50) }} />
-        <span className="shimmer" style={{ width: 64 + ((i * 23) % 40) }} />
+        <span className="chrome-skeleton shimmer" style={{ width: 96 + ((i * 37) % 50) }} />
+        <span className="chrome-skeleton shimmer" style={{ width: 64 + ((i * 23) % 40) }} />
       </div>
     ));
   return (
     <div aria-busy="true" aria-label="Loading">
       {[6, 7, 4].map((n, i) => (
         <section className="member-section" key={i}>
-          <span className="shimmer is-small" style={{ width: 90, marginBottom: 14 }} />
+          <span className="chrome-skeleton shimmer is-small" style={{ width: 90, marginBottom: 14 }} />
           {rows(n)}
         </section>
       ))}

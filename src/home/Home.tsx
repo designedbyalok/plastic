@@ -1,4 +1,4 @@
-import { FileSkeletons } from '../app/Skeleton.tsx';
+import { FileSkeletons, ProfileSkeleton } from '../app/Skeleton.tsx';
 /**
  * Home: the person's files. Recents (everything, most recently edited first), Files (organized
  * in folders), the Archive, and their Profile. Each file is a folder of HTML and CSS; its name
@@ -304,7 +304,7 @@ export function Home({ route }: { route: HomeRoute }) {
           </section>
         ) : route.name === 'profile' && !searching ? (
           <section className="home-files" aria-label="Profile">
-            <ProfileView profile={profile} onSaved={() => void refresh()} />
+            {files === null ? (loadError ? null : <ProfileSkeleton />) : <ProfileView profile={profile} onSaved={() => void refresh()} />}
           </section>
         ) : (
           <>

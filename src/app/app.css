@@ -453,18 +453,13 @@ html.is-resizing-panel * {
   text-overflow: ellipsis;
 }
 
-/* The element's tag, shown on hover/selection: the semantics stay one glance away. */
+/* Page file labels; element semantics remain in layer tooltips. */
 .layer-tag {
   flex: none;
   color: var(--ui-faint);
   font-family: var(--ui-mono);
   font-size: 10.5px;
   opacity: 0;
-}
-
-.layer-row:hover .layer-tag,
-.layer-row.is-selected .layer-tag {
-  opacity: 1;
 }
 
 .layer-rename {
@@ -3275,3 +3270,19 @@ textarea.insp-input {
 .comments-item-head svg { flex: none; color: var(--ui-success); }
 .comments-item-body { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; overflow-wrap: anywhere; }
 .comments-item-meta { color: var(--ui-muted); font-size: 11px; }
+
+/* Layer actions appear on interaction; hidden and locked states remain visible. */
+.lp-row-lock, .lp-row-visibility { opacity: 0; }
+.layer-row:hover .lp-row-lock,
+.layer-row.is-hovered .lp-row-lock,
+.layer-row.is-selected .lp-row-lock,
+.layer-row:focus-within .lp-row-lock,
+.lp-row-lock.is-locked,
+.layer-row:hover .lp-row-visibility,
+.layer-row.is-hovered .lp-row-visibility,
+.layer-row.is-selected .lp-row-visibility,
+.layer-row:focus-within .lp-row-visibility,
+.lp-row-visibility.is-hidden { opacity: 1; }
+.lp-row-lock:focus-visible, .lp-row-visibility:focus-visible { outline: 1px solid var(--ui-accent); outline-offset: 1px; }
+.lp-row-lock:disabled, .lp-row-visibility:disabled { cursor: default; }
+@media (hover: none) { .lp-row-lock, .lp-row-visibility { opacity: 1; } }

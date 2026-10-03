@@ -45,3 +45,29 @@
 .skeleton-file-list .skeleton-preview { height: 36px; margin: 0; }
 .skeleton-code { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
 @media (max-width: 800px) { .skeleton-inspector { display: none; } .skeleton-sidebar { flex-basis: 180px; } .skeleton-main { padding: 24px 20px; } }
+/* Screen-specific silhouettes share one quiet chrome material. */
+.app-skeleton.is-home { background: var(--ui-home, #242424); }
+.is-home .skeleton-sidebar { flex-basis: 212px; }
+.is-home .skeleton-main { padding: 32px 80px; }
+.skeleton-profile { max-width: 760px; margin: 24px auto; }
+.skeleton-profile-identity { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 24px 0 32px; }
+.skeleton-profile-identity .skeleton-line { width: 150px; height: 20px; }
+.skeleton-profile-identity .skeleton-line.short { width: 100px; height: 12px; }
+.skeleton-avatar { width: 96px; height: 96px; border-radius: 50%; margin-bottom: 10px; }
+.skeleton-profile-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; padding: 20px 12px; margin-bottom: 40px; }
+.skeleton-profile-stats > div { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.skeleton-profile-stats .skeleton-line { width: 80%; }
+.skeleton-profile-stats .skeleton-line.short { width: 45%; height: 18px; }
+.skeleton-activity-grid { width: 100%; height: 112px; mask-image: radial-gradient(circle at center, #000 4px, transparent 4.5px); mask-size: calc(100% / 53) 16px; }
+.skeleton-profile .skeleton-toolbar, .profile .skeleton-toolbar { margin-bottom: 14px; }
+.skeleton-panel { padding: 16px; display: grid; gap: 24px; }
+.skeleton-panel-row { display: flex; flex-direction: column; gap: 10px; }
+.skeleton-admin-tabs { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.skeleton-admin .skeleton-panel { padding: 16px 0; }
+.skeleton-admin .skeleton-panel-row { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 24px; padding: 12px 0; }
+.skeleton-auth { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: var(--ui-home, #242424); }
+.skeleton-auth-card { width: min(360px, 100%); padding: 28px 24px 22px; display: flex; flex-direction: column; gap: 14px; border-radius: 16px; background: var(--ui-panel, #282828); }
+.skeleton-auth-mark { width: 40px; height: 40px; margin-bottom: 4px; }
+.skeleton-auth-field { height: 34px; width: 100%; border-radius: 8px; }
+@media (max-width: 800px) { .is-home .skeleton-main { padding: 24px 20px; } .skeleton-profile-stats { gap: 8px; } }
+@media (max-width: 500px) { .skeleton-profile-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 24px; } }

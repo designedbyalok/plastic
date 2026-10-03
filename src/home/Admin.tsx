@@ -277,7 +277,7 @@ export function AdminView() {
         {FILTERS.map((f) => (
           <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} className={`admin-filter${filter === f.id ? ' is-active' : ''}`} onClick={() => setFilter(f.id)}>
             {f.label}
-            {page ? <span className="admin-count">{page.counts[f.count]}</span> : <span className="admin-count shimmer" aria-hidden="true" />}
+            {page ? <span className="admin-count">{page.counts[f.count]}</span> : <span className="admin-count chrome-skeleton shimmer" aria-hidden="true" />}
           </button>
         ))}
       </div>
@@ -517,24 +517,24 @@ function SkeletonRow() {
   return (
     <tr className="admin-skeleton" aria-hidden="true">
       <td>
-        <span className="shimmer" style={{ width: 150 }} />
-        <span className="shimmer is-small" style={{ width: 110 }} />
+        <span className="chrome-skeleton shimmer" style={{ width: 150 }} />
+        <span className="chrome-skeleton shimmer is-small" style={{ width: 110 }} />
       </td>
       <td>
-        <span className="shimmer" style={{ width: 64 }} />
+        <span className="chrome-skeleton shimmer" style={{ width: 64 }} />
       </td>
       <td>
-        <span className="shimmer" style={{ width: 36 }} />
+        <span className="chrome-skeleton shimmer" style={{ width: 36 }} />
       </td>
       <td>
-        <span className="shimmer" style={{ width: 200 }} />
+        <span className="chrome-skeleton shimmer" style={{ width: 200 }} />
       </td>
       <td>
-        <span className="shimmer" style={{ width: 84 }} />
-        <span className="shimmer is-small" style={{ width: 70 }} />
+        <span className="chrome-skeleton shimmer" style={{ width: 84 }} />
+        <span className="chrome-skeleton shimmer is-small" style={{ width: 70 }} />
       </td>
       <td className="admin-status">
-        <span className="shimmer is-button" />
+        <span className="chrome-skeleton shimmer is-button" />
       </td>
     </tr>
   );

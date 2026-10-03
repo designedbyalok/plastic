@@ -1899,8 +1899,7 @@
   height: 12px;
   max-width: 100%;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--home-fill) 0%, var(--home-fill-strong) 40%, var(--home-fill) 80%) 0 0 / 300% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+  background: color-mix(in srgb, var(--home-text-secondary) 10%, transparent);
 }
 
 .shimmer.is-small {
@@ -1920,15 +1919,6 @@
   width: 18px;
   height: 16px;
   border-radius: 999px;
-}
-
-@keyframes shimmer {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: 0% 0;
-  }
 }
 
 .admin-spin {
