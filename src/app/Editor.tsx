@@ -22,6 +22,7 @@ type Status = 'opening' | 'open' | 'missing' | 'error';
 export function Editor({ projectId }: { projectId: string }) {
   const codeOpen = useEditor((s) => s.codeOpen);
   const agentsOpen = useEditor((s) => s.agentsOpen);
+  const uiHidden = useEditor((s) => s.uiHidden);
   const title = useEditor((s) => s.doc.title);
   const [status, setStatus] = useState<Status>('opening');
   const [openError, setOpenError] = useState('');
@@ -90,19 +91,19 @@ export function Editor({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="app editor">
+    <div className={`app editor${uiHidden ? ' is-ui-hidden' : ''}`}>
       <div className="workspace">
-        <LayersPanel />
-        <ToolRail />
+        {!uiHidden && <LayersPanel />}
+        {!uiHidden && <ToolRail />}
         <main className="stage">
           {status === 'open' && <Canvas />}
-          {codeOpen && (
+          {codeOpen && !uiHidden && (
             <Suspense fallback={<CodeSkeleton />}>
               <CodePanel />
             </Suspense>
           )}
         </main>
-        <Inspector />
+        {!uiHidden && <Inspector />}
       </div>
       {agentsOpen && <ConnectAgents />}
     </div>

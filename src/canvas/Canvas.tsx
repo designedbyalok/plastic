@@ -154,7 +154,7 @@ export function Canvas() {
     const hit = vectorRootOf(store.doc, deepest) ?? deepest;
     if (!hit) store.select([]);
     else if (!store.selection.includes(hit)) store.select([hit]);
-    setMenuAt({ x: e.clientX, y: e.clientY });
+    setMenuAt({ x: e.clientX, y: e.clientY, target: hit ? 'layers' : 'canvas' });
   };
 
   // The menu sits outside the canvas: React events from its portal would otherwise bubble into

@@ -136,7 +136,7 @@ function InspectorHeader() {
   );
 }
 
-/** Links to this file or its frames. Anyone with the link can view; only the owner can edit. */
+/** Links to this file or its frames. They unfurl with a preview card; only the owner can open the file. */
 function ShareMenu() {
   const [open, setOpen] = useState(false);
   const frame = useEditor((s) => {
@@ -167,7 +167,7 @@ function ShareMenu() {
             <span>Copy frame context for AI</span>
           </Menu.Item>
           <Menu.Separator className="insp-menu-divider" />
-          <p className="insp-share-note">Anyone with a link can view this file. Only the owner can edit it.</p>
+          <p className="insp-share-note">Links show a preview card when shared. Only you can open and edit this file.</p>
         </MenuContent>
       )}
     </span></Menu.Root>

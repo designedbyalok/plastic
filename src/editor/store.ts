@@ -85,6 +85,8 @@ export interface EditorState {
   readonly rulersVisible: boolean;
   readonly codeOpen: boolean;
   readonly layersOpen: boolean;
+  /** Panels and toolbar hidden ("."), leaving only the canvas. Not remembered. */
+  readonly uiHidden: boolean;
   /** Left panel width in px (a per-browser preference). */
   readonly layersWidth: number;
   /** The "Connect your agent" dialog. */
@@ -119,6 +121,7 @@ export interface EditorState {
   setVectorEdit(edit: VectorEdit | null): void;
   setCodeOpen(open: boolean): void;
   setLayersOpen(open: boolean): void;
+  setUiHidden(hidden: boolean): void;
   setLayersWidth(width: number): void;
   setAgentsOpen(open: boolean): void;
   setShortcutsOpen(open: boolean): void;
@@ -183,6 +186,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   rulersVisible: readPref('plastic:rulers') === '1',
   codeOpen: false,
   layersOpen: readPref('plastic:layers-open') !== '0',
+  uiHidden: false,
   layersWidth: clampPanelWidth(Number(readPref('plastic:layers-width')) || PANEL_WIDTH.default),
   agentsOpen: false,
   shortcutsOpen: false,
@@ -332,6 +336,9 @@ export const useEditor = create<EditorState>()((set, get) => ({
   },
   setCodeOpen(open) {
     set({ codeOpen: open });
+  },
+  setUiHidden(hidden) {
+    set({ uiHidden: hidden });
   },
   setLayersOpen(open) {
     set({ layersOpen: open });

@@ -14,6 +14,7 @@ import type { DesignDocument, NodeId } from '../document/types.ts';
 import { frameSpec } from '../elements/insertables.ts';
 import { elementSpec } from '../elements/registry.ts';
 import { activeRoots, useEditor } from './store.ts';
+import { notify } from '../canvas/gestureStore.ts';
 import { selectFont } from '../document/fonts.ts';
 import { DEFAULT_TEXT_FONT } from '../elements/insertables.ts';
 
@@ -372,4 +373,32 @@ export function zoomToSelection(): void {
   const union = unionRects(rects);
   if (union) state().setViewport(fitRect(union, screenSize(), 96, 4));
   else zoomToFit();
+}
+
+/**
+ * Select and zoom to the next (or previous) artboard on the page, in layer order, wrapping
+ * around. Starts from the artboard holding the selection.
+ */
+export function cycleArtboard(step: 1 | -1): void {
+  const store = state();
+  const roots = activeRoots(store);
+  if (!roots.length) return;
+  const current = store.selection.length ? rootOfNode(store.doc, store.selection.at(-1)!) : null;
+  const index = current ? roots.indexOf(current) : -1;
+  const next = roots[index < 0 ? (step > 0 ? 0 : roots.length - 1) : (index + step + roots.length) % roots.length]!;
+  store.select([next]);
+  zoomToLayer(next);
+}
+
+function rootOfNode(doc: DesignDocument, id: NodeId): NodeId {
+  let current = id;
+  for (let parent = getParentId(doc, current); parent; parent = getParentId(doc, current)) current = parent;
+  return current;
+}
+
+/** Hide or show the panels and toolbar (".") for an uncluttered canvas. */
+export function toggleUi(): void {
+  const hidden = !state().uiHidden;
+  state().setUiHidden(hidden);
+  if (hidden) notify('Press . to show the interface');
 }

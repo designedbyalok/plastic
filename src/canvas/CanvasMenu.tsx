@@ -4,18 +4,20 @@
  */
 import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { addFlexOrWrap, duplicateSelection } from '../editor/commands.ts';
+import { addFlexOrWrap, cycleArtboard, duplicateSelection, toggleUi } from '../editor/commands.ts';
+import { toScreen } from './dom.ts';
 import { copySelectionToClipboard, pasteFromSystemClipboard } from '../editor/clipboard.ts';
 import { copyFrameContext, copyFrameLink } from '../editor/frameLinks.ts';
 import {
   copyAs, copyStyles, frameSelection, hasCopiedStyles, isHidden, isLocked, pasteStyles, reorderSelection,
   toggleHidden, toggleLocked, ungroupSelection,
 } from '../editor/layerActions.ts';
-import { useEditor } from '../editor/store.ts';
+import { activeRoots, useEditor } from '../editor/store.ts';
 import { getElement } from '../document/tree.ts';
 import { Menu, MenuContent } from '../panels/ui/Menu.tsx';
 
-export type CanvasMenuAt = { x: number; y: number } | null;
+/** Where the menu opened (client point) and on what: layers, or empty canvas. */
+export type CanvasMenuAt = { x: number; y: number; target: 'layers' | 'canvas' } | null;
 
 function Item({ label, kbd, run, disabled }: { label: ReactNode; kbd?: string; run(): void; disabled?: boolean }) {
   return (
@@ -37,6 +39,7 @@ export function CanvasMenu({ at, onClose }: { at: CanvasMenuAt; onClose(): void 
   const hidden = primary ? isHidden(doc, primary) : false;
   const locked = primary ? isLocked(doc, primary) : false;
   // Read when the menu opens (they live outside the store).
+  const artboards = useEditor(activeRoots).length > 0;
   const canPasteStyles = some && hasCopiedStyles();
 
   return (
@@ -44,7 +47,17 @@ export function CanvasMenu({ at, onClose }: { at: CanvasMenuAt; onClose(): void 
       <Menu.Trigger asChild>
         <span aria-hidden="true" className="canvas-menu-anchor" style={at ? { left: at.x, top: at.y } : undefined} />
       </Menu.Trigger>
-      {at && (
+      {at?.target === 'canvas' && (
+        <MenuContent align="start" side="bottom" sideOffset={2} aria-label="Canvas actions" className="canvas-menu" onCloseAutoFocus={(e) => e.preventDefault()}>
+          <Item label="Paste" kbd="⌘V" run={() => void pasteFromSystemClipboard('normal', toScreen(at.x, at.y))} />
+          <Divider />
+          <Item label="Next artboard" kbd="N" disabled={!artboards} run={() => cycleArtboard(1)} />
+          <Item label="Previous artboard" kbd="⇧N" disabled={!artboards} run={() => cycleArtboard(-1)} />
+          <Divider />
+          <Item label="Hide UI" kbd="." run={toggleUi} />
+        </MenuContent>
+      )}
+      {at?.target === 'layers' && (
         <MenuContent align="start" side="bottom" sideOffset={2} aria-label="Layer actions" className="canvas-menu" onCloseAutoFocus={(e) => e.preventDefault()}>
           <Item label="Copy" kbd="⌘C" disabled={!some} run={() => void copySelectionToClipboard()} />
           <Item label="Copy link" kbd="⌘L" disabled={!some} run={() => void copyFrameLink(primary)} />

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { INSERTABLES } from '../elements/insertables.ts';
 import {
-  addFlexOrWrap, deleteSelection, toggleClipContent, duplicateSelection, enterSelection, nudgeSelection, selectParent,
+  addFlexOrWrap, cycleArtboard, deleteSelection, toggleUi, toggleClipContent, duplicateSelection, enterSelection, nudgeSelection, selectParent,
   zoomBy, zoomTo, zoomToFit, zoomToSelection,
 } from './commands.ts';
 import { navigate } from '../app/router.ts';
@@ -181,6 +181,7 @@ export function useShortcuts(enabled = true): void {
           return;
         }
         if (key === 'a') addFlexOrWrap();
+        else if (key === 'n') cycleArtboard(-1);
         else if (e.code === 'Digit0') zoomTo(1);
         else if (e.code === 'Digit1') zoomToFit();
         else if (e.code === 'Digit2') zoomToSelection();
@@ -234,6 +235,12 @@ export function useShortcuts(enabled = true): void {
           break;
         case 'o':
           store.setTool({ kind: 'shape', shape: 'ellipse' });
+          break;
+        case 'n':
+          cycleArtboard(1);
+          break;
+        case '.':
+          toggleUi();
           break;
         default: {
           if (e.shiftKey) return;

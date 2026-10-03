@@ -179,6 +179,7 @@ export function handleCanvasPaste(e: ClipboardEvent, artboardHint?: NodeId): voi
   const store = useEditor.getState();
   const mode = nextPasteMode;
   nextPasteMode = 'normal';
+  nextPastePoint = null; // a keyboard paste lands in view, not where a menu last opened
   if (e.defaultPrevented || ownsTextPaste(e) || store.editingTextId || store.agentsOpen || store.tx) return;
   const html = e.clipboardData?.getData('text/html') ?? '';
   const text = e.clipboardData?.getData('text/plain') ?? '';
@@ -188,8 +189,20 @@ export function handleCanvasPaste(e: ClipboardEvent, artboardHint?: NodeId): voi
   pasteContent({ html, text, token }, mode, artboardHint);
 }
 
+/** Where the next canvas paste lands (a point in the canvas, set by a right-click), once. */
+let nextPastePoint: Point | null = null;
+
+/** The world position for pasted layers: the right-clicked point, or a third into the view. */
+function pastePosition(): Point {
+  const viewport = getViewportElement();
+  const at = nextPastePoint ?? { x: (viewport?.clientWidth ?? window.innerWidth) / 3, y: (viewport?.clientHeight ?? window.innerHeight) / 3 };
+  nextPastePoint = null;
+  return screenToWorld(at, useEditor.getState().viewport);
+}
+
 /** Paste from the system clipboard without a paste event (the canvas menu, ⇧⌘R). */
-export async function pasteFromSystemClipboard(mode: PasteMode): Promise<void> {
+export async function pasteFromSystemClipboard(mode: PasteMode, at?: Point): Promise<void> {
+  nextPastePoint = at ?? null;
   let html = '';
   let text = '';
   try {
@@ -236,8 +249,7 @@ function pasteContent(content: { html: string; text: string; token: string }, mo
       return;
     }
     const artboard = pasteArtboard(store.doc, store.activePage, store.selection, artboardHint);
-    const viewport = getViewportElement();
-    const position = screenToWorld({ x: (viewport?.clientWidth ?? window.innerWidth) / 3, y: (viewport?.clientHeight ?? window.innerHeight) / 3 }, store.viewport);
+    const position = pastePosition();
     const result = importClipboardHtml(store.doc, artboard, markup, { page: store.activePage, position });
     store.apply(artboard ? 'Paste into artboard' : 'Paste onto canvas', () => result.doc, { select: result.ids });
     store.setTool({ kind: 'select' });
@@ -415,9 +427,7 @@ function pasteNative(mode: PasteMode, hint?: NodeId): void {
     }
     const selected = state.selection.length === 1 ? getElement(state.doc, state.selection[0]) : null;
     const parent = selected && elementSpec(selected.tag).acceptsChildren ? selected.id : hint ?? null;
-    const viewport = getViewportElement();
-    const position = screenToWorld({ x: (viewport?.clientWidth ?? window.innerWidth) / 3,
-      y: (viewport?.clientHeight ?? window.innerHeight) / 3 }, state.viewport);
+    const position = pastePosition();
     const result = paste(state.doc, parent, position);
     state.apply('Paste Layers', () => result.doc, { select: result.ids });
     copy.used = true;
