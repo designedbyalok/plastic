@@ -109,6 +109,8 @@ export interface DesignDocument {
   readonly frames: Readonly<Record<NodeId, Point>>;
   /** User-given layer names. Editor metadata (project.json). */
   readonly names: Readonly<Record<NodeId, string>>;
+  /** Locked layers: not selectable or movable on the canvas (the Layers panel still can). Editor metadata. */
+  readonly locked?: readonly NodeId[];
 }
 
 export interface ComponentInstance {

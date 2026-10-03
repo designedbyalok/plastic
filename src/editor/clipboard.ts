@@ -9,12 +9,12 @@ import { createId } from '../document/ids.ts';
 import { VOID_TAGS } from '../document/markup.ts';
 import { getViewportElement } from '../canvas/dom.ts';
 import { screenToWorld } from '../canvas/coords.ts';
-import { getElement, getParentId, rootOf, topmostIds, textContent } from '../document/tree.ts';
+import { getElement, getParentId, pageOf, rootOf, topmostIds, textContent } from '../document/tree.ts';
 import type { DesignDocument, DocNode, NodeId, Point } from '../document/types.ts';
 import { escapeText, parseHTML } from '../serialization/html.ts';
 import { serializeNode } from '../serialization/html.ts';
 import { pastePlasticNodes } from '../document/clipboardNodes.ts';
-import { removeNodes } from '../document/ops.ts';
+import { insertRoot, moveNode, removeNodes, setFrame, setStyleOnNodes, stripPosition } from '../document/ops.ts';
 import { domElement, styleOf } from '../canvas/dom.ts';
 import { elementSpec } from '../elements/registry.ts';
 import { notify } from '../canvas/gestureStore.ts';
@@ -162,19 +162,83 @@ export function importClipboardHtml(doc: DesignDocument, artboard: NodeId | null
   return { doc: loadInterFont(normalizeInterFonts({ ...doc, nodes, names, styles, frames, pages })), ids: parsed.roots };
 }
 
+/**
+ * How a paste places its layers: normally (into the selected container, or onto the canvas),
+ * "on top" of the copied layers (same parent and position, Figma's ⇧⌘V), or "replace" (in
+ * place of each selected layer, which is removed, ⇧⌘R).
+ */
+export type PasteMode = 'normal' | 'over' | 'replace';
+
+/** ⇧⌘V still pastes through the browser's paste event; the key handler sets the mode for it. */
+let nextPasteMode: PasteMode = 'normal';
+export function setNextPasteMode(mode: PasteMode): void {
+  nextPasteMode = mode;
+}
+
 export function handleCanvasPaste(e: ClipboardEvent, artboardHint?: NodeId): void {
   const store = useEditor.getState();
+  const mode = nextPasteMode;
+  nextPasteMode = 'normal';
   if (e.defaultPrevented || ownsTextPaste(e) || store.editingTextId || store.agentsOpen || store.tx) return;
-  if (pasteNativeSelection(e, artboardHint)) return;
-  const html = e.clipboardData?.getData('text/html');
-  const text = e.clipboardData?.getData('text/plain');
-  if (!html && !text) return;
+  const html = e.clipboardData?.getData('text/html') ?? '';
+  const text = e.clipboardData?.getData('text/plain') ?? '';
+  const token = e.clipboardData?.getData(PLASTIC_CLIPBOARD) || tokenIn(html);
+  if (!html && !text && !token) return;
   e.preventDefault();
-  const artboard = pasteArtboard(store.doc, store.activePage, store.selection, artboardHint);
+  pasteContent({ html, text, token }, mode, artboardHint);
+}
+
+/** Paste from the system clipboard without a paste event (the canvas menu, ⇧⌘R). */
+export async function pasteFromSystemClipboard(mode: PasteMode): Promise<void> {
+  let html = '';
+  let text = '';
   try {
+    for (const item of await navigator.clipboard.read()) {
+      if (!html && item.types.includes('text/html')) html = await (await item.getType('text/html')).text();
+      if (!text && item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+    }
+  } catch {
+    // Reading may be refused; layers copied in this tab can still be pasted.
+    if (!captured) {
+      notify('Allow clipboard access to paste here, or press ⌘V.');
+      return;
+    }
+  }
+  const token = tokenIn(html) || (!html && !text && captured ? captured.token : '');
+  if (!html && !text && !token) {
+    notify('The clipboard is empty.');
+    return;
+  }
+  pasteContent({ html, text, token }, mode);
+}
+
+function tokenIn(html: string): string {
+  return /data-plastic-token="([^"]+)"/.exec(html)?.[1] ?? '';
+}
+
+function pasteContent(content: { html: string; text: string; token: string }, mode: PasteMode, artboardHint?: NodeId): void {
+  if (content.token && captured && content.token === captured.token) {
+    pasteNative(mode, artboardHint);
+    return;
+  }
+  const { html, text } = content;
+  if (!html && !text) return;
+  const store = useEditor.getState();
+  const markup = html || `<div style="white-space: pre-wrap">${escapeText(text)}</div>`;
+  try {
+    if (mode === 'replace') {
+      const targets = topmostIds(store.doc, store.selection).filter((id) => getElement(store.doc, id));
+      if (!targets.length) return notify('Select layers to replace.');
+      store.apply('Paste to Replace', (doc) => replaceEach(doc, targets, (d, parent, position) => importClipboardHtml(d, parent, markup, { page: store.activePage, position })), {
+        select: [],
+      });
+      notify('Replaced');
+      return;
+    }
+    const artboard = pasteArtboard(store.doc, store.activePage, store.selection, artboardHint);
     const viewport = getViewportElement();
     const position = screenToWorld({ x: (viewport?.clientWidth ?? window.innerWidth) / 3, y: (viewport?.clientHeight ?? window.innerHeight) / 3 }, store.viewport);
-    const result = importClipboardHtml(store.doc, artboard, html || `<div style="white-space: pre-wrap">${escapeText(text!)}</div>`, { page: store.activePage, position });
+    const result = importClipboardHtml(store.doc, artboard, markup, { page: store.activePage, position });
     store.apply(artboard ? 'Paste into artboard' : 'Paste onto canvas', () => result.doc, { select: result.ids });
     store.setTool({ kind: 'select' });
     notify(artboard ? 'Pasted into artboard' : 'Pasted onto canvas');
@@ -183,59 +247,186 @@ export function handleCanvasPaste(e: ClipboardEvent, artboardHint?: NodeId): voi
   }
 }
 
+/**
+ * For each target: paste (via `paste`, into the target's parent or onto its page), move the
+ * pasted layers to where the target was, then remove the target.
+ */
+function replaceEach(
+  doc: DesignDocument,
+  targets: readonly NodeId[],
+  paste: (doc: DesignDocument, parent: NodeId | null, position: Point) => { doc: DesignDocument; ids: NodeId[] },
+): DesignDocument {
+  let next = doc;
+  const pasted: NodeId[] = [];
+  for (const target of targets) {
+    if (!next.nodes[target]) continue;
+    const parent = getParentId(next, target);
+    const page = pageOf(next, target);
+    const frame = next.frames[target] ?? { x: 0, y: 0 };
+    const result = paste(next, parent, frame);
+    next = result.doc;
+    next = placeAt(next, result.ids, target);
+    pasted.push(...result.ids);
+    if (parent) next = takePlaceOf(next, result.ids, target);
+    if (!parent && page) result.ids.forEach((id, i) => (next = setFrame(next, id, { x: frame.x + i * 32, y: frame.y + i * 32 })));
+    next = removeNodes(next, [target]);
+  }
+  queueMicrotask(() => useEditor.getState().select(pasted.filter((id) => useEditor.getState().doc.nodes[id])));
+  return next;
+}
+
+/** Inside a frame, a replacement sits where the replaced layer was: at its offset, or in its flow. */
+function takePlaceOf(doc: DesignDocument, ids: readonly NodeId[], target: NodeId): DesignDocument {
+  const cls = getElement(doc, target)?.classes[0];
+  const rule = cls ? doc.styles.rules[cls] ?? {} : {};
+  let next = doc;
+  for (const id of ids) {
+    if (!getElement(next, id)) continue;
+    next = stripPosition(next, id);
+    if (rule.position !== 'absolute' && rule.position !== 'fixed') continue;
+    for (const prop of ['position', 'left', 'top', 'right', 'bottom']) if (rule[prop]) next = setStyleOnNodes(next, [id], prop, rule[prop]!);
+  }
+  return next;
+}
+
+/** Move freshly pasted layers to sit right after `anchor` (same parent, or same page for roots). */
+function placeAt(doc: DesignDocument, ids: readonly NodeId[], anchor: NodeId): DesignDocument {
+  let next = doc;
+  const parent = getParentId(next, anchor);
+  if (parent) {
+    let index = getElement(next, parent)!.children.indexOf(anchor) + 1;
+    for (const id of ids) next = moveNode(next, id, parent, index++);
+    return next;
+  }
+  const page = pageOf(next, anchor);
+  if (!page) return next;
+  for (const id of ids) {
+    // Roots are reordered on their page: take each out and put it back after the anchor.
+    const pages = next.pages.map((p) => (p.file === page.file ? { ...p, roots: p.roots.filter((r) => r !== id) } : p));
+    next = { ...next, pages };
+    const roots = next.pages.find((p) => p.file === page.file)!.roots;
+    next = insertRoot(next, page.file, roots.indexOf(anchor) + 1, id);
+  }
+  return next;
+}
+
 
 const PLASTIC_CLIPBOARD = 'application/x-plastic-selection';
 let captured: { token: string; doc: DesignDocument; ids: NodeId[]; cut: boolean; used: boolean; assetBase: string | null } | null = null;
 
+/** The selection as clipboard content: Plastic layers (by token) plus portable HTML and text. */
+function selectionClipboard(): { token: string; ids: NodeId[]; html: string; text: string } | null {
+  const state = useEditor.getState();
+  const ids = topmostIds(state.doc, state.selection).filter((id) => getElement(state.doc, id));
+  if (!ids.length) return null;
+  const token = createId();
+  // A portable computed-style fallback supports other tabs and ordinary HTML destinations.
+  const fragment = new DOMParser().parseFromString(ids.map((id) => serializeNode(state.doc, id)).join(''), 'text/html');
+  for (const el of Array.from(fragment.body.querySelectorAll('[data-pl-id]'))) {
+    const live = domElement(el.getAttribute('data-pl-id'));
+    if (live) {
+      const css = styleOf(live);
+      el.setAttribute('style', Array.from(css).filter((prop) => !prop.startsWith('--')).map((prop) => `${prop}: ${css.getPropertyValue(prop)};`).join(''));
+      for (const attr of ['src', 'poster', 'href']) {
+        const value = el.getAttribute(attr);
+        if (value && !value.startsWith('#')) el.setAttribute(attr, new URL(value, live.ownerDocument.baseURI).href);
+      }
+    }
+  }
+  // The token also rides in the HTML, so pastes that only see HTML (the async clipboard API
+  // can't write custom types) still restore the original layers.
+  return { token, ids, html: `<x-paper-html data-plastic-token="${token}">${fragment.body.innerHTML}</x-paper-html>`, text: ids.map((id) => textContent(state.doc, id)).join('\n') };
+}
+
+function remember(token: string, ids: NodeId[], cut: boolean): void {
+  const state = useEditor.getState();
+  captured = { token, doc: state.doc, ids, cut, used: false, assetBase: state.assetBase };
+  if (cut) {
+    const parent = getParentId(state.doc, ids[0]!);
+    state.apply('Cut Layers', (doc) => removeNodes(doc, ids), { select: parent ? [parent] : [] });
+    notify('Layers Cut');
+  } else notify('Layers Copied');
+}
+
 export function handleCanvasCopy(e: ClipboardEvent, cut = false): void {
   const state = useEditor.getState();
   if (e.defaultPrevented || ownsTextPaste(e) || state.editingTextId || state.tx || state.agentsOpen || !e.clipboardData) return;
-  const ids = topmostIds(state.doc, state.selection).filter((id) => getElement(state.doc, id));
-  if (!ids.length) return;
   try {
-    const token = createId();
-    // A portable computed-style fallback supports other tabs and ordinary HTML destinations.
-    const fragment = new DOMParser().parseFromString(ids.map((id) => serializeNode(state.doc, id)).join(''), 'text/html');
-    for (const el of Array.from(fragment.body.querySelectorAll('[data-pl-id]'))) {
-      const live = domElement(el.getAttribute('data-pl-id'));
-      if (live) {
-        const css = styleOf(live);
-        el.setAttribute('style', Array.from(css).filter((prop) => !prop.startsWith('--')).map((prop) => `${prop}: ${css.getPropertyValue(prop)};`).join(''));
-        for (const attr of ['src', 'poster', 'href']) {
-          const value = el.getAttribute(attr);
-          if (value && !value.startsWith('#')) el.setAttribute(attr, new URL(value, live.ownerDocument.baseURI).href);
-        }
-      }
-    }
-    e.clipboardData.setData(PLASTIC_CLIPBOARD, token);
-    e.clipboardData.setData('text/html', `<x-paper-html>${fragment.body.innerHTML}</x-paper-html>`);
-    e.clipboardData.setData('text/plain', ids.map((id) => textContent(state.doc, id)).join('\n'));
-    captured = { token, doc: state.doc, ids, cut, used: false, assetBase: state.assetBase };
+    const content = selectionClipboard();
+    if (!content) return;
+    e.clipboardData.setData(PLASTIC_CLIPBOARD, content.token);
+    e.clipboardData.setData('text/html', content.html);
+    e.clipboardData.setData('text/plain', content.text);
     e.preventDefault();
-    if (cut) {
-      const parent = getParentId(state.doc, ids[0]!);
-      state.apply('Cut Layers', (doc) => removeNodes(doc, ids), { select: parent ? [parent] : [] });
-      notify('Layers Cut');
-    } else notify('Layers Copied');
+    remember(content.token, content.ids, cut);
   } catch (error) { notify(error instanceof Error ? error.message : 'Could not copy layers.'); }
 }
 
-function pasteNativeSelection(e: ClipboardEvent, hint?: NodeId): boolean {
-  const token = e.clipboardData?.getData(PLASTIC_CLIPBOARD);
-  if (!captured || !token || token !== captured.token) return false;
-  e.preventDefault();
-  const state = useEditor.getState();
-  const selected = state.selection.length === 1 ? getElement(state.doc, state.selection[0]) : null;
-  const parent = selected && elementSpec(selected.tag).acceptsChildren ? selected.id : hint ?? null;
-  const viewport = getViewportElement();
-  const position = screenToWorld({ x: (viewport?.clientWidth ?? window.innerWidth) / 3,
-    y: (viewport?.clientHeight ?? window.innerHeight) / 3 }, state.viewport);
+/** Copy the selection without a copy event (the canvas menu). */
+export async function copySelectionToClipboard(): Promise<void> {
   try {
-    const result = pastePlasticNodes(state.doc, captured.doc, captured.ids, parent, state.activePage, position, captured.cut && !captured.used, captured.assetBase !== state.assetBase ? captured.assetBase ?? undefined : undefined);
+    const content = selectionClipboard();
+    if (!content) return;
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'text/html': new Blob([content.html], { type: 'text/html' }), 'text/plain': new Blob([content.text], { type: 'text/plain' }) }),
+      ]);
+    } catch {
+      // Without clipboard access the layers can still be pasted in this tab.
+    }
+    remember(content.token, content.ids, false);
+  } catch (error) { notify(error instanceof Error ? error.message : 'Could not copy layers.'); }
+}
+
+function pasteNative(mode: PasteMode, hint?: NodeId): void {
+  if (!captured) return;
+  const copy = captured;
+  const state = useEditor.getState();
+  const assetBase = copy.assetBase !== state.assetBase ? copy.assetBase ?? undefined : undefined;
+  const preserve = copy.cut && !copy.used;
+  const paste = (doc: DesignDocument, parent: NodeId | null, position: Point) =>
+    pastePlasticNodes(doc, copy.doc, copy.ids, parent, state.activePage, position, preserve, assetBase);
+  try {
+    if (mode === 'replace') {
+      const targets = topmostIds(state.doc, state.selection).filter((id) => getElement(state.doc, id));
+      if (!targets.length) return notify('Select layers to replace.');
+      state.apply('Paste to Replace', (doc) => replaceEach(doc, targets, paste), {});
+      copy.used = true;
+      notify('Replaced');
+      return;
+    }
+    // On top: where the copied layers are (if they're still here), right above them.
+    const originals = copy.ids.filter((id) => state.doc.nodes[id]);
+    if (mode === 'over' && originals.length === copy.ids.length) {
+      const anchor = originals.at(-1)!;
+      const parent = getParentId(state.doc, anchor);
+      const origin = state.doc.frames[copy.ids[0]!] ?? { x: 0, y: 0 };
+      state.apply('Paste on Top', (doc) => {
+        const result = paste(doc, parent, origin);
+        let next = placeAt(result.doc, result.ids, anchor);
+        if (!parent) result.ids.forEach((id, i) => (next = setFrame(next, id, doc.frames[copy.ids[i]!] ?? origin)));
+        queueMicrotask(() => useEditor.getState().select(result.ids));
+        return next;
+      }, {});
+      copy.used = true;
+      state.setTool({ kind: 'select' });
+      notify('Pasted on top');
+      return;
+    }
+    const selected = state.selection.length === 1 ? getElement(state.doc, state.selection[0]) : null;
+    const parent = selected && elementSpec(selected.tag).acceptsChildren ? selected.id : hint ?? null;
+    const viewport = getViewportElement();
+    const position = screenToWorld({ x: (viewport?.clientWidth ?? window.innerWidth) / 3,
+      y: (viewport?.clientHeight ?? window.innerHeight) / 3 }, state.viewport);
+    const result = paste(state.doc, parent, position);
     state.apply('Paste Layers', () => result.doc, { select: result.ids });
-    captured.used = true;
+    copy.used = true;
     state.setTool({ kind: 'select' });
     notify('Layers Pasted');
   } catch (error) { notify(error instanceof Error ? error.message : 'Could not paste layers.'); }
-  return true;
+}
+
+/** Whether there is anything this tab copied (for enabling menu items). */
+export function hasCopiedLayers(): boolean {
+  return captured !== null;
 }

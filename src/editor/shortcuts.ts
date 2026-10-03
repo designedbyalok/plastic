@@ -13,7 +13,8 @@ import { runOutlineStroke, runPathOp } from '../vector/pathOps.ts';
 import { setSnapPref, snapPrefs } from '../canvas/snap.ts';
 import { notify } from '../canvas/gestureStore.ts';
 import { copyFrameLink } from './frameLinks.ts';
-import { handleCanvasCopy, handleCanvasPaste } from './clipboard.ts';
+import { handleCanvasCopy, handleCanvasPaste, pasteFromSystemClipboard, setNextPasteMode } from './clipboard.ts';
+import { copyStyles, frameSelection, pasteStyles, reorderSelection, toggleHidden, toggleLocked, ungroupSelection } from './layerActions.ts';
 
 /** Keys in vector edit mode. Returns whether the key was handled. */
 function handleVectorKey(e: KeyboardEvent, key: string, mod: boolean): boolean {
@@ -132,6 +133,32 @@ export function useShortcuts(enabled = true): void {
       if (mod && !e.shiftKey && key === 'e') {
         e.preventDefault();
         void runPathOp('flatten');
+        return;
+      }
+      // Layer actions (the canvas menu's keys). Codes, not keys: Alt and Shift change e.key.
+      if (mod && e.shiftKey && !e.altKey && e.code === 'KeyV') {
+        // The browser's paste event still fires and carries the clipboard; this marks it "on top".
+        setNextPasteMode('over');
+        return;
+      }
+      const layerAction = (() => {
+        if (mod && e.altKey && !e.shiftKey) return ({ KeyC: copyStyles, KeyV: pasteStyles } as Record<string, () => void>)[e.code];
+        if (mod && e.shiftKey && !e.altKey) {
+          return ({
+            KeyR: () => void pasteFromSystemClipboard('replace'),
+            KeyG: ungroupSelection,
+            KeyH: toggleHidden,
+            KeyL: toggleLocked,
+          } as Record<string, () => void>)[e.code];
+        }
+        if (e.altKey || e.shiftKey) return e.shiftKey && !mod && e.code === 'KeyF' ? frameSelection : undefined;
+        if (e.code === 'BracketRight') return () => reorderSelection(mod ? 'forward' : 'front');
+        if (e.code === 'BracketLeft') return () => reorderSelection(mod ? 'backward' : 'back');
+        return undefined;
+      })();
+      if (layerAction) {
+        e.preventDefault();
+        layerAction();
         return;
       }
       if (mod) {

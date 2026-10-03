@@ -306,7 +306,7 @@ export function zoomTo(zoom: number): void {
   state().setViewport(zoomAround(viewport, { x: size.width / 2, y: size.height / 2 }, zoom));
 }
 
-function worldRectOf(screenRect: Rect): Rect {
+export function worldRectOf(screenRect: Rect): Rect {
   const { viewport } = state();
   const p = screenToWorld({ x: screenRect.x, y: screenRect.y }, viewport);
   return { x: p.x, y: p.y, width: screenRect.width / viewport.zoom, height: screenRect.height / viewport.zoom };

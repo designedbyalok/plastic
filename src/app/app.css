@@ -3151,3 +3151,18 @@ textarea.insp-input {
 .insp-token-slot:has(> .paint-color-row) { gap: 6px; }
 .insp-token-slot > .paint-color-row { flex: 1; width: 0; }
 .insp-token-slot:has(> .paint-color-row) > .insp-token-button { position: static; flex: none; width: 20px; height: 24px; background: transparent; opacity: 1; }
+
+/* Canvas right-click menu: anchored at the pointer. */
+.canvas-menu-anchor { position: fixed; width: 0; height: 0; pointer-events: none; }
+/* The whole list shows at once (no scrolling): compact rows, no height cap. Radix shifts it to fit. */
+.insp-menu.plastic-menu-portal.canvas-menu { min-width: 184px; max-height: none; overflow: visible; padding: 4px; }
+.canvas-menu .insp-menu-item { height: 24px; gap: 16px; padding: 0 8px; font-size: 12px; }
+.canvas-menu .insp-menu-divider { margin: 3px -4px; }
+.canvas-menu .insp-menu-item kbd { font-family: inherit; font-size: 11px; letter-spacing: 0.02em; }
+.canvas-menu .insp-menu-item svg { flex: none; color: var(--ui-faint); }
+.canvas-menu .insp-menu-item[data-state='open'] { background: var(--ui-raised); }
+.insp-share-menu { min-width: 248px; }
+.insp-share-note { max-width: 232px; white-space: normal; margin: 0; padding: 6px 8px 4px; color: var(--ui-muted); font-size: 11px; line-height: 1.4; }
+.lp-row-state { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--ui-muted); cursor: pointer; }
+.lp-row-state:hover { color: var(--ui-text); background: rgb(var(--ink) / 0.08); }
+.layer-is-hidden .layer-name, .layer-is-hidden .layer-icon { opacity: 0.45; }

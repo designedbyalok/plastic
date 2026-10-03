@@ -37,6 +37,8 @@ export interface ProjectJson {
   readonly layers: {
     readonly names: Readonly<Record<NodeId, string>>;
     readonly collapsed: readonly NodeId[];
+    /** Written only when something is locked. */
+    readonly locked?: readonly NodeId[];
   };
 }
 
@@ -96,6 +98,7 @@ export function readProjectJson(text: string): ProjectJson {
     ? layers.collapsed.filter((id): id is string => typeof id === 'string')
     : [];
   const activePage = typeof canvas.activePage === 'string' ? canvas.activePage : null;
+  const locked = Array.isArray(layers.locked) ? layers.locked.filter((id): id is string => typeof id === 'string') : [];
 
   const components = readComponents(raw.components);
   const thumbnail = readThumbnail(raw.thumbnail);
@@ -105,7 +108,7 @@ export function readProjectJson(text: string): ProjectJson {
     ...(components ? { components } : {}),
     pages,
     canvas: { viewport, activePage, frames },
-    layers: { names, collapsed },
+    layers: { names, collapsed, ...(locked.length ? { locked } : {}) },
   };
 }
 

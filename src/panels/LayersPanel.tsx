@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronRight, Diamond, File, PanelLeft, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Diamond, EyeOff, File, Lock, PanelLeft, Plus, X } from 'lucide-react';
+import { isHidden, isLocked, toggleHidden, toggleLocked } from '../editor/layerActions.ts';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { setName, setTitle } from '../document/ops.ts';
 import { addPage, nextPageName, removePage, renamePage } from '../document/pages.ts';
@@ -319,7 +320,7 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
         data-layer-id={id}
         aria-selected={selected}
         aria-expanded={children.length ? !collapsed : undefined}
-        className={`layer-row${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}${drop ? ` drop-${drop}` : ''}`}
+        className={`layer-row${isHidden(doc, id) ? ' layer-is-hidden' : ''}${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}${drop ? ` drop-${drop}` : ''}`}
         style={{ paddingLeft: 4 + depth * 12 }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
@@ -387,6 +388,18 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
           <span className="layer-name">{name}</span>
         )}
         <span className="layer-tag">&lt;{el.tag}&gt;</span>
+        {isLocked(doc, id) && (
+          <button type="button" className="lp-row-state" title="Locked on the canvas. Click to unlock." aria-label="Unlock layer"
+            onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); toggleLocked([id]); }}>
+            <Lock size={12} strokeWidth={1.75} />
+          </button>
+        )}
+        {isHidden(doc, id) && (
+          <button type="button" className="lp-row-state" title="Hidden. Click to show." aria-label="Show layer"
+            onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); toggleHidden([id]); }}>
+            <EyeOff size={12} strokeWidth={1.75} />
+          </button>
+        )}
       </div>
       {!collapsed && children.map((child) => <LayerRow key={child.id} id={child.id} depth={depth + 1} />)}
     </>

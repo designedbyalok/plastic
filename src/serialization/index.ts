@@ -56,7 +56,11 @@ export function serializeProject(
     files: { styles: STYLES_FILE, tokens: TOKENS_FILE },
     pages: doc.pages.map((p) => ({ file: p.file, name: p.name, ...(p.canvas ? { canvas: p.canvas } : {}), ...(p.guides?.length ? { guides: p.guides.filter((g) => !g.frame || doc.nodes[g.frame]) } : {}) })),
     canvas: { viewport: meta.viewport, activePage: meta.activePage, frames: pick(doc.frames, roots) },
-    layers: { names: pick(doc.names, Object.keys(doc.nodes)), collapsed: meta.collapsed.filter((id) => doc.nodes[id]) },
+    layers: {
+      names: pick(doc.names, Object.keys(doc.nodes)),
+      collapsed: meta.collapsed.filter((id) => doc.nodes[id]),
+      ...(doc.locked?.some((id) => doc.nodes[id]) ? { locked: doc.locked.filter((id) => doc.nodes[id]) } : {}),
+    },
   };
   const files: Record<string, string> = {};
   for (const page of doc.pages) files[page.file] = serializeHTML(doc, page);
@@ -128,6 +132,7 @@ export function parseProject(
     tokens,
     frames,
     names: pick(project.layers.names, Object.keys(nodes)),
+    ...(project.layers.locked?.some((id) => nodes[id]) ? { locked: project.layers.locked.filter((id) => nodes[id]) } : {}),
   };
   const activePage = pages.some((p) => p.file === project.canvas.activePage) ? project.canvas.activePage : null;
   return {

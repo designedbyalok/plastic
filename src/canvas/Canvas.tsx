@@ -3,12 +3,14 @@ import { AiReadingOverlay } from './AiReadingOverlay.tsx';
  * The spatial editing environment: a viewport containing a transformed "world" layer of
  * artboards (real DOM) and a screen-space overlay. Pointer input is routed to gestures.
  */
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { selectableTarget } from '../editor/layerActions.ts';
+import { CanvasMenu, type CanvasMenuAt } from './CanvasMenu.tsx';
 import { canEditText } from '../editor/commands.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
 import { ArtboardHost } from './ArtboardHost.tsx';
 import { zoomAround } from './coords.ts';
-import { nodeIdAt, setViewportElement, toScreen } from './dom.ts';
+import { nodeIdAt, setHitFilter, setViewportElement, toScreen } from './dom.ts';
 import { insertAt, startFrameDraw, startPan, startSelectGesture } from './gestures.ts';
 import { Rulers } from './Rulers.tsx';
 import { Overlay } from './Overlay.tsx';
@@ -26,11 +28,14 @@ export function Canvas() {
   const viewport = useEditor((s) => s.viewport);
   const tool = useEditor((s) => s.tool);
   const spacePressed = useEditor((s) => s.spacePressed);
+  const [menuAt, setMenuAt] = useState<CanvasMenuAt>(null);
   useTextEditing();
 
   useEffect(() => {
     const el = ref.current!;
     setViewportElement(el);
+    // Locked layers can't be picked on the canvas: clicks go to the layer that contains them.
+    setHitFilter((id) => selectableTarget(useEditor.getState().doc, id));
     // Wheel pans; pinch (ctrl+wheel on trackpads) or cmd/ctrl+wheel zooms around the pointer.
     const onWheel = (e: WheelEvent) => {
       finishTextEditing(true);
@@ -63,6 +68,7 @@ export function Canvas() {
       resize.disconnect();
       el.removeEventListener('wheel', onWheel);
       setViewportElement(null);
+      setHitFilter(null);
     };
   }, []);
 
@@ -138,9 +144,26 @@ export function Canvas() {
     }
   };
 
+  const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const store = useEditor.getState();
+    if (store.vectorEdit || store.editingTextId) return;
+    if (store.tool.kind !== 'select') store.setTool({ kind: 'select' });
+    // Right-click acts on what's under the pointer: it joins nothing, it replaces the selection.
+    const deepest = nodeIdAt(e.clientX, e.clientY);
+    const hit = vectorRootOf(store.doc, deepest) ?? deepest;
+    if (!hit) store.select([]);
+    else if (!store.selection.includes(hit)) store.select([hit]);
+    setMenuAt({ x: e.clientX, y: e.clientY });
+  };
+
+  // The menu sits outside the canvas: React events from its portal would otherwise bubble into
+  // the canvas's pointer handlers and select whatever is under the clicked item.
   return (
+    <>
     <div
       ref={ref}
+      onContextMenu={onContextMenu}
       className={`canvas tool-${tool.kind}${tool.kind === 'insert' && ['text', 'heading'].includes(tool.itemId) ? ' tool-text' : ''}${spacePressed || tool.kind === 'hand' ? ' is-panning' : ''}`}
       style={canvasColor ? { background: canvasColor } : undefined}
       onPointerDown={onPointerDown}
@@ -167,5 +190,7 @@ export function Canvas() {
         </div>
       )}
     </div>
+    <CanvasMenu at={menuAt} onClose={() => setMenuAt(null)} />
+    </>
   );
 }

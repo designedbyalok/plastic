@@ -4,7 +4,7 @@ import { ComponentSection, ComponentLibrarySection } from './ComponentSection.ts
 import { SourceSection } from './SourceSection.tsx';
 import { ScrollArea } from '../ui/ScrollArea.tsx';
 import { VariantsSection } from './VariantsSection.tsx';
-import { pageOf } from '../../document/tree.ts';
+import { pageOf, rootOf } from '../../document/tree.ts';
 import { useAsThumbnail } from '../../editor/thumbnail.ts';
 import { copyFrameContext, copyFrameLink } from '../../editor/frameLinks.ts';
 import { resolvedTheme, useTheme } from '../../app/theme.ts';
@@ -121,6 +121,7 @@ function InspectorHeader() {
       <EditorPresence />
       <span className="insp-top-actions">
         <ZoomMenu />
+        <ShareMenu />
         <button
           type="button"
           className={`insp-top-button${codeOpen ? ' is-active' : ''}`}
@@ -132,6 +133,44 @@ function InspectorHeader() {
         </button>
       </span>
     </header>
+  );
+}
+
+/** Links to this file or its frames. Anyone with the link can view; only the owner can edit. */
+function ShareMenu() {
+  const [open, setOpen] = useState(false);
+  const frame = useEditor((s) => {
+    const id = s.selection.at(-1);
+    return id && s.doc.nodes[id] ? rootOf(s.doc, id) : null;
+  });
+  const run = (action: () => Promise<void>) => {
+    setOpen(false);
+    void action();
+  };
+  return (
+    <Menu.Root open={open} onOpenChange={setOpen} modal={false}><span className="insp-menu-anchor">
+      <Menu.Trigger asChild>
+        <button type="button" className={`insp-top-button${open ? ' is-active' : ''}`} aria-haspopup="menu" aria-expanded={open} title="Share a link to this file">
+          Share
+        </button>
+      </Menu.Trigger>
+      {open && (
+        <MenuContent align="end" aria-label="Share" className="insp-share-menu">
+          <Menu.Item className="insp-menu-item" onSelect={() => run(() => copyFrameLink())}>
+            <span>Copy link to file</span>
+          </Menu.Item>
+          <Menu.Item className="insp-menu-item" disabled={!frame} onSelect={() => frame && run(() => copyFrameLink(frame))}>
+            <span>Copy link to selected frame</span>
+            <kbd>⌘ L</kbd>
+          </Menu.Item>
+          <Menu.Item className="insp-menu-item" disabled={!frame} onSelect={() => frame && run(() => copyFrameContext(frame))}>
+            <span>Copy frame context for AI</span>
+          </Menu.Item>
+          <Menu.Separator className="insp-menu-divider" />
+          <p className="insp-share-note">Anyone with a link can view this file. Only the owner can edit it.</p>
+        </MenuContent>
+      )}
+    </span></Menu.Root>
   );
 }
 

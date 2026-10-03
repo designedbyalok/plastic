@@ -123,9 +123,17 @@ export function elementsAtPoint(clientX: number, clientY: number): HTMLElement[]
   return [];
 }
 
-/** The deepest design element under a client point. */
+let hitFilter: ((id: NodeId | null) => NodeId | null) | null = null;
+
+/** Redirect canvas picks (locked layers pass the click to the layer above them). */
+export function setHitFilter(filter: typeof hitFilter): void {
+  hitFilter = filter;
+}
+
+/** The deepest pickable design element under a client point. */
 export function nodeIdAt(clientX: number, clientY: number): NodeId | null {
-  return nodeIdOf(elementsAtPoint(clientX, clientY)[0]);
+  const id = nodeIdOf(elementsAtPoint(clientX, clientY)[0]);
+  return hitFilter ? hitFilter(id) : id;
 }
 
 export function isOutOfFlow(el: Element | null): boolean {

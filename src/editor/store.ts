@@ -179,7 +179,8 @@ export const useEditor = create<EditorState>()((set, get) => ({
   tool: { kind: 'select' },
   viewport: { x: 80, y: 80, zoom: 1 },
   collapsed: {},
-  rulersVisible: readPref('plastic:rulers') !== '0',
+  // Hidden until turned on (⇧R or the menu); the choice is remembered.
+  rulersVisible: readPref('plastic:rulers') === '1',
   codeOpen: false,
   layersOpen: readPref('plastic:layers-open') !== '0',
   layersWidth: clampPanelWidth(Number(readPref('plastic:layers-width')) || PANEL_WIDTH.default),
