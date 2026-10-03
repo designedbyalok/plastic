@@ -40,5 +40,8 @@
     // Public URL of the app. `wrangler dev` overrides it from .dev.vars.
     "BETTER_AUTH_URL": "https://useplastic.app"
   },
+  // Hourly + weekly sweep of superseded file revisions (worker/cleanup.ts). Cron triggers are free.
+  // The weekly expression must match WEEKLY_CRON in cleanup.ts.
+  "triggers": { "crons": ["17 * * * *", "0 4 * * 0"] },
   "observability": { "enabled": true }
 }

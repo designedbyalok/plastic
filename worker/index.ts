@@ -12,6 +12,7 @@
 import { serveFilePreview, servePreviewImage } from './previews.ts';
 import { getAuth, providers } from './auth.ts';
 import { emailContext } from './emails.ts';
+import { scheduledSweep } from './cleanup.ts';
 import type { Env } from './env.ts';
 import { handleProjects } from './projects.ts';
 import { activity, handleFolders } from './library.ts';
@@ -57,5 +58,10 @@ export default {
     }
     if (url.pathname.startsWith('/api/')) return json({ error: 'Not found' }, 404);
     return env.ASSETS.fetch(request);
+  },
+
+  /** Cron: delete file revisions no manifest references anymore (see cleanup.ts). */
+  async scheduled(controller, env): Promise<void> {
+    await scheduledSweep(env, controller.cron, controller.scheduledTime);
   },
 } satisfies ExportedHandler<Env>;

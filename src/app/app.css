@@ -519,19 +519,32 @@ html.is-resizing-panel * {
   background: var(--ui-row-selected);
 }
 
+/* The title gets the row; the file name only fills what's left (and gives way first). */
+.page-row .layer-name {
+  flex: 0 1 auto;
+}
+
 .page-row .layer-tag {
-  margin-left: auto;
+  display: none;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
 }
 
 .page-row:hover .layer-tag {
+  display: block;
   opacity: 1;
 }
 
 .page-delete {
   display: none;
+  flex: none;
   width: 20px;
   height: 20px;
-  margin-right: -6px;
+  margin: 0 -6px 0 auto;
   color: var(--ui-secondary);
 }
 

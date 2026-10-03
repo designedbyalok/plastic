@@ -158,6 +158,8 @@ export function createAuth(env: Env) {
     },
     session: {
       // Read live session state so password recovery immediately revokes previous sessions.
+      // Deliberate: a lookup is ~2 indexed D1 row reads per API request, far inside the free
+      // allowance, while any cookie cache would leave a revoked session working until it expires.
       cookieCache: { enabled: false },
     },
     advanced: {

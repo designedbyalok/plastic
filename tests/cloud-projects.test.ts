@@ -7,6 +7,10 @@ const owner = 'user',
   id = 'test',
   prefix = 'users/user/projects/test/';
 const oldVersion = 'a'.repeat(32);
+const sha256 = async (data: ArrayBuffer | string) =>
+  Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', typeof data === 'string' ? new TextEncoder().encode(data) : data)), (b) =>
+    b.toString(16).padStart(2, '0'),
+  ).join('');
 
 function harness() {
   const objects = new Map<string, { text: string; etag: string }>();
@@ -33,12 +37,15 @@ function harness() {
       return o ? { body: o.text, etag: o.etag, httpEtag: `"${o.etag}"` } : null;
     },
     head: async (key: string) => objects.get(key) ?? null,
-    put: async (key: string, bytes: ArrayBuffer) => {
+    // Like R2: accepts a stream or bytes, and rejects a body that doesn't match a given sha256.
+    put: async (key: string, body: ReadableStream | ArrayBuffer | null, options?: { sha256?: string }) => {
+      const bytes = await new Response(body).arrayBuffer();
+      if (options?.sha256 && options.sha256 !== (await sha256(bytes))) throw new Error('checksum mismatch');
       objects.set(key, { text: new TextDecoder().decode(bytes), etag: 'b'.repeat(32) });
     },
   };
   const env = { DB, FILES };
-  const call = (path: string[], method = 'GET', body?: unknown, version?: string) =>
+  const call = (path: string[], method = 'GET', body?: unknown, version?: string, headers: Record<string, string> = {}) =>
     handleProjects(
       new Request(`https://plastic.test/api/projects/test${version ? `?v=${version}` : ''}`, {
         method,
@@ -46,7 +53,8 @@ function harness() {
           ? {
               body: typeof body === 'string' ? body : JSON.stringify(body),
               headers: {
-                'content-length': String(
+                ...headers,
+                'content-length': headers['content-length'] ?? String(
                   new TextEncoder().encode(typeof body === 'string' ? body : JSON.stringify(body)).length,
                 ),
               },
@@ -68,6 +76,21 @@ function harness() {
 }
 
 describe('cloud project revisions', () => {
+  it('streams uploads with a browser checksum and rejects a body that does not match', async () => {
+    const h = harness();
+    const version = await sha256('streamed');
+    const ok = await h.call(['files', 'index.html'], 'PUT', 'streamed', undefined, { 'x-plastic-sha256': version });
+    expect(await ok.json()).toEqual({ version });
+    expect(h.objects.get(`${prefix}revisions/index.html/${version}`)?.text).toBe('streamed');
+    const bad = await h.call(['files', 'index.html'], 'PUT', 'tampered', undefined, { 'x-plastic-sha256': version });
+    expect(bad.status).toBe(400);
+    expect(h.objects.get(`${prefix}revisions/index.html/${version}`)?.text).toBe('streamed');
+  });
+  it('only hashes small uploads from clients without checksums', async () => {
+    const h = harness();
+    const large = await h.call(['files', 'index.html'], 'PUT', 'x', undefined, { 'content-length': String(2 * 1024 * 1024) });
+    expect(large.status).toBe(428);
+  });
   it('uploads immutable content hashes without replacing committed legacy bytes', async () => {
     const h = harness();
     const a = await h.call(['files', 'index.html'], 'PUT', 'first');

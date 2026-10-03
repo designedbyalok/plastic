@@ -13,7 +13,7 @@
  *   POST   /api/projects                         { title, assetsFrom? } → { id }
  *   GET    /api/projects/<id>                    → { files: { name: version } } (files: null if missing)
  *   GET    /api/projects/<id>/files/<name>?v=…   → the file (immutable when ?v is given)
- *   PUT    /api/projects/<id>/files/<name>       raw text → { version }
+ *   PUT    /api/projects/<id>/files/<name>       raw text, x-plastic-sha256: <hex> → { version }
  *   POST   /api/projects/<id>/commit             { files: { name: version }, title?, notify? } → 204
  *   GET    /api/projects/<id>/assets/<name>      → the image (names are content hashes: immutable)
  *   PUT    /api/projects/<id>/assets/<name>      raw bytes → 204
@@ -35,7 +35,12 @@ const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 500;
 const LOCATION = 'Your account';
 const REVISION = /^[a-f0-9]{32,64}$/;
-const revisionKey = (prefix: string, name: string, version: string) => `${prefix}revisions/${name}/${version}`;
+const SHA256 = /^[a-f0-9]{64}$/;
+/** Hex SHA-256 of the upload body, computed by the browser and verified by R2. */
+export const CHECKSUM_HEADER = 'x-plastic-sha256';
+const LEGACY_UPLOAD_BYTES = 1024 * 1024;
+export const revisionKey = (prefix: string, name: string, version: string) => `${prefix}revisions/${name}/${version}`;
+const hex = (buffer: ArrayBuffer) => Array.from(new Uint8Array(buffer), (b) => b.toString(16).padStart(2, '0')).join('');
 
 const IMMUTABLE = 'private, max-age=31536000, immutable';
 
@@ -46,13 +51,13 @@ const empty = (status: number) => new Response(null, { status, headers: { 'cache
 const error = (status: number, message: string) => json({ error: message }, status);
 const extension = (name: string) => name.split('.').pop()!.toLowerCase();
 
-const projectPrefix = (owner: string, id: string) => `users/${owner}/projects/${id}/`;
+export const projectPrefix = (owner: string, id: string) => `users/${owner}/projects/${id}/`;
 
 function slugify(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'untitled';
 }
 
-function parseVersions(text: string | null | undefined): Versions {
+export function parseVersions(text: string | null | undefined): Versions {
   try {
     const value = JSON.parse(text ?? '{}') as unknown;
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -214,11 +219,24 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
       if (!Number.isFinite(size)) return error(411, 'Content-Length is required.');
       if (size > MAX_FILE_BYTES) return error(413, 'Files can be up to 25 MB.');
       if (!(await getRow(env, owner, id))) return error(404, 'No such file.');
+      const contentType = FILE_TYPES[extension(name)]!;
+      const claimed = request.headers.get(CHECKSUM_HEADER)?.toLowerCase() ?? '';
+      if (SHA256.test(claimed)) {
+        // The browser hashes the file; the body streams straight into R2, which verifies the
+        // checksum itself. The Worker never buffers or hashes the bytes (no CPU per megabyte).
+        try {
+          await env.FILES.put(revisionKey(prefix, name, claimed), request.body, { sha256: claimed, httpMetadata: { contentType } });
+        } catch {
+          return error(400, 'Checksum mismatch.');
+        }
+        return json({ version: claimed });
+      }
+      // Clients from before checksums (a tab left open across a deploy): hash here, small files only.
+      if (size > LEGACY_UPLOAD_BYTES) return error(428, 'Reload Plastic to save this file.');
       const bytes = await request.arrayBuffer();
-      if (bytes.byteLength > MAX_FILE_BYTES) return error(413, 'Files can be up to 25 MB.');
-      const hash = await crypto.subtle.digest('SHA-256', bytes);
-      const version = Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
-      await env.FILES.put(revisionKey(prefix, name, version), bytes, { httpMetadata: { contentType: FILE_TYPES[extension(name)] } });
+      if (bytes.byteLength > LEGACY_UPLOAD_BYTES) return error(413, 'Reload Plastic to save this file.');
+      const version = hex(await crypto.subtle.digest('SHA-256', bytes));
+      await env.FILES.put(revisionKey(prefix, name, version), bytes, { httpMetadata: { contentType } });
       return json({ version });
     }
     return error(405, 'Method not allowed.');
@@ -248,8 +266,8 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
     const committed = await env.DB.prepare('update project set files = ?, title = ?, updated_at = ? where owner_id = ? and id = ? and files = ?').bind(JSON.stringify(files), title, now, owner, id, row.files).run();
     if (committed.meta.changes !== 1) return error(409, 'Project changed elsewhere.');
     await recordEdit(env, owner);
-    // Historical revisions are retained so cached URLs and recovery snapshots stay valid.
-    // Permanent project deletion removes the entire prefix, including revisions.
+    // Superseded revisions stay readable for a while (editors may still be fetching them) and
+    // are deleted by the scheduled sweep once the project has been idle (see cleanup.ts).
     // Editors with a live connection announce their own saves over it (much cheaper); the
     // server only notifies the room for saves made without one.
     if (body.notify === true) {

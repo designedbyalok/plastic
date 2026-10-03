@@ -9,6 +9,11 @@ import { StorageConflictError } from './conflict.ts';
 import { authClient, detectBackend } from '../auth/client.ts';
 import { PROJECT_FILE_NAME, isPageFile, type ProjectFiles } from './index.ts';
 
+async function sha256(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export interface ProjectSummary {
   readonly id: string;
   /** Last modification time (ms since epoch). */
@@ -506,10 +511,12 @@ class CloudWorkspace implements Workspace {
     for (let i = 0; i < changed.length; i += 6) {
       await Promise.all(
         changed.slice(i, i + 6).map(async (name) => {
+          // Hashed here so the server can stream the body into storage (R2 verifies the hash).
+          const bytes = new TextEncoder().encode(files[name]);
           const response = await fetch(`${this.endpoint(id)}/files/${encodeURIComponent(name)}`, {
             method: 'PUT',
-            headers: { 'content-type': 'text/plain; charset=utf-8' },
-            body: files[name],
+            headers: { 'content-type': 'text/plain; charset=utf-8', 'x-plastic-sha256': await sha256(bytes) },
+            body: bytes,
           });
           if (!response.ok) throw new Error(`Save failed: ${response.status}`);
           versions[name] = ((await response.json()) as { version: string }).version;
