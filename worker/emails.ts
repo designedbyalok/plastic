@@ -70,7 +70,10 @@ export async function sendEmail(env: Env, template: EmailTemplate, to: string, f
           from: EMAIL_FROM,
           to: [to],
           ...message,
-          ...(template === 'release-notes' ? { headers: { 'List-Unsubscribe': `<${fields.unsubscribeUrl}>` } } : {}),
+          // One-click unsubscribe (RFC 8058): mail clients POST to the URL.
+          ...(template === 'release-notes'
+            ? { headers: { 'List-Unsubscribe': `<${fields.unsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } }
+            : {}),
         }),
         signal: AbortSignal.timeout(10_000),
       });

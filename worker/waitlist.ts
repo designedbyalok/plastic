@@ -5,12 +5,14 @@
  *                                              (a new address gets a thank-you email, within a daily cap)
  *   GET  /api/admin/waitlist           admin   ?filter=waiting|invited|joined|all&before=<ms> → { entries, next, counts }
  *   POST /api/admin/invite             admin   { email, resend? } → { ok, emailed }
+ *   POST /api/admin/release-notes      admin   send the current edition to members who haven't had it → { sent, remaining }
  *
  * Joining costs one D1 write (a repeat is a no-op) and the answer never reveals whether an email
  * was already listed. Admins are the emails in ADMIN_EMAILS.
  */
 import type { Env } from './env.ts';
 import { deliverInBackground, sendEmail } from './emails.ts';
+import { RELEASE_NOTES_EDITION, pendingReleaseNotes, sendReleaseNotesBatch } from './releaseNotes.ts';
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const error = (status: number, message: string) => json({ error: message }, status);
@@ -158,6 +160,8 @@ export async function handleAdmin(request: Request, env: Env, admin: { email: st
       next: results.length > PAGE ? page[page.length - 1]!.created_at : null,
       counts: { total: counts?.total ?? 0, waiting: counts?.waiting ?? 0, invited: counts?.invited ?? 0, joined: counts?.joined ?? 0 },
       mail: Boolean(env.RESEND_API_KEY),
+      // Only where email can be sent (the Waitlist page shows the control only then).
+      releaseNotes: env.RESEND_API_KEY ? { edition: RELEASE_NOTES_EDITION, pending: await pendingReleaseNotes(env) } : null,
     });
   }
 
@@ -184,6 +188,12 @@ export async function handleAdmin(request: Request, env: Env, admin: { email: st
       sendEmail(env, 'invite', email, { actionUrl: signUp.href }, `invite:${email}:${now}`),
     );
     return json({ ok: true, emailed: true });
+  }
+
+  if (path[0] === 'release-notes' && path.length === 1) {
+    if (request.method !== 'POST') return error(405, 'Method not allowed.');
+    if (!env.RESEND_API_KEY) return error(503, 'Email isn’t configured on this server.');
+    return json(await sendReleaseNotesBatch(env));
   }
 
   return error(404, 'Not found');

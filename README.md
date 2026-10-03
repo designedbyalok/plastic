@@ -108,6 +108,11 @@ emails (or `ADMIN_EMAILS` in `wrangler.jsonc`) can create an account, by any sig
 Admins see **Waitlist** in the sidebar (`/admin`): **Invite** emails a sign-up link through
 Resend. Apply `migrations/0007_waitlist.sql` with `bun run db:migrate:remote` before deploying.
 
+New members get the current release-notes email right after signing up; existing members get it
+from **Send release notes** on the Waitlist page. Each member gets each edition once
+(`RELEASE_NOTES_EDITION` in `worker/releaseNotes.ts`; bump it when the email changes), and every
+email has a one-click unsubscribe. Apply `migrations/0008_release_notes.sql` before deploying.
+
 ## Docs
 
 - [Agents (MCP)](docs/AGENTS.md) — connecting coding agents, and the tools they get.

@@ -1505,6 +1505,31 @@
   font-size: 12.5px;
 }
 
+.admin-release {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 760px;
+  margin-top: 16px;
+  padding: 8px 8px 8px 12px;
+  border-radius: 10px;
+  background: var(--home-fill);
+  color: var(--home-text-secondary);
+  font-size: 12.5px;
+}
+
+.admin-release > svg {
+  flex: none;
+}
+
+.admin-release span {
+  flex: 1;
+}
+
+.admin-release .profile-button {
+  flex: none;
+}
+
 .admin-link {
   display: flex;
   align-items: center;

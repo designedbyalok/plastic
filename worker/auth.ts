@@ -8,6 +8,7 @@ import { customSession, magicLink, username } from 'better-auth/plugins';
 import type { Env } from './env.ts';
 import { deliverInBackground, emailContext, sendEmail, signInDevice } from './emails.ts';
 import { canCreateAccount, isAdmin } from './waitlist.ts';
+import { sendReleaseNotes } from './releaseNotes.ts';
 
 /** Shown when someone without an invite tries to create an account (any sign-up method). */
 export const INVITE_ONLY_MESSAGE = 'Plastic is invite-only for now. Join the waitlist at useplastic.app and we’ll email you an invite.';
@@ -78,6 +79,8 @@ export function createAuth(env: Env) {
             },
             afterEmailVerification: async (user) => {
               await deliverInBackground(sendEmail(env, 'welcome', user.email, { name: user.name, actionUrl: appURL() }, user.id));
+              // New members also get the current release notes (once; they can unsubscribe).
+              await sendReleaseNotes(env, user.email);
             },
           },
           databaseHooks: {
@@ -86,14 +89,18 @@ export function createAuth(env: Env) {
                 before: inviteOnly,
                 after: async (user) => {
                   // Social providers and magic links can create an already-verified account.
-                  if (user.emailVerified)
+                  if (user.emailVerified) {
                     await deliverInBackground(sendEmail(env, 'welcome', user.email, { name: user.name, actionUrl: appURL() }, user.id));
+                    await sendReleaseNotes(env, user.email);
+                  }
                 },
               },
               update: {
                 after: async (user, context) => {
-                  if (context?.path === '/magic-link/verify' && user.emailVerified)
+                  if (context?.path === '/magic-link/verify' && user.emailVerified) {
                     await deliverInBackground(sendEmail(env, 'welcome', user.email, { name: user.name, actionUrl: appURL() }, user.id));
+                    await sendReleaseNotes(env, user.email);
+                  }
                 },
               },
             },

@@ -10,6 +10,7 @@
  *   *    /api/folders/*, GET /api/activity → folders and profile activity (see library.ts)
  *   POST /api/waitlist     → join the waitlist (public); /api/admin/* → waitlist and invites
  *                             for ADMIN_EMAILS (see waitlist.ts)
+ *   GET/POST /api/unsubscribe → release-notes opt-out (see releaseNotes.ts)
  *   GET  /, /changelog, /download → the public site for visitors (see site.ts)
  */
 import { serveFilePreview, servePreviewImage } from './previews.ts';
@@ -21,6 +22,7 @@ import { handleProjects } from './projects.ts';
 import { activity, handleFolders } from './library.ts';
 import { serveSite } from './site.ts';
 import { handleAdmin, joinWaitlist } from './waitlist.ts';
+import { handleUnsubscribe } from './releaseNotes.ts';
 
 export { ProjectRoom } from './live.ts';
 
@@ -39,6 +41,7 @@ export default {
     }
     // Emails go out after the response (waitUntil), so joining and inviting stay fast.
     if (url.pathname === '/api/waitlist') return emailContext.run(context, () => joinWaitlist(request, env));
+    if (url.pathname === '/api/unsubscribe') return handleUnsubscribe(request, env);
     if (url.pathname === '/api/health') {
       // Asked once per page load; the answer only changes on deploy, so let browsers reuse it.
       return Response.json({ auth: true, providers: providers(env) }, { headers: { 'cache-control': 'public, max-age=600' } });

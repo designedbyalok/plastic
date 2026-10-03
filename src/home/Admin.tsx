@@ -3,7 +3,7 @@
  * People join from the landing page; inviting someone emails them a sign-up link, and only
  * invited emails can create an account.
  */
-import { Check, Copy, Mail, RefreshCw, Send, UserPlus } from 'lucide-react';
+import { Check, Copy, Mail, Megaphone, RefreshCw, Send, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
 type Filter = 'waiting' | 'invited' | 'joined' | 'all';
@@ -25,6 +25,8 @@ interface Page {
   readonly next: number | null;
   readonly counts: Record<Filter | 'total', number>;
   readonly mail: boolean;
+  /** The current release-notes edition and how many members haven't received it. */
+  readonly releaseNotes: { readonly edition: string; readonly pending: number } | null;
 }
 
 const FILTERS: { id: Filter; label: string; count: keyof Page['counts'] }[] = [
@@ -131,6 +133,26 @@ export function AdminView() {
     }
   };
 
+  const sendReleaseNotes = async () => {
+    setBusy('release-notes');
+    setNotice(null);
+    setManualLink(null);
+    try {
+      const response = await fetch('/api/admin/release-notes', { method: 'POST' });
+      const data = (await response.json().catch(() => ({}))) as { sent?: number; remaining?: number; error?: string };
+      if (!response.ok) throw new Error(data.error ?? 'Couldn’t send the release notes.');
+      setNotice(
+        `Release notes sent to ${data.sent} ${data.sent === 1 ? 'member' : 'members'}.` +
+          (data.remaining ? ` ${data.remaining} still to go; send again to continue (batches keep within the daily email limit).` : ''),
+      );
+      await refresh();
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const submitDirect = (e: FormEvent) => {
     e.preventDefault();
     const email = direct.trim();
@@ -160,6 +182,23 @@ export function AdminView() {
         </button>
       </form>
 
+      {page?.releaseNotes && (
+        <div className="admin-release">
+          <Megaphone size={14} strokeWidth={1.75} />
+          <span>
+            Release notes ({page.releaseNotes.edition}):{' '}
+            {page.releaseNotes.pending
+              ? `${page.releaseNotes.pending} ${page.releaseNotes.pending === 1 ? 'member hasn’t' : 'members haven’t'} received it yet. New members get it automatically after signing up.`
+              : 'every member has it. New members get it automatically after signing up.'}
+          </span>
+          {page.releaseNotes.pending > 0 && (
+            <button type="button" className="profile-button" disabled={busy !== null} onClick={() => void sendReleaseNotes()}>
+              <Send size={12} strokeWidth={1.75} />
+              {busy === 'release-notes' ? 'Sending…' : 'Send release notes'}
+            </button>
+          )}
+        </div>
+      )}
       {page && !page.mail && (
         <p className="admin-note">
           This server can’t send email (no RESEND_API_KEY), so invites are saved and you share the sign-up link yourself. On useplastic.app invites are emailed automatically.

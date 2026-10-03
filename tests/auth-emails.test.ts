@@ -34,6 +34,7 @@ function harness(invited: readonly string[] = ['user@example.com', 'magic@exampl
   database.exec(readFileSync('migrations/0001_better_auth.sql', 'utf8'));
   database.exec(readFileSync('migrations/0004_username.sql', 'utf8'));
   database.exec(readFileSync('migrations/0007_waitlist.sql', 'utf8'));
+  database.exec(readFileSync('migrations/0008_release_notes.sql', 'utf8'));
   // Plastic is invite-only: the accounts these tests create were invited first.
   for (const email of invited) database.prepare('insert into waitlist (email, created_at, invited_at) values (?, 0, 1)').run(email);
   const env = {
