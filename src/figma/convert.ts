@@ -70,7 +70,18 @@ export async function convertFigFile(bytes: Uint8Array, title: string): Promise<
   } catch (error) {
     throw new Error(`Not a readable Figma file (${error instanceof Error ? error.message : String(error)}).`);
   }
-  return convertGraph(graph, title);
+  // Big files convert for seconds: pause between layers so the page keeps responding.
+  const steps = convertSteps(graph, title);
+  let last = performance.now();
+  let step = steps.next();
+  while (!step.done) {
+    if (performance.now() - last > 40) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      last = performance.now();
+    }
+    step = steps.next();
+  }
+  return step.value;
 }
 
 // --- conversion ------------------------------------------------------------------------------
@@ -87,6 +98,9 @@ const TEXT_ALIGN: Record<string, string> = { CENTER: 'center', RIGHT: 'right', J
 const TEXT_CASE: Record<string, string> = { UPPER: 'uppercase', LOWER: 'lowercase', TITLE: 'capitalize' };
 const DECORATION: Record<string, string> = { UNDERLINE: 'underline', STRIKETHROUGH: 'line-through' };
 
+/** Bound fields that take plain numbers (or aren't numbers at all), unlike lengths. */
+const UNITLESS_FIELDS = /^(opacity|fontWeight|visible|characters|fontFamily|fontStyle)$|color$|\/color$/i;
+
 const isAutoLayout = (n: SceneNode | undefined): boolean => !!n && AUTO_LAYOUT.has(n.layoutMode);
 
 class Converter {
@@ -99,6 +113,9 @@ class Converter {
   private readonly classByKey = new Map<string, string>();
   private readonly taken = new Set<string>();
   private readonly tokenByVariable = new Map<string, string>();
+  /** Number variables used as lengths (their tokens get px). */
+  private readonly lengthVariables = new Set<string>();
+  private readonly tokenNames = new Set<string>();
   readonly tokens: Record<string, string> = {};
   private modeBlocks = new Map<string, Record<string, string>>();
   private readonly fonts = new Map<string, { token: string; weights: Set<number>; italic: boolean; layers: number }>();
@@ -121,7 +138,10 @@ class Converter {
     if (/^[^a-zA-Z_]/.test(name)) name = `t-${name}`;
     let n = 2;
     let candidate = name;
-    while (candidate in this.tokens) candidate = `${name}-${n++}`;
+    // Names are handed out before any value is written: check those too, or two variables
+    // with the same name ("8" in two collections) would share one token.
+    while (candidate in this.tokens || this.tokenNames.has(candidate)) candidate = `${name}-${n++}`;
+    this.tokenNames.add(candidate);
     return candidate;
   }
 
@@ -158,7 +178,7 @@ class Converter {
     }
     if (v.type === 'COLOR' && raw && typeof raw === 'object') return colorCss(raw as never);
     if (v.type === 'FLOAT' && typeof raw === 'number') {
-      if (/^(spacing|radius|text|leading|tracking)-/.test(name)) return px(raw);
+      if (/^(spacing|radius|text|leading|tracking)-/.test(name) || this.lengthVariables.has(v.id)) return px(raw);
       if (name.startsWith('opacity-')) return String(round(raw > 1 ? raw / 100 : raw, 3));
       return String(round(raw, 3));
     }
@@ -166,7 +186,26 @@ class Converter {
     return null;
   }
 
+  /**
+   * Number variables bound to lengths (padding, gap, size, radius, stroke, type size) hold
+   * pixels; they need a unit in CSS, or `padding: var(--t-8)` is `padding: 8` and is dropped.
+   * Figma variables don't say, so look at where each one is used.
+   */
+  private findLengthVariables(): void {
+    const mark = (id: string) => {
+      const v = this.graph.variables.get(id);
+      if (!v || v.type !== 'FLOAT' || this.lengthVariables.has(id)) return;
+      this.lengthVariables.add(id);
+      // An alias is a length if what it points at is used as one, and the other way round.
+      for (const raw of Object.values(v.valuesByMode)) if (raw && typeof raw === 'object' && 'aliasId' in raw) mark((raw as { aliasId: string }).aliasId);
+    };
+    for (const n of this.graph.getAllNodes()) {
+      for (const [field, id] of Object.entries(n.boundVariables ?? {})) if (!UNITLESS_FIELDS.test(field)) mark(id);
+    }
+  }
+
   private importVariables(): void {
+    this.findLengthVariables();
     const variables = [...this.graph.variables.values()].filter((v) => v.type !== 'BOOLEAN');
     for (const v of variables) this.tokenByVariable.set(v.id, this.tokenName(v));
     for (const v of variables) {
@@ -202,6 +241,8 @@ class Converter {
   private bound(n: SceneNode, field: string): string | null {
     const id = n.boundVariables?.[field];
     const token = id ? this.tokenByVariable.get(id) : undefined;
+    // A unitless field can't use a token that holds pixels: it keeps its own value.
+    if (token && UNITLESS_FIELDS.test(field) && this.lengthVariables.has(id!)) return null;
     return token ? `var(--${token})` : null;
   }
 
@@ -302,11 +343,23 @@ class Converter {
       if (CONTAINER_TYPES.has(n.type)) this.layout(n, d);
       const children = this.children(n, inInstance);
       const tag = n.type === 'SECTION' ? 'section' : 'div';
-      id = this.element(tag, n.name, d, children, n.visible ? {} : { hidden: '' }, n.name);
-      return id;
+      id = this.element(tag, n.name, d, children, {}, n.name);
     }
-    if (!n.visible) this.nodes[id] = { ...(this.nodes[id] as ElementNode), attrs: { ...(this.nodes[id] as ElementNode).attrs, hidden: '' } };
+    if (!n.visible) this.hide(id, n.name);
     return id;
+  }
+
+  /**
+   * A layer hidden in Figma is hidden the way Plastic hides layers: display: none on its own
+   * class, its previous display kept in data-pl-display for Show. (The `hidden` attribute
+   * isn't enough: a class's display: flex overrides it, and the layer would reappear.)
+   */
+  private hide(id: NodeId, name: string): void {
+    const el = this.nodes[id] as ElementNode;
+    const rule = el.classes[0] ? (this.rules[el.classes[0]] ?? {}) : {};
+    const previous = rule.display;
+    const cls = this.className(el.classes[0] ?? name, { ...rule, display: 'none' });
+    this.nodes[id] = { ...el, classes: [cls, ...el.classes.slice(1)], attrs: { ...el.attrs, ...(previous && previous !== 'none' ? { 'data-pl-display': previous } : {}) } };
   }
 
   private children(n: SceneNode, insideInstance: boolean): NodeId[] {
@@ -360,6 +413,10 @@ class Converter {
     if (!parent) {
       d.position = 'relative';
     } else if (isAutoLayout(parent) && n.layoutPositioning !== 'ABSOLUTE') {
+      // Absolutely positioned layers paint above in-flow ones in CSS, whatever their order. In
+      // Figma the layer order decides: an absolute background drawn first sits behind the
+      // text. Positioning the in-flow layers too makes the page paint in layer order.
+      if (this.hasAbsoluteChild(parent)) d.position = 'relative';
       if (parent.layoutMode === 'GRID') {
         const g = n.gridPosition;
         if (g) {
@@ -397,6 +454,19 @@ class Converter {
     if (n.maxHeight) d['max-height'] = px(n.maxHeight);
     if (parent && n.rotation && !this.isGraphic(n)) d.rotate = `${round(n.rotation)}deg`;
     if ((n.flipX || n.flipY) && !this.isGraphic(n)) d.scale = `${n.flipX ? -1 : 1} ${n.flipY ? -1 : 1}`;
+  }
+
+  private readonly absoluteChildCache = new Map<string, boolean>();
+  private hasAbsoluteChild(parent: SceneNode): boolean {
+    let known = this.absoluteChildCache.get(parent.id);
+    if (known === undefined) {
+      known = parent.childIds.some((id) => {
+        const c = this.graph.getNode(id);
+        return !!c && c.visible && c.layoutPositioning === 'ABSOLUTE';
+      });
+      this.absoluteChildCache.set(parent.id, known);
+    }
+    return known;
   }
 
   /** Absolute position honoring constraints, relative to the parent's border box. */
@@ -681,9 +751,22 @@ class Converter {
   private graphic(n: SceneNode, d: Record<string, string>): NodeId {
     const origin = this.graph.getAbsolutePosition(n.id);
     const body = this.hasMask(n) ? this.svgComposite(n, origin) : this.svgPiece(n.id, origin);
-    const w = round(Math.max(n.width, 0.01));
-    const h = round(Math.max(n.height, 0.01));
-    const markup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" fill="none">${body}</svg>`;
+    let viewBox = `0 0 ${round(Math.max(n.width, 0.01))} ${round(Math.max(n.height, 0.01))}`;
+    // A straight line has no height (or width), and an SVG with a 0 size draws nothing. Give it
+    // a box as thick as its stroke, centered on the line by negative margins, so it shows and
+    // still takes no room in the layout, as in Figma.
+    const thickness = Math.max(1, ...n.strokes.filter((s) => s.visible).map((s) => s.weight ?? 1));
+    const flat = (size: number) => size < 0.5;
+    if (flat(n.height) && !flat(n.width) && !('top' in d && 'bottom' in d)) {
+      d.height = px(thickness);
+      d['margin-block'] = px(-thickness / 2);
+      viewBox = `0 ${round(-thickness / 2)} ${round(n.width)} ${round(thickness)}`;
+    } else if (flat(n.width) && !flat(n.height) && !('left' in d && 'right' in d)) {
+      d.width = px(thickness);
+      d['margin-inline'] = px(-thickness / 2);
+      viewBox = `${round(-thickness / 2)} 0 ${round(thickness)} ${round(n.height)}`;
+    }
+    const markup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" fill="none">${body}</svg>`;
     d.display = 'block';
     d.overflow = 'visible';
     Object.assign(d, effectDecls(n.effects, 'graphic'));
@@ -739,6 +822,20 @@ class Converter {
     return this.adoptSvg(markup, n, d);
   }
 
+  /** Underline/strikethrough with its style, thickness, color, offset and skip-ink. */
+  private decoration(t: Pick<SceneNode, 'textDecoration' | 'textDecorationStyle' | 'textDecorationThickness' | 'textDecorationFills' | 'textUnderlineOffset' | 'textDecorationSkipInk'>, d: Record<string, string>): void {
+    const line = DECORATION[t.textDecoration];
+    if (!line) return;
+    d['text-decoration-line'] = line;
+    if (t.textDecorationStyle === 'DOTTED') d['text-decoration-style'] = 'dotted';
+    else if (t.textDecorationStyle === 'WAVY') d['text-decoration-style'] = 'wavy';
+    if (t.textDecorationThickness) d['text-decoration-thickness'] = px(t.textDecorationThickness);
+    const fill = t.textDecorationFills?.find((f) => f.visible && f.type === 'SOLID');
+    if (fill) d['text-decoration-color'] = colorCss(fill.color, fill.opacity);
+    if (t.textUnderlineOffset != null && line === 'underline') d['text-underline-offset'] = px(t.textUnderlineOffset);
+    if (t.textDecorationSkipInk === false) d['text-decoration-skip-ink'] = 'none';
+  }
+
   private textElement(n: SceneNode, d: Record<string, string>): NodeId {
     const font = this.fontToken(n.fontFamily || 'Inter', n.fontWeight || 400, n.italic);
     this.fonts.get(n.fontFamily || 'Inter')!.layers++;
@@ -753,8 +850,13 @@ class Converter {
     if (align) d['text-align'] = align;
     const transform = TEXT_CASE[n.textCase];
     if (transform) d['text-transform'] = transform;
-    const decoration = DECORATION[n.textDecoration];
-    if (decoration) d['text-decoration'] = decoration;
+    this.decoration(n, d);
+    // OpenType features and variable font axes (e.g. tabular numbers, optical size).
+    const features = (n.fontFeatures ?? []).map((f) => `"${f.tag}" ${f.enabled ? 1 : 0}`);
+    if (features.length) d['font-feature-settings'] = features.join(', ');
+    const axes = (n.fontVariations ?? []).filter((v) => v.axis !== 'wght').map((v) => `"${v.axis}" ${round(v.value)}`);
+    if (axes.length) d['font-variation-settings'] = axes.join(', ');
+    if (n.textDirection === 'RTL') d.direction = 'rtl';
     if (n.leadingTrim === 'CAP_HEIGHT') d['text-box'] = 'trim-both cap alphabetic';
     this.textPaint(n, n.fills, d);
     d['white-space'] = n.textAutoResize === 'WIDTH_AND_HEIGHT' ? 'pre' : 'pre-wrap';
@@ -849,6 +951,10 @@ class Converter {
     if (s.letterSpacing !== undefined && s.letterSpacing !== n.letterSpacing) d['letter-spacing'] = px(s.letterSpacing);
     if (s.lineHeight && s.lineHeight !== n.lineHeight) d['line-height'] = px(s.lineHeight);
     if (s.textDecoration && s.textDecoration !== n.textDecoration) d['text-decoration'] = DECORATION[s.textDecoration] ?? 'none';
+    if (s.textDecoration && s.textDecoration !== 'NONE' && (s.textDecoration !== n.textDecoration || s.textDecorationStyle || s.textDecorationThickness || s.textDecorationFills || s.textUnderlineOffset)) {
+      delete d['text-decoration'];
+      this.decoration({ ...n, ...s }, d);
+    }
     if (s.fills?.length) {
       const own: Record<string, string> = {};
       this.textPaint(n, s.fills, own);
@@ -912,26 +1018,35 @@ function pageFileName(name: string, index: number, taken: Set<string>): string {
 
 /** Needs a global DOMParser (browsers have one; the server installs jsdom's). */
 export function convertGraph(graph: SceneGraph, title: string): Conversion {
+  const steps = convertSteps(graph, title);
+  let step = steps.next();
+  while (!step.done) step = steps.next();
+  return step.value;
+}
+
+/** The conversion, yielding after each top-level layer (see convertFigFile). */
+function* convertSteps(graph: SceneGraph, title: string): Generator<void, Conversion, void> {
   const c = new Converter(graph);
   const pages: Page[] = [];
   const frames: Record<NodeId, Point> = {};
   const fileNames = new Set<string>();
   const report: { name: string; file: string; artboards: number }[] = [];
 
-  graph.getPages().forEach((canvas, index) => {
+  for (const [index, canvas] of graph.getPages().entries()) {
     const file = pageFileName(canvas.name, index, fileNames);
     const roots: NodeId[] = [];
     for (const childId of canvas.childIds) {
       const n = graph.getNode(childId);
       if (!n) continue;
       const id = c.root(n);
+      yield;
       if (!id) continue;
       roots.push(id);
       frames[id] = { x: round(n.x), y: round(n.y) };
     }
     pages.push({ file, name: canvas.name || `Page ${index + 1}`, roots });
     report.push({ name: canvas.name, file, artboards: roots.length });
-  });
+  }
   if (!pages.length) throw new Error('The Figma file has no pages.');
 
   const base = emptyDocument(title);

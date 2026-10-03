@@ -3,6 +3,7 @@ import { SceneGraph } from '@open-pencil/scene-graph';
 import { describe, expect, it } from 'vitest';
 import { convertGraph } from '../src/figma/convert.ts';
 import { parseProject } from '../src/serialization';
+import type { ElementNode } from '../src/document/types';
 
 const white = { r: 1, g: 1, b: 1, a: 1 };
 const indigo = { r: 0.31, g: 0.27, b: 0.9, a: 1 };
@@ -79,5 +80,62 @@ describe('Figma import', () => {
     expect(out.files['tokens.css']).toContain('--color-brand-primary: #4f45e6;');
     expect(out.files['tokens.css']).toContain('[data-mode="dark"] {\n  --color-brand-primary: #ffffff;\n}');
     expect(out.files['styles.css']).toMatch(/\.button \{[^}]*background: var\(--color-brand-primary\);/);
+  });
+
+  it('hides hidden layers the way Plastic does, so a class display can’t bring them back', () => {
+    const g = sample();
+    const label = [...g.nodes.values()].find((n) => n.name === 'Label')!;
+    const button = [...g.nodes.values()].find((n) => n.name === 'Button')!;
+    g.createNode('TEXT', button.id, { name: 'Hint', text: 'Hidden', fontFamily: 'Plastic Test Sans', fontSize: 14, textAutoResize: 'WIDTH_AND_HEIGHT', width: 40, height: 20, fills: solid(white), visible: false });
+    g.updateNode(button.id, { visible: false });
+    const out = convertGraph(g, 'Hidden');
+    const html = out.files['index.html']!;
+    expect(html).not.toMatch(/ hidden[ >]/);
+    const doc = parseProject(out.files).doc;
+    const el = (name: string) => Object.values(doc.nodes).find((n): n is ElementNode => n.kind === 'element' && doc.names[n.id] === name)!;
+    const rule = (name: string) => doc.styles.rules[el(name).classes[0]!]!;
+    expect(rule('Button').display).toBe('none');
+    expect(el('Button').attrs['data-pl-display']).toBe('flex');
+    expect(rule('Hint').display).toBe('none');
+    expect(label.visible).toBe(true);
+    expect(rule('Label').display).not.toBe('none');
+  });
+
+  it('gives number variables used as lengths a unit, and same-named variables their own tokens', () => {
+    const g = sample();
+    g.variableCollections.set('c1', { id: 'c1', name: 'Spacing', modes: [{ modeId: 'm', name: 'Default' }], defaultModeId: 'm', variableIds: ['a', 'b'] });
+    g.variableCollections.set('c2', { id: 'c2', name: 'Other', modes: [{ modeId: 'm2', name: 'Default' }], defaultModeId: 'm2', variableIds: ['c'] });
+    const v = (id: string, name: string, collectionId: string, value: number) =>
+      g.variables.set(id, { id, name, type: 'FLOAT', collectionId, valuesByMode: { [collectionId === 'c1' ? 'm' : 'm2']: value }, description: '', hiddenFromPublishing: false });
+    v('a', '24', 'c1', 24);
+    v('b', 'Ratio', 'c1', 3);
+    v('c', '24', 'c2', 24);
+    const card = [...g.nodes.values()].find((n) => n.name === 'Card')!;
+    g.updateNode(card.id, { boundVariables: { paddingTop: 'a', paddingRight: 'a', paddingBottom: 'a', paddingLeft: 'a', itemSpacing: 'c' } });
+    const tokens = convertGraph(g, 'Units').files;
+    expect(tokens['tokens.css']).toContain('--t-24: 24px;');
+    expect(tokens['tokens.css']).toContain('--t-24-2: 24px;');
+    expect(tokens['tokens.css']).toContain('--ratio: 3;');
+    expect(tokens['styles.css']).toMatch(/\.card \{[^}]*gap: var\(--t-24-2\);[^}]*padding: var\(--t-24\);/);
+  });
+
+  it('paints in layer order when an auto layout frame also has absolute layers', () => {
+    // The badge is absolute; the title, button and label flow. Positioning the flowing layers
+    // keeps the CSS paint order the same as Figma's layer order.
+    expect(css).toMatch(/\.title \{[^}]*position: relative;/);
+    expect(css).toMatch(/\.button \{[^}]*position: relative;/);
+    expect(css).not.toMatch(/\.label \{[^}]*position: relative;/); // its frame has no absolute layers
+  });
+
+  it('draws straight lines in a box as thick as their stroke, taking no room in the layout', () => {
+    const g = sample();
+    const card = [...g.nodes.values()].find((n) => n.name === 'Card')!;
+    g.createNode('LINE', card.id, {
+      name: 'Rule', width: 200, height: 0, layoutAlignSelf: 'STRETCH',
+      strokes: [{ color: indigo, weight: 2, opacity: 1, visible: true, align: 'CENTER', cap: 'NONE', join: 'MITER', dashPattern: [2, 2] }],
+    });
+    const out = convertGraph(g, 'Lines');
+    expect(out.files['styles.css']).toMatch(/\.rule \{[^}]*height: 2px;[^}]*margin-block: -1px;/);
+    expect(out.files['index.html']).toMatch(/<svg class="rule"[^>]*viewBox="0 -1 \d+ 2"/);
   });
 });

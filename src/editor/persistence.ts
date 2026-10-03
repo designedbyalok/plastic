@@ -3,7 +3,7 @@
  * written back shortly after they happen, and edits made to the files by anything else
  * (an editor, git checkout, a coding agent) are loaded in as an undoable change.
  */
-import { parseProject, serializeProject, sameFiles, type ProjectFiles } from '../serialization/index.ts';
+import { finishProject, parseProject, parseProjectAsync, serializeProject, sameFiles, type ProjectFiles } from '../serialization/index.ts';
 import { connectWorkspace, type ProjectStorage } from '../serialization/storage.ts';
 import { setTitle } from '../document/ops.ts';
 import { bundledFontsReady, loadInterFont } from '../document/fonts.ts';
@@ -103,9 +103,15 @@ export async function openProject(id: string): Promise<OpenedProject> {
   const files = await project.load();
   await bundledFontsReady;
   if (!files || ticket !== opening) return { found: false, restoredViewport: false, readOnly: false, stop: () => {} };
+  // Big files (a large Figma import) take seconds to read: pause between pages so the tab keeps
+  // responding, and read them once. The saved form is compared against that same read.
+  const stored = await parseProjectAsync(files);
+  if (ticket !== opening) return { found: false, restoredViewport: false, readOnly: false, stop: () => {} };
   const readOnly = project.readOnly === true;
   useEditor.getState().setReadOnly(readOnly);
-  const parsedFile = parseProject(files);
+  const asSaved = finishProject(stored, { syncComponents: false });
+  const baseline = serializeProject(asSaved.doc, asSaved.meta, { syncComponents: false });
+  const parsedFile = finishProject(stored);
   const { meta } = parsedFile;
   const doc = loadInterFont(parsedFile.doc);
   useEditor.getState().load(doc, { viewport: meta.viewport, collapsed: meta.collapsed, activePage: meta.activePage });
@@ -119,7 +125,7 @@ export async function openProject(id: string): Promise<OpenedProject> {
     return serializeProject(parsed.doc, parsed.meta, options);
   };
   let applying = false;
-  const coordinator = new ProjectSync(project, normalized(files), {
+  const coordinator = new ProjectSync(project, baseline, {
     normalize: normalized,
     dirty: () => {
       if (sync === coordinator) schedule();
@@ -149,7 +155,7 @@ export async function openProject(id: string): Promise<OpenedProject> {
   });
   sync = coordinator;
   void updateShareLink().catch(console.error);
-  if (!readOnly && !sameFiles(normalized(files), serializeProject(doc, meta))) {
+  if (!readOnly && !sameFiles(baseline, serializeProject(doc, meta))) {
     useEditor.getState().setSaveState('saving', useEditor.getState().revision - 1);
     schedule(0);
   }

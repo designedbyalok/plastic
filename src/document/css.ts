@@ -77,6 +77,9 @@ export function serializeDeclarations(decls: Declarations, indent = '  '): strin
     .join('\n');
 }
 
+/** Serialized sheets by identity (sheets are immutable). */
+const styleCache = new WeakMap<StyleSheet, string>();
+
 export function parseStyleSheet(css: string): StyleSheet {
   const rules: Record<string, Record<string, string>> = Object.create(null);
   const before: string[] = [],
@@ -88,7 +91,16 @@ export function parseStyleSheet(css: string): StyleSheet {
     else if (node.type !== 'comment' || !node.text.startsWith('Written by Plastic.'))
       (Object.keys(rules).length ? after : before).push(node.toString());
   }
-  return { rules, preserved: before.join('\n\n'), preservedAfter: after.join('\n\n'), source: root.toString() };
+  const sheet: StyleSheet = { rules, preserved: before.join('\n\n'), preservedAfter: after.join('\n\n'), source: root.toString() };
+  // Unedited, a sheet serializes back to its own source: skip re-parsing it to find that out.
+  styleCache.set(sheet, sheet.source!);
+  return sheet;
+}
+
+function sameDeclarations(a: Declarations, b: Declarations): boolean {
+  if (a === b) return true;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
 }
 
 /** Patch only edited declarations, preserving duplicate fallbacks, comments and rule order. */
@@ -98,11 +110,22 @@ function patchRules(
   next: Readonly<Record<string, Declarations>>,
   match: (r: Rule) => string | null,
 ): void {
+  // Rules by class, found in one pass (big imported sheets have thousands of classes).
+  let byName: Map<string, Rule[]> | null = null;
+  const rulesOf = (name: string): Rule[] => {
+    if (!byName) {
+      byName = new Map();
+      root.nodes.forEach((n) => {
+        const key = n.type === 'rule' ? match(n) : null;
+        if (key !== null) (byName!.get(key) ?? byName!.set(key, []).get(key)!).push(n as Rule);
+      });
+    }
+    return byName.get(name) ?? [];
+  };
   for (const name of new Set([...Object.keys(before), ...Object.keys(next)])) {
-    const rules: Rule[] = [];
-    root.nodes.forEach((n) => {
-      if (n.type === 'rule' && match(n) === name) rules.push(n);
-    });
+    // Unchanged rules need no patching (the common case: one edit in a large sheet).
+    if (name in before && name in next && sameDeclarations(before[name]!, next[name]!)) continue;
+    const rules = [...rulesOf(name)];
     if (!(name in next)) {
       rules.forEach((r) => r.remove());
       continue;
@@ -153,7 +176,6 @@ function patchRules(
   }
 }
 
-const styleCache = new WeakMap<StyleSheet, string>();
 export function serializeStyleSheet(sheet: StyleSheet): string {
   const cached = styleCache.get(sheet);
   if (cached !== undefined) return cached;

@@ -6,6 +6,7 @@ import { AiReadingOverlay } from './AiReadingOverlay.tsx';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { selectableTarget } from '../editor/layerActions.ts';
 import { CanvasMenu, type CanvasMenuAt } from './CanvasMenu.tsx';
+import { useContentInView } from './useContentInView.ts';
 import { CommentLayer, anchorAt } from '../comments/CommentLayer.tsx';
 import { useComments } from '../comments/store.ts';
 import { canEditText } from '../editor/commands.ts';
@@ -37,6 +38,7 @@ export function Canvas() {
   const [menuAt, setMenuAt] = useState<CanvasMenuAt>(null);
   const uiHidden = useEditor((s) => s.uiHidden);
   useTextEditing();
+  useContentInView();
 
   useEffect(() => {
     const el = ref.current!;

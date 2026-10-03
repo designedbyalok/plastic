@@ -87,10 +87,14 @@ function pageOrder(files: ProjectFiles, project: ProjectJson): { file: string; n
   return pages.length ? pages : [{ file: FIRST_PAGE_FILE, name: 'Page 1' }];
 }
 
-export function parseProject(
-  files: ProjectFiles,
-  options: ProjectOptions = {},
-): { doc: DesignDocument; meta: EditorMeta } {
+type ParsedProject = { doc: DesignDocument; meta: EditorMeta };
+
+/**
+ * Read a project's files into a document, one page at a time: it yields after each page so
+ * a caller can let the browser breathe (parseProjectAsync). Returns the document as stored,
+ * before components are synchronized (finishProject does that).
+ */
+function* readProjectFiles(files: ProjectFiles): Generator<void, ParsedProject, void> {
   const project = readProjectJson(files[PROJECT_FILE] ?? '');
   const seen = new Set<NodeId>();
   const nodes: DesignDocument['nodes'] = {};
@@ -101,6 +105,7 @@ export function parseProject(
     Object.assign(nodes, markup.nodes);
     pages.push({ file, name, roots: markup.roots, ...(canvas ? { canvas } : {}), ...(guides ? { guides: guides.filter((g) => !g.frame || markup.nodes[g.frame]) } : {}) });
     if (!title || file === FIRST_PAGE_FILE) title = files[file] ? markup.title : title;
+    yield;
   }
 
   let styles = parseStyleSheet(files[STYLES_FILE] ?? '');
@@ -135,10 +140,41 @@ export function parseProject(
     ...(project.layers.locked?.some((id) => nodes[id]) ? { locked: project.layers.locked.filter((id) => nodes[id]) } : {}),
   };
   const activePage = pages.some((p) => p.file === project.canvas.activePage) ? project.canvas.activePage : null;
-  return {
-    doc: normalizeInterFonts(options.syncComponents === false ? doc : synchronizeComponents(doc)),
-    meta: { viewport: project.canvas.viewport, collapsed: project.layers.collapsed, activePage },
-  };
+  return { doc, meta: { viewport: project.canvas.viewport, collapsed: project.layers.collapsed, activePage } };
+}
+
+/** The document the editor works on, from one read as stored (see readProjectFiles). */
+export function finishProject(stored: ParsedProject, options: ProjectOptions = {}): ParsedProject {
+  return { doc: normalizeInterFonts(options.syncComponents === false ? stored.doc : synchronizeComponents(stored.doc)), meta: stored.meta };
+}
+
+export function parseProject(files: ProjectFiles, options: ProjectOptions = {}): ParsedProject {
+  const steps = readProjectFiles(files);
+  let step = steps.next();
+  while (!step.done) step = steps.next();
+  return finishProject(step.value, options);
+}
+
+/**
+ * parseProject for big files: the same result as stored (finish it with finishProject), but
+ * pausing after each page so the tab keeps painting and never shows "page unresponsive".
+ */
+export async function parseProjectAsync(files: ProjectFiles, onPage?: (done: number, total: number) => void): Promise<ParsedProject> {
+  const total = Object.keys(files).filter(isPageFile).length;
+  const steps = readProjectFiles(files);
+  let done = 0;
+  let last = performance.now();
+  let step = steps.next();
+  while (!step.done) {
+    onPage?.(++done, total);
+    // Yield only once a slice of work has piled up: small files open without any delay.
+    if (performance.now() - last > 40) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      last = performance.now();
+    }
+    step = steps.next();
+  }
+  return step.value;
 }
 
 export function sameFiles(a: ProjectFiles, b: ProjectFiles | null | undefined): boolean {
