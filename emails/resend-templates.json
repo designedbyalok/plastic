@@ -1,0 +1,37 @@
+{
+  "verify-email": {
+    "id": "c89aee06-4b76-4aff-9af8-a4f893a8899e",
+    "alias": "plastic-verify-email",
+    "status": "published"
+  },
+  "welcome": {
+    "id": "a4a40f0a-41ac-43ea-9c34-869c9184b7c8",
+    "alias": "plastic-welcome",
+    "status": "published"
+  },
+  "sign-in": {
+    "id": "7598191f-89b7-4b5e-9bc5-ee2c512695b8",
+    "alias": "plastic-sign-in",
+    "status": "published"
+  },
+  "password-reset": {
+    "id": "792edf4e-224f-4536-a30a-e37f71ebc6a8",
+    "alias": "plastic-password-reset",
+    "status": "published"
+  },
+  "password-changed": {
+    "id": "134d5d56-a3c0-4e4e-a61c-47250e97711f",
+    "alias": "plastic-password-changed",
+    "status": "published"
+  },
+  "magic-link": {
+    "id": "5acb0f59-1502-43f9-9def-76996e89bb40",
+    "alias": "plastic-magic-link",
+    "status": "published"
+  },
+  "release-notes": {
+    "id": "19282e5f-ee83-41af-91b8-1ad353b5b250",
+    "alias": "plastic-release-notes",
+    "status": "published"
+  }
+}

@@ -30,6 +30,7 @@
     "tests"
   ],
   "exclude": [
+    "tests/auth-emails.test.ts",
     "tests/mcp.test.ts",
     "tests/library.test.ts",
     "tests/project-store.test.ts",

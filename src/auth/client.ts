@@ -3,13 +3,13 @@
  * sign-in; the local dev server has no accounts — your files are on your disk.
  */
 import { createAuthClient } from 'better-auth/react';
-import { usernameClient } from 'better-auth/client/plugins';
+import { magicLinkClient, usernameClient } from 'better-auth/client/plugins';
 
 export const authClient = createAuthClient({
   basePath: '/api/auth',
   // The session cookie is long-lived; re-checking it on every window focus is a request for nothing.
   sessionOptions: { refetchOnWindowFocus: false },
-  plugins: [usernameClient()],
+  plugins: [usernameClient(), magicLinkClient()],
 });
 
 export interface Backend {
@@ -27,7 +27,10 @@ export function detectBackend(): Promise<Backend> {
     .then(async (r) => {
       if (!r.ok || !r.headers.get('content-type')?.includes('application/json')) return { auth: false, providers: [] };
       const data = (await r.json()) as Partial<Backend>;
-      return { auth: data.auth === true, providers: Array.isArray(data.providers) ? data.providers : [] };
+      return {
+        auth: data.auth === true,
+        providers: Array.isArray(data.providers) ? data.providers : [],
+      };
     })
     .catch(() => ({ auth: false, providers: [] }));
   return backend;

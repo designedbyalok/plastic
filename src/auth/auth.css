@@ -16,7 +16,9 @@
   padding: 28px 24px 22px;
   border-radius: 16px;
   background: var(--ui-panel);
-  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.05), 0 16px 48px #00000059;
+  box-shadow:
+    0 0 0 1px rgb(var(--ink) / 0.05),
+    0 16px 48px #00000059;
 }
 
 .auth-mark {
@@ -121,6 +123,20 @@
   margin: 0;
   color: #f26b6b;
   line-height: 1.4;
+}
+
+.auth-notice {
+  margin: 0;
+  color: rgb(var(--ink) / 0.8);
+  line-height: 1.6;
+}
+.auth-text-button {
+  align-self: flex-end;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ui-accent-text);
+  font: inherit;
 }
 
 .auth-switch {

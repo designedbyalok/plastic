@@ -12,6 +12,8 @@ export interface Env {
   readonly BETTER_AUTH_URL: string;
   /** Secret: `bunx wrangler secret put BETTER_AUTH_SECRET` (locally in .dev.vars). */
   readonly BETTER_AUTH_SECRET: string;
+  /** Sending-only Resend key, configured as a Worker secret. */
+  readonly RESEND_API_KEY?: string;
   readonly GITHUB_CLIENT_ID?: string;
   readonly GITHUB_CLIENT_SECRET?: string;
   readonly GOOGLE_CLIENT_ID?: string;

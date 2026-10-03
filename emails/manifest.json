@@ -1,0 +1,62 @@
+{
+  "sender": "Plastic <hello@useplastic.app>",
+  "status": "approved",
+  "templates": [
+    {
+      "id": "verify-email",
+      "page": "index.html",
+      "frame": "verify-email-1",
+      "subject": "Verify your email • Plastic",
+      "preheader": "Confirm your email to open your Plastic workspace.",
+      "category": "transactional"
+    },
+    {
+      "id": "welcome",
+      "page": "welcome.html",
+      "frame": "welcome-1",
+      "subject": "Welcome to Plastic",
+      "preheader": "Your workspace is ready. Make something that lasts.",
+      "category": "transactional"
+    },
+    {
+      "id": "sign-in",
+      "page": "sign-in.html",
+      "frame": "sign-in-1",
+      "subject": "New sign-in to Plastic",
+      "preheader": "A new sign-in to your account. Review the details.",
+      "category": "transactional"
+    },
+    {
+      "id": "password-reset",
+      "page": "password-reset.html",
+      "frame": "password-reset-1",
+      "subject": "Reset your password • Plastic",
+      "preheader": "Choose a new password and return to your canvas.",
+      "category": "transactional"
+    },
+    {
+      "id": "password-changed",
+      "page": "password-changed.html",
+      "frame": "password-changed-1",
+      "subject": "Your Plastic password was changed",
+      "preheader": "Your password was reset successfully.",
+      "category": "transactional"
+    },
+    {
+      "id": "magic-link",
+      "page": "magic-link.html",
+      "frame": "magic-link-1",
+      "subject": "Your sign-in link • Plastic",
+      "preheader": "One secure link. No password. Back to your canvas.",
+      "category": "transactional"
+    },
+    {
+      "id": "release-notes",
+      "page": "release-notes.html",
+      "frame": "release-notes-1",
+      "subject": "A closer canvas • What’s new in Plastic",
+      "preheader": "Frame thumbnails, Figma imports, reusable components, AI presence and a more capable canvas.",
+      "category": "marketing"
+    }
+  ]
+}

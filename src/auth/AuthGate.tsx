@@ -31,6 +31,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 function Session({ providers, children }: { providers: readonly string[]; children: ReactNode }) {
   const { data, isPending, refetch } = authClient.useSession();
   if (isPending) return <AppSkeleton />;
+  // Password recovery links must work even when this browser already has a session.
+  const recovery = new URLSearchParams(location.search).get('auth');
+  if (recovery === 'reset-password' || recovery === 'forgot-password') return <SignIn providers={providers} />;
   if (!data) return <SignIn providers={providers} />;
   const account: Account = {
     name: data.user.name,
