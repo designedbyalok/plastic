@@ -310,17 +310,27 @@ export function wrapInStack(
   if (!first) return { doc, id: null };
   const parentId = getParentId(doc, first);
   const parent = getElement(doc, parentId);
-  if (!parent) return { doc, id: null };
-  const siblings = ids.filter((id) => parent.children.includes(id));
-  const index = Math.min(...siblings.map((id) => parent.children.indexOf(id)));
+  const page = !parent ? pageOf(doc, first) : undefined;
+  const children = parent?.children ?? page?.roots;
+  if (!children) return { doc, id: null };
+  const siblings = ids.filter((id) => children.includes(id));
+  if (!siblings.length) return { doc, id: null };
+  const index = Math.min(...siblings.map((id) => children.indexOf(id)));
 
   const className = uniqueClassName(takenClassNames(doc), 'stack');
   const style: Record<string, string> = {
+    all: 'unset',
+    'box-sizing': 'border-box',
     display: 'flex',
     'flex-direction': options.direction,
     gap: `${options.gap}px`,
+    width: 'max-content',
+    height: 'max-content',
+    'align-items': 'flex-start',
+    'justify-content': 'flex-start',
+    padding: '0px',
   };
-  if (options.placement) {
+  if (parent && options.placement) {
     Object.assign(style, {
       position: 'absolute',
       left: `${Math.round(options.placement.x)}px`,
@@ -333,7 +343,7 @@ export function wrapInStack(
     ...next,
     nodes: { ...next.nodes, [id]: { kind: 'element', id, tag: 'div', attrs: {}, classes: [className], children: [] } },
   };
-  next = insertChild(next, parent.id, index, id);
+  next = parent ? insertChild(next, parent.id, index, id) : setFrame(insertRoot(next, page!.file, index, id), id, options.placement ?? doc.frames[first] ?? { x: 0, y: 0 });
 
   siblings.forEach((childId, i) => {
     next = stripPosition(next, childId);

@@ -1,3 +1,4 @@
+import { readAiActivity } from '../server/aiActivity.ts';
 import { parseStyleSheet } from '../src/document/css.ts';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -51,6 +52,7 @@ describe('Plastic MCP server', () => {
     await call('set_tokens', { file: 'agent-login', tokens: { 'color-primary': '#4f46e5', 'spacing-4': '16px' } });
     const file = await call<{ pages: { artboards: { id: string }[] }[] }>('get_file', { file: 'agent-login' });
     const frame = file.pages[0]!.artboards[0]!.id;
+    expect((await readAiActivity(workspace, 'agent-login')).some(a => a.operation === 'get_file' && a.mode === 'read')).toBe(true);
 
     const written = await call<{ created: string[]; outline: string }>('write_html', {
       file: 'agent-login',

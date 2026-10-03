@@ -24,6 +24,7 @@
     "server",
     "tests/mcp.test.ts",
     "tests/library.test.ts",
-    "tests/project-store.test.ts"
+    "tests/project-store.test.ts",
+    "tests/ai-activity.test.ts"
   ]
 }

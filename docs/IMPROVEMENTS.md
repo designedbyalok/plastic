@@ -237,3 +237,23 @@ New Text and Heading layers hug their content and own a neutral typography basel
 ### Subtle Chrome Loading Skeletons
 
 Startup/session checks, lazy app routes, file opening, the file grid/list, and the code panel now use layout-shaped skeletons with a slow, low-contrast metallic shimmer. Reduced-motion preferences stop the shimmer. Opening files no longer briefly display another project's layer controls. Pending canvas images receive measured, editor-only masks until loading and decoding finish; failures, replacement sources, deleted images and iframe teardown clear their masks safely. Loading decorations stay out of the document model and saved/exported design.
+
+### Dropdown Clipping
+
+Inspector token pickers, layout positioning, zoom, and theme token menus now use the [Radix Dropdown Menu primitive](https://www.radix-ui.com/primitives/docs/components/dropdown-menu). Portaled content escapes panel scroll clipping, avoids viewport edges, and scrolls when its contents exceed available height. Arrow keys, typeahead, Escape and focus restoration use the library's managed behavior. Canvas shortcuts and clipboard actions yield to an open menu. A regression test verifies portal placement, token binding, keyboard isolation, and focus return; the running editor was checked at panel edges.
+
+### Auto Layout Sizing
+
+Width and Height now expose Fixed, Fit, Fill, and Relative modes using ordinary CSS. Numeric input and canvas resizing switch the edited axis to Fixed; Fit hugs content, Fill uses flex growth on the main axis and stretch across it, and Relative uses percentages. Fill and Relative require a parent. Choosing Fill inside a Fit parent freezes that parent's current size on the same axis to prevent circular sizing. Nested flex children expose Absolute Position. Shift+A wraps text (including standalone canvas text) in an intrinsic flex frame with zero gap/padding and no added decoration, preserving the original text and undo history. Behavior follows [Figma's auto-layout sizing](https://help.figma.com/hc/en-us/articles/31289464393751-Use-the-horizontal-and-vertical-flows-in-auto-layout) and [Paper's flex wrapping shortcut](https://paper.design/docs/support).
+
+### Text Creation And Fill
+
+The Text tool shows an empty caret and a live draft instead of inserting placeholder text. Leaving an empty draft creates no node or undo entry. Typed text commits as one insertion when editing ends, with Inter Variable and Fit width; multiline text stays intact. Initial text color chooses white or dark based on the composited container/ancestor background and the canvas color, with browser normalization for modern CSS color formats. Text color is edited under Fill as native CSS `color`; imported text backgrounds remain available under Background.
+
+### Absolute Alignment Inside Flex
+
+Absolute children of a flex parent now show Align in Parent controls for left/center/right and top/middle/bottom. Alignment uses the parent's padded area and the child's visible bounds, preserves its transforms and the other axis, and keeps it out of flex flow. Static flex parents become containing blocks as needed. Each action is undoable.
+
+### AI Presence And Frame Reading
+
+MCP calls now announce short-lived activity across HTTP and separate stdio processes. Targeted reads highlight their frame or layer with a quiet glow and scanning shimmer; write activity shows AI Editing. Whole-file reads highlight the current page's frames. Overlapping calls coexist, long calls refresh their leases, and stale sessions expire. Activity never changes or locks the design. The editor shows the active user's photo or initials and a bot avatar during activity. The MIT-licensed [loading-dev Blocks](https://loading.dev/spinners/blocks) spinner supplies the avatar indicator and animated favicon, which restores every original icon when activity ends. Reduced-motion settings disable the frame sweep. Current AI presence follows Plastic's local MCP transports; accounts on cloud deployments retain their user avatar.

@@ -1,3 +1,5 @@
+import { useAiActivity } from '../editor/useAiActivity.ts';
+import { useAiFavicon } from './useAiFavicon.ts';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Canvas } from '../canvas/Canvas.tsx';
 import { zoomToFit } from '../editor/commands.ts';
@@ -24,6 +26,8 @@ export function Editor({ projectId }: { projectId: string }) {
   const [status, setStatus] = useState<Status>('opening');
   const [openError, setOpenError] = useState('');
   useShortcuts(status === 'open');
+  useAiActivity(projectId, status === 'open');
+  useAiFavicon();
 
   useEffect(() => {
     if (status !== 'open') return;

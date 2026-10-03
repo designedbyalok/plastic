@@ -1,13 +1,16 @@
+import { alignAbsoluteLayers } from '../../editor/absoluteAlignment.ts';
+import { SizeControl } from './SizeControl.tsx';
+import { Menu, MenuContent } from '../ui/Menu.tsx';
 /**
  * Presentation sections, ordered like a design tool (Layout, Radius, Opacity, Fill…) but every
  * control writes a plain CSS declaration. Optional sections stay collapsed behind a + until
  * something is set, and − clears exactly the declarations that section owns.
  */
 import {
-  ALargeSmall, Angle, ArrowDown, ArrowDownToLine, ArrowRight, ArrowUpToLine, Baseline, Bold, Check, ChevronDown, FlipHorizontal2, FlipVertical2, FoldVertical,
+  AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, ALargeSmall, Angle, ArrowDown, ArrowDownToLine, ArrowRight, ArrowUpToLine, Baseline, Bold, Check, ChevronDown, FlipHorizontal2, FlipVertical2, FoldVertical,
   LayoutGrid, Minus, RotateCcw, RotateCwSquare, SlidersVertical, Space, Strikethrough, TextAlignCenter, TextAlignEnd, TextAlignStart, TriangleAlert, Type, Underline, X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import valueParser from 'postcss-value-parser';
 import { domElement, isOutOfFlow, styleOf } from '../../canvas/dom.ts';
 import { setDeclaration, setFrame, setStyleOnNodes } from '../../document/ops.ts';
@@ -40,14 +43,12 @@ export function LayoutSection({ ids }: Ids) {
   const free = !anyRoot && ids.every((id) => isOutOfFlow(domElement(id)));
   const containers = ids.every((id) => {
     const el = getElement(doc, id);
-    return el && elementSpec(el.tag).acceptsChildren;
+    return el && elementSpec(el.tag).acceptsChildren && !elementSpec(el.tag).editableText;
   });
   const declaredDisplay = useDeclared(ids, 'display');
   const display = declaredDisplay === MIXED ? '' : declaredDisplay || computedValue(ids[0], 'display');
   const mode = display.includes('flex') ? 'flex' : display.includes('grid') ? 'grid' : 'block';
   const clipped = useDeclared(ids, 'overflow') === 'hidden';
-  const height = useDeclared(ids, 'height');
-  const heightProp = allRoots && !height ? 'min-height' : 'height';
   const singleRoot = allRoots && ids.length === 1 ? ids[0]! : null;
 
   return (
@@ -77,8 +78,8 @@ export function LayoutSection({ ids }: Ids) {
         <RotationInput ids={ids} />
       </Row>
       <Row>
-        <CssInput ids={ids} prop="width" prefix="W" numeric />
-        <CssInput ids={ids} prop={heightProp} prefix="H" numeric />
+        <SizeControl ids={ids} axis="width" />
+        <SizeControl ids={ids} axis="height" />
         <TransformButtons ids={ids} />
       </Row>
 
@@ -91,13 +92,15 @@ export function LayoutSection({ ids }: Ids) {
           </Row>
           <Row><CssInput ids={ids} prop="gap" prefix="Gap" numeric /><CssInput ids={ids} prop="padding" prefix="Pad" /></Row>
         </>
-      ) : (containers || ids.length > 1) && (
+      ) : ids.length > 0 && (
         <Row><button type="button" className="insp-button" onClick={addFlexOrWrap}>
           {containers && ids.length === 1 ? 'Add Flex' : 'Wrap in Flex'} <span className="insp-kbd">⇧ A</span>
         </button></Row>
       )}
 
       <FlexChildRow ids={ids} />
+      {!anyRoot && ids.every(id => { const el = domElement(getParentId(doc, id)); return el && styleOf(el).display.includes('flex'); }) &&
+        <div className="insp-row insp-row-check"><Checkbox checked={free} onChange={on => setFreePositioning(ids, on)} label="Absolute Position" /></div>}
 
       <div className="insp-row insp-row-check">
         <Checkbox checked={clipped} onChange={(on) => setStyle(ids, 'overflow', on ? 'hidden' : '')} label="Clip Content" hint="⌥ C" />
@@ -173,47 +176,36 @@ function PaddingAxis({ ids, axis }: Ids & { axis: 'X' | 'Y' }) {
 /** "Layout ⌄": how the element is positioned — in its parent's flow, or freely (absolute). */
 function PositionMenu({ free, onChange }: { free: boolean; onChange(free: boolean): void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener('pointerdown', close, true);
-    return () => window.removeEventListener('pointerdown', close, true);
-  }, [open]);
   const options = [
     { free: false, label: 'In Flow', hint: 'Positioned by its parent’s layout' },
     { free: true, label: 'Free Position', hint: 'position: absolute' },
   ];
   return (
-    <span className="insp-menu-anchor" ref={ref}>
-      <button type="button" className="insp-title-button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+    <Menu.Root open={open} onOpenChange={setOpen} modal={false}><span className="insp-menu-anchor">
+      <Menu.Trigger asChild><button type="button" className="insp-title-button" aria-haspopup="menu" aria-expanded={open}>
         Layout
         <ChevronDown size={12} strokeWidth={1.75} />
-      </button>
+      </button></Menu.Trigger>
       {open && (
-        <div className="insp-menu insp-menu-left" role="menu">
-          {options.map((o) => (
-            <button
+        <MenuContent align="start" aria-label="Layout Position">
+          <Menu.RadioGroup value={free ? 'free' : 'flow'}>{options.map((o) => (
+            <Menu.RadioItem
               key={o.label}
-              type="button"
-              role="menuitemradio"
-              aria-checked={o.free === free}
+              value={o.free ? 'free' : 'flow'}
               className="insp-menu-item"
               title={o.hint}
-              onClick={() => {
+              onSelect={() => {
                 if (o.free !== free) onChange(o.free);
                 setOpen(false);
               }}
             >
               <span className="insp-menu-check">{o.free === free && <Check size={12} strokeWidth={2} />}</span>
               <span>{o.label}</span>
-            </button>
-          ))}
-        </div>
+            </Menu.RadioItem>
+          ))}</Menu.RadioGroup>
+        </MenuContent>
       )}
-    </span>
+    </span></Menu.Root>
   );
 }
 
@@ -307,8 +299,19 @@ function FlexChildRow({ ids }: Ids) {
   const doc = useEditor((s) => s.doc);
   const parents = new Set(ids.map((id) => getParentId(doc, id)));
   const parentEl = domElement(parents.size === 1 ? [...parents][0] : null);
-  if (!parentEl || ids.some((id) => isOutOfFlow(domElement(id)))) return null;
+  if (!parentEl) return null;
   const display = styleOf(parentEl).display;
+  if (display.includes('flex') && ids.every(id => { const el = domElement(id); return el && styleOf(el).position === 'absolute'; })) {
+    return <div className="absolute-alignment"><span className="insp-hint">Align in Parent</span><Row>
+      <div className="insp-iconbar" role="group" aria-label="Horizontal Alignment in Parent">
+        {([{ value: 'start', label: 'Align Left', Icon: AlignHorizontalJustifyStart }, { value: 'center', label: 'Align Horizontal Center', Icon: AlignHorizontalJustifyCenter }, { value: 'end', label: 'Align Right', Icon: AlignHorizontalJustifyEnd }] as const).map(({value, label, Icon}) => <button key={value} type="button" title={label} aria-label={label} onClick={() => alignAbsoluteLayers(ids, 'x', value)}><Icon size={14} /></button>)}
+      </div>
+      <div className="insp-iconbar" role="group" aria-label="Vertical Alignment in Parent">
+        {([{ value: 'start', label: 'Align Top', Icon: AlignVerticalJustifyStart }, { value: 'center', label: 'Align Vertical Center', Icon: AlignVerticalJustifyCenter }, { value: 'end', label: 'Align Bottom', Icon: AlignVerticalJustifyEnd }] as const).map(({value, label, Icon}) => <button key={value} type="button" title={label} aria-label={label} onClick={() => alignAbsoluteLayers(ids, 'y', value)}><Icon size={14} /></button>)}
+      </div>
+    </Row></div>;
+  }
+  if (ids.some(id => isOutOfFlow(domElement(id)))) return null;
   if (display.includes('flex')) {
     return (
       <Row>
@@ -397,7 +400,17 @@ function OptionalSection({ ids, title, props, onAdd, aside, children }: Ids & { 
   );
 }
 
-export function FillSection({ ids }: Ids) {
+export function FillSection({ ids, textual = false }: Ids & { textual?: boolean }) {
+  return textual ? <TextFillSection ids={ids} /> : <BackgroundFillSection ids={ids} />;
+}
+function TextFillSection({ ids }: Ids) {
+  const background = useAnyDeclared(ids, ['background', 'background-color', 'background-image']);
+  return <>
+    <Section title="Fill"><Row><ColorInput ids={ids} prop="color" /></Row></Section>
+    {background && <BackgroundFillSection ids={ids} title="Background" />}
+  </>;
+}
+function BackgroundFillSection({ ids, title = 'Fill' }: Ids & { title?: string }) {
   const declared = useDeclared(ids, 'background');
   const gradient = declared && declared !== MIXED ? parseCssGradient(declared) : null;
   const image = declared && declared !== MIXED && /url\(/i.test(declared);
@@ -413,7 +426,7 @@ export function FillSection({ ids }: Ids) {
     setStyle(ids, 'background', cssGradient(next));
   };
   return (
-    <OptionalSection ids={ids} title="Fill" props={['background', 'background-color', 'background-image']} onAdd={() => setStyle(ids, 'background', '#ffffff')}>
+    <OptionalSection ids={ids} title={title} props={['background', 'background-color', 'background-image']} onAdd={() => setStyle(ids, 'background', '#ffffff')}>
       {!image && declared !== MIXED && (
         <Row>
           <Segmented
@@ -463,7 +476,7 @@ const FONT_WEIGHTS: readonly { value: string; label: string }[] = [
 ];
 
 const TEXT_PROPS = ['font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-align', 'align-content'];
-const TEXT_EXTRA_PROPS = ['color', 'text-decoration', 'text-decoration-line', 'text-transform'];
+const TEXT_EXTRA_PROPS = [ 'text-decoration', 'text-decoration-line', 'text-transform'];
 
 /** "Inter, system-ui, sans-serif" → "Inter"; known stacks get their friendly name. */
 /** Tokens of a kind as select options: value var(--name), labelled by name. */
@@ -614,7 +627,7 @@ export function TextSection({ ids, textual }: Ids & { textual: boolean }) {
     <button
       type="button"
       className={`icon-button${extrasOpen ? ' is-on' : ''}`}
-      title="More Text Settings: Color, Decoration, Case"
+      title="More Text Settings: Decoration, Case"
       aria-label="More Text Settings"
       aria-pressed={extrasOpen}
       onClick={() => setShowExtras(!showExtras)}
@@ -662,9 +675,7 @@ export function TextSection({ ids, textual }: Ids & { textual: boolean }) {
       </Row>
       {extrasOpen && (
         <>
-          <Row>
-            <ColorInput ids={ids} prop="color" />
-          </Row>
+          {!textual && <Row><ColorInput ids={ids} prop="color" /></Row>}
           <Row>
             <TextSegmented
               ids={ids}

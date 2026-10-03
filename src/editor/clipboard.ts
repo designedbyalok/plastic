@@ -43,7 +43,7 @@ text-decoration: none;
 export function ownsTextPaste(e: Event): boolean {
   const target = e.composedPath()[0] as HTMLElement | undefined;
   return !!target && target.nodeType === 1 && (
-    target.isContentEditable || !!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), .cm-editor, [role="combobox"], [role="listbox"], [data-plastic-select]')
+    target.isContentEditable || !!target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), .cm-editor, [role="combobox"], [role="listbox"], [data-plastic-select], [data-plastic-menu]')
   );
 }
 

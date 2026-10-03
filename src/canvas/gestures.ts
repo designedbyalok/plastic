@@ -1,8 +1,11 @@
+import { beginTextInsertion } from './textEditing.ts';
+import { insertionTextColor } from './textColor.ts';
+import { setSize, type SizeAxis } from '../editor/sizing.ts';
 /**
  * Pointer gestures on the canvas. Each gesture reads live layout from the DOM once at the
  * start, then produces document edits inside a transaction so the whole drag is one undo step.
  */
-import { canEditText, createFrame } from '../editor/commands.ts';
+import { createFrame } from '../editor/commands.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
 import { instantiate, withRootStyle } from '../document/factory.ts';
 import { insertChild, insertRoot, moveNode, setFrame, setStyleOnNodes } from '../document/ops.ts';
@@ -254,7 +257,15 @@ export function startResize(e: PointerEvent, id: NodeId, handle: Handle): void {
   const startLeft = parseFloat(cs.left) || 0;
   const startTop = parseFloat(cs.top) || 0;
   const frame = doc.frames[id] ?? { x: 0, y: 0 };
-  const heightProp = root ? 'min-height' : 'height';
+  const parent = getParentId(doc, id) ?? undefined;
+  const parentEl = domElement(parent);
+  const pcs = parentEl ? styleOf(parentEl) : null;
+  const flex = !free && !!pcs?.display.includes('flex');
+  const sizeContext = (axis: SizeAxis) => ({ parent, flex,
+    main: flex && pcs!.flexDirection.startsWith('column') === (axis === 'height'),
+    measured: axis === 'width' ? startW : startH, parentMeasured: 0, parentFit: false,
+    legacyMinHeight: root && axis === 'height',
+  });
   const tx = transactional();
 
   trackPointer(e, {
@@ -266,8 +277,8 @@ export function startResize(e: PointerEvent, id: NodeId, handle: Handle): void {
       const h = Math.max(1, startH + (handle.includes('s') ? dy : handle.includes('n') ? -dy : 0));
       tx.preview((base) => {
         let next = base;
-        if (handle.includes('e') || handle.includes('w')) next = setStyleOnNodes(next, [id], 'width', px(w - extraX));
-        if (handle.includes('n') || handle.includes('s')) next = setStyleOnNodes(next, [id], heightProp, px(h - extraY));
+        if (handle.includes('e') || handle.includes('w')) next = setSize(next, id, 'width', 'fixed', sizeContext('width'), px(w - extraX));
+        if (handle.includes('n') || handle.includes('s')) next = setSize(next, id, 'height', 'fixed', sizeContext('height'), px(h - extraY));
         const shiftX = handle.includes('w') ? startW - w : 0;
         const shiftY = handle.includes('n') ? startH - h : 0;
         if (root && (shiftX || shiftY)) next = setFrame(next, id, { x: frame.x + shiftX, y: frame.y + shiftY });
@@ -311,14 +322,20 @@ export function startFrameDraw(e: PointerEvent): void {
 // --- insert tool ------------------------------------------------------------------------------
 
 /** Click-to-insert: into the container under the pointer, in flow or freely positioned. */
-export function insertAt(e: PointerEvent, itemId: string): void {
+export function insertAt(e: PointerEvent, itemId: string, text?: string): void {
   const item = insertable(itemId);
   if (!item) return;
   const { doc, viewport } = editor();
   const container = containerAt(doc, e.clientX, e.clientY);
+  const color = item.editTextOnInsert ? insertionTextColor(container?.id) : '';
+  if (item.editTextOnInsert && text === undefined) {
+    editor().select([]);
+    beginTextInsertion({ x: e.clientX, y: e.clientY }, color, value => insertAt(e, itemId, value), item.spec().style);
+    return;
+  }
   let newId: NodeId = '';
   const make = (d: DesignDocument, spec = item.spec()) => {
-    const made = instantiate(d, spec);
+    const made = instantiate(d, item.editTextOnInsert ? { ...spec, style: { ...spec.style, width: 'max-content', color }, children: [text ?? ''] } : spec);
     return item.editTextOnInsert ? { ...made, doc: selectFont(made.doc, [made.id], DEFAULT_TEXT_FONT) } : made;
   };
 
@@ -353,5 +370,5 @@ export function insertAt(e: PointerEvent, itemId: string): void {
 
   editor().select([newId]);
   editor().setTool({ kind: 'select' });
-  if (item.editTextOnInsert && canEditText(editor().doc, newId)) requestAnimationFrame(() => editor().setEditingText(newId));
+
 }

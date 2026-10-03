@@ -1,3 +1,4 @@
+import { AiReadingOverlay } from './AiReadingOverlay.tsx';
 /**
  * The spatial editing environment: a viewport containing a transformed "world" layer of
  * artboards (real DOM) and a screen-space overlay. Pointer input is routed to gestures.
@@ -32,6 +33,7 @@ export function Canvas() {
     setViewportElement(el);
     // Wheel pans; pinch (ctrl+wheel on trackpads) or cmd/ctrl+wheel zooms around the pointer.
     const onWheel = (e: WheelEvent) => {
+      finishTextEditing(true);
       e.preventDefault();
       const store = useEditor.getState();
       const v = store.viewport;
@@ -68,7 +70,7 @@ export function Canvas() {
     const native = e.nativeEvent;
     const store = useEditor.getState();
     // The editing artboard receives its own pointer events, so anything reaching here is outside it.
-    if (store.editingTextId) finishTextEditing(true);
+    finishTextEditing(true);
     const active = document.activeElement as HTMLElement | null;
     if (active && active !== document.body) active.blur?.();
     if (e.button === 1 || (e.button === 0 && (store.spacePressed || store.tool.kind === 'hand'))) {
@@ -139,7 +141,7 @@ export function Canvas() {
   return (
     <div
       ref={ref}
-      className={`canvas tool-${tool.kind}${spacePressed || tool.kind === 'hand' ? ' is-panning' : ''}`}
+      className={`canvas tool-${tool.kind}${tool.kind === 'insert' && ['text', 'heading'].includes(tool.itemId) ? ' tool-text' : ''}${spacePressed || tool.kind === 'hand' ? ' is-panning' : ''}`}
       style={canvasColor ? { background: canvasColor } : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -155,6 +157,7 @@ export function Canvas() {
         ))}
       </div>
       <Overlay />
+      <AiReadingOverlay />
       <Rulers />
       {pageEmpty && (
         <div className="canvas-empty">

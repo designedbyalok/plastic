@@ -67,13 +67,14 @@ function handleVectorKey(e: KeyboardEvent, key: string, mod: boolean): boolean {
 function isTyping(e: KeyboardEvent): boolean {
   const target = e.composedPath()[0] as HTMLElement | undefined;
   if (!target || target.nodeType !== 1) return false;
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || !!target.closest('[role="combobox"], [role="listbox"], [data-plastic-select]');
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || !!target.closest('[role="combobox"], [role="listbox"], [data-plastic-select], [data-plastic-menu]');
 }
 
 export function useShortcuts(enabled = true): void {
   useEffect(() => {
     if (!enabled) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       const store = useEditor.getState();
       const mod = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();

@@ -1,3 +1,4 @@
+import { readAiActivity, withAiActivity } from './aiActivity.ts';
 /**
  * Dev-server bridge between the editor and design files on disk.
  *
@@ -57,6 +58,7 @@ export function plasticWorkspace(): Plugin {
     let workspaceTimer: NodeJS.Timeout | undefined;
     const watcher = fs.watch(root, { recursive: true }, (_event, filename) => {
       const id = filename?.toString().split(path.sep)[0];
+      if (id?.startsWith('.')) return;
       clearTimeout(workspaceTimer);
       workspaceTimer = setTimeout(() => server.ws.send({ type: 'custom', event: WORKSPACE_CHANGED_EVENT, data: {} }), 150);
       if (!id || !PROJECT_ID.test(id)) return;
@@ -85,12 +87,19 @@ export function plasticWorkspace(): Plugin {
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://local');
+    const activity = /^\/__plastic\/ai-activity\/([a-z0-9][a-z0-9_-]*)$/i.exec(url.pathname);
+    if (activity) {
+      if (req.method !== 'GET') return json(res, 405);
+      if (!isLocalRequest(req)) return json(res, 403);
+      res.setHeader('Cache-Control', 'no-store');
+      return json(res, 200, await readAiActivity(root, activity[1]!));
+    }
     const frame = /^\/__plastic\/frame\/([^/]+)\/([\w-]+)$/.exec(url.pathname);
     if (frame) {
       if (req.method !== 'GET') return json(res, 405);
       if (!isLocalRequest(req)) return json(res, 403, { error: 'Local requests only.' });
       try {
-        const design = await new DesignApi(store).getFrame(`/file/${frame[1]}?frame=${frame[2]}`);
+        const design = await withAiActivity(root, 'get_frame', { file: frame[1], id: frame[2] }, () => new DesignApi(store).getFrame(`/file/${frame[1]}?frame=${frame[2]}`));
         const { assetsDirectory: _assetsDirectory, ...publicDesign } = design;
         return json(res, 200, { ...publicDesign, assetBase: `/__plastic/files/${frame[1]}/` });
       } catch (error) { return json(res, 404, { error: error instanceof Error ? error.message : 'Frame not found.' }); }

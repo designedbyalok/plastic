@@ -1,3 +1,4 @@
+import { withAiActivity } from '../aiActivity.ts';
 /**
  * Plastic's MCP server: lets coding agents (Claude, Codex, Cursor, Copilot, …) read and write
  * designs and tokens. Tools are thin wrappers over DesignApi, which uses the editor's own
@@ -38,7 +39,7 @@ function fail(error: unknown) {
 }
 
 /** Wrap a handler so errors become tool errors the agent can read and correct. */
-function run<A>(fn: (args: A) => Promise<unknown>) {
+function toolResult<A>(fn: (args: A) => Promise<unknown>) {
   return async (args: A) => {
     try {
       return ok(await fn(args));
@@ -55,6 +56,7 @@ const styles = z.record(z.string(), z.string().nullable()).describe('CSS declara
 
 export function createMcpServer(store: ProjectStore): McpServer {
   const api = new DesignApi(store);
+  const run = <A,>(operation: string, fn: (args: A) => Promise<unknown>) => toolResult((args: A) => withAiActivity(store.root, operation, args, () => fn(args)));
   const server = new McpServer({ name: 'plastic', version: '0.1.0' }, { instructions: INSTRUCTIONS });
   const readOnly = { readOnlyHint: true, openWorldHint: false };
   const writes = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
@@ -65,7 +67,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
   server.registerTool(
     'list_files',
     { title: 'List files', description: 'List the design files in the Plastic workspace, with their pages and token counts.', annotations: readOnly },
-    run(() => api.listFiles()),
+    run('list_files', () => api.listFiles()),
   );
 
   server.registerTool(
@@ -76,7 +78,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { file },
       annotations: readOnly,
     },
-    run(({ file }) => api.getFile(file)),
+    run('get_file', ({ file }) => api.getFile(file)),
   );
 
   server.registerTool(
@@ -88,7 +90,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { file, page },
       annotations: readOnly,
     },
-    run(({ file, page }) => api.getPage(file, page)),
+    run('get_page', ({ file, page }) => api.getPage(file, page)),
   );
 
   server.registerTool(
@@ -99,7 +101,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { file, id: nodeId },
       annotations: readOnly,
     },
-    run(({ file, id }) => api.getNode(file, id)),
+    run('get_node', ({ file, id }) => api.getNode(file, id)),
   );
 
   server.registerTool(
@@ -110,13 +112,13 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { link: z.string().describe('Copied Plastic frame link, e.g. http://localhost:5173/file/demo?frame=abc123.') },
       annotations: readOnly,
     },
-    run(({ link }) => api.getFrame(link)),
+    run('get_frame', ({ link }) => api.getFrame(link)),
   );
 
   server.registerTool(
     'get_tokens',
     { title: 'Get tokens', description: 'All design tokens (CSS custom properties in tokens.css) with their kind and how to reference them.', inputSchema: { file }, annotations: readOnly },
-    run(({ file }) => api.getTokens(file)),
+    run('get_tokens', ({ file }) => api.getTokens(file)),
   );
 
   // --- writing ---------------------------------------------------------------------------------
@@ -129,7 +131,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { title: z.string().describe('File title, e.g. "Pricing page".'), withFrame: z.boolean().optional().describe('Start with an empty artboard (default true).') },
       annotations: writes,
     },
-    run(({ title, withFrame }) => api.createFile(title, withFrame ?? true)),
+    run('create_file', ({ title, withFrame }) => api.createFile(title, withFrame ?? true)),
   );
 
   server.registerTool(
@@ -147,7 +149,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
       },
       annotations: writes,
     },
-    run((a) => api.addFrame(a.file, a)),
+    run('add_frame', (a) => api.addFrame(a.file, a)),
   );
 
   server.registerTool(
@@ -168,7 +170,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
       },
       annotations: writes,
     },
-    run((a) => api.writeHtml(a.file, a)),
+    run('write_html', (a) => api.writeHtml(a.file, a)),
   );
 
   server.registerTool(
@@ -179,7 +181,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { file, page, html: z.string(), css: z.string().optional() },
       annotations: destructive,
     },
-    run((a) => api.setPageHtml(a.file, a)),
+    run('set_page_html', (a) => api.setPageHtml(a.file, a)),
   );
 
   server.registerTool(
@@ -190,7 +192,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { file, className: z.string().optional(), ids: z.array(z.string()).optional(), styles },
       annotations: writes,
     },
-    run((a) => api.updateStyles(a.file, a)),
+    run('update_styles', (a) => api.updateStyles(a.file, a)),
   );
 
   server.registerTool(
@@ -201,25 +203,25 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { file, id: nodeId, attributes: z.record(z.string(), z.string().nullable()), tag: z.string().optional().describe('New tag name, e.g. "section" or "h2".') },
       annotations: writes,
     },
-    run(({ file, id, attributes, tag }) => api.setAttributes(file, id, attributes, tag)),
+    run('set_attributes', ({ file, id, attributes, tag }) => api.setAttributes(file, id, attributes, tag)),
   );
 
   server.registerTool(
     'set_text',
     { title: 'Set text', description: 'Replace the text of an element (its first text node).', inputSchema: { file, id: nodeId, text: z.string() }, annotations: writes },
-    run(({ file, id, text }) => api.setText(file, id, text)),
+    run('set_text', ({ file, id, text }) => api.setText(file, id, text)),
   );
 
   server.registerTool(
     'move_node',
     { title: 'Move element', description: 'Move an element into another element at an index.', inputSchema: { file, id: nodeId, parentId: nodeId, index: z.number().optional() }, annotations: writes },
-    run(({ file, id, parentId, index }) => api.moveNode(file, id, parentId, index)),
+    run('move_node', ({ file, id, parentId, index }) => api.moveNode(file, id, parentId, index)),
   );
 
   server.registerTool(
     'delete_nodes',
     { title: 'Delete elements', description: 'Delete elements and everything inside them.', inputSchema: { file, ids: z.array(z.string()) }, annotations: destructive },
-    run(({ file, ids }) => api.deleteNodes(file, ids)),
+    run('delete_nodes', ({ file, ids }) => api.deleteNodes(file, ids)),
   );
 
   server.registerTool(
@@ -231,7 +233,7 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { path: z.string().describe('Absolute path to a .fig file (in Figma: File → Save local copy…).') },
       annotations: writes,
     },
-    run(async ({ path: figPath }) => {
+    run('import_figma', async ({ path: figPath }) => {
       if (!/\.fig$/i.test(figPath)) throw new DesignError('Expected a path to a .fig file.');
       const bytes = await fsp.readFile(figPath).catch(() => {
         throw new DesignError(`Can't read ${figPath}.`);
@@ -245,19 +247,19 @@ export function createMcpServer(store: ProjectStore): McpServer {
   server.registerTool(
     'create_page',
     { title: 'Create page', description: 'Add an empty page (a new HTML file) to a file.', inputSchema: { file, name: z.string() }, annotations: writes },
-    run(({ file, name }) => api.createPage(file, name)),
+    run('create_page', ({ file, name }) => api.createPage(file, name)),
   );
 
   server.registerTool(
     'rename_page',
     { title: 'Rename page', description: 'Rename a page (its file name stays the same).', inputSchema: { file, page: z.string(), name: z.string() }, annotations: writes },
-    run(({ file, page, name }) => api.renamePage(file, page, name)),
+    run('rename_page', ({ file, page, name }) => api.renamePage(file, page, name)),
   );
 
   server.registerTool(
     'delete_page',
     { title: 'Delete page', description: 'Delete a page and its HTML file.', inputSchema: { file, page: z.string() }, annotations: destructive },
-    run(({ file, page }) => api.deletePage(file, page)),
+    run('delete_page', ({ file, page }) => api.deletePage(file, page)),
   );
 
   // --- tokens ----------------------------------------------------------------------------------
@@ -271,13 +273,13 @@ export function createMcpServer(store: ProjectStore): McpServer {
       inputSchema: { file, tokens: z.record(z.string(), z.string().nullable()).describe('e.g. { "color-primary": "#4f46e5", "spacing-4": "16px" }') },
       annotations: writes,
     },
-    run(({ file, tokens }) => api.setTokens(file, tokens)),
+    run('set_tokens', ({ file, tokens }) => api.setTokens(file, tokens)),
   );
 
   server.registerTool(
     'rename_token',
     { title: 'Rename token', description: 'Rename a token and every var() that uses it.', inputSchema: { file, from: z.string(), to: z.string() }, annotations: writes },
-    run(({ file, from, to }) => api.renameToken(file, from, to)),
+    run('rename_token', ({ file, from, to }) => api.renameToken(file, from, to)),
   );
 
   return server;

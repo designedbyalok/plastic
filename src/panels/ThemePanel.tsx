@@ -1,3 +1,4 @@
+import { Menu, MenuContent } from './ui/Menu.tsx';
 /**
  * Theme: the project's design tokens, i.e. the custom properties in tokens.css. Grouped by the
  * kind their name prefix implies (color-, spacing-, radius-, font-…). Rows read as a list; click
@@ -6,7 +7,7 @@
 import {
   ALargeSmall, Baseline, Bold, ChevronDown, ChevronRight, Hexagon, Layers2, MoveDiagonal, Plus, Space, SquareDashed, TriangleAlert, Type, X, type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type FocusEvent } from 'react';
+import { useState, type FocusEvent } from 'react';
 import { OTHER_GROUP, TOKEN_GROUPS, TOKEN_NAME, removeToken, renameToken, setToken, tokenKind, tokenUsage, uniqueTokenName, type TokenGroup, type TokenKind } from '../document/tokens.ts';
 import { useEditor } from '../editor/store.ts';
 import { missingFamily } from '../app/fonts.ts';
@@ -64,41 +65,30 @@ export function ThemePanel() {
 
 function AddTokenMenu({ onAdd }: { onAdd(group: TokenGroup): void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener('pointerdown', close, true);
-    return () => window.removeEventListener('pointerdown', close, true);
-  }, [open]);
   return (
-    <span className="insp-menu-anchor" ref={ref}>
-      <button type="button" className="icon-button" title="Add Token" aria-label="Add Token" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+    <Menu.Root open={open} onOpenChange={setOpen} modal={false}><span className="insp-menu-anchor">
+      <Menu.Trigger asChild><button type="button" className="icon-button" title="Add Token" aria-label="Add Token" aria-haspopup="menu" aria-expanded={open}>
         <Plus size={13} strokeWidth={1.5} />
-      </button>
+      </button></Menu.Trigger>
       {open && (
-        <div className="insp-menu" role="menu">
+        <MenuContent align="end" aria-label="Add Token">
           <div className="rail-menu-title">Add Token</div>
           {GROUPS.map((g) => (
-            <button
+            <Menu.Item
               key={g.kind}
-              type="button"
-              role="menuitem"
               className="insp-menu-item"
-              onClick={() => {
+              onSelect={() => {
                 onAdd(g);
                 setOpen(false);
               }}
             >
               <span>{g.label}</span>
               <kbd>--{g.prefix}…</kbd>
-            </button>
+            </Menu.Item>
           ))}
-        </div>
+        </MenuContent>
       )}
-    </span>
+    </span></Menu.Root>
   );
 }
 

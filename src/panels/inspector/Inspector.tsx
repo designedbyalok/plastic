@@ -1,3 +1,5 @@
+import { EditorPresence } from '../../app/EditorPresence.tsx';
+import { Menu, MenuContent } from '../ui/Menu.tsx';
 import { ComponentSection, ComponentLibrarySection } from './ComponentSection.tsx';
 import { SourceSection } from './SourceSection.tsx';
 import { ScrollArea } from '../ui/ScrollArea.tsx';
@@ -6,7 +8,7 @@ import { pageOf } from '../../document/tree.ts';
 import { copyFrameContext, copyFrameLink } from '../../editor/frameLinks.ts';
 import { resolvedTheme, useTheme } from '../../app/theme.ts';
 import { ChevronDown, Pipette } from 'lucide-react';
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { zoomBy, zoomTo, zoomToFit, zoomToSelection } from '../../editor/commands.ts';
 import { activeRoots, useEditor } from '../../editor/store.ts';
 import { getElement } from '../../document/tree.ts';
@@ -89,7 +91,7 @@ export function Inspector() {
             <VectorSections ids={ids} />
           ) : (
             <>
-              <FillSection ids={ids} />
+              <FillSection ids={ids} textual={textual} />
               <TextSection ids={ids} textual={textual} />
               <BorderSection ids={ids} />
             </>
@@ -112,7 +114,7 @@ function InspectorHeader() {
   const codeOpen = useEditor((s) => s.codeOpen);
   return (
     <header className="insp-top">
-      <SaveStatus />
+      <EditorPresence />
       <span className="insp-top-actions">
         <ZoomMenu />
         <button
@@ -129,20 +131,6 @@ function InspectorHeader() {
   );
 }
 
-function SaveStatus() {
-  const status = useEditor((s) => s.saveStatus);
-  const dirty = useEditor((s) => s.revision !== s.savedRevision);
-  const location = useEditor((s) => s.storageLocation);
-  const state = status === 'error' ? 'error' : dirty || status === 'saving' ? 'saving' : 'saved';
-  const text = state === 'error' ? 'Save failed' : state === 'saving' ? 'Saving…' : 'Saved';
-  return (
-    <span className={`insp-save is-${state}`} title={location ? `Files in ${location}/` : undefined}>
-      <span className="insp-save-dot" aria-hidden="true" />
-      {text}
-    </span>
-  );
-}
-
 const ZOOM_ITEMS = [
   { label: 'Zoom In', kbd: '⌘ +', run: () => zoomBy(1.25) },
   { label: 'Zoom Out', kbd: '⌘ −', run: () => zoomBy(0.8) },
@@ -154,47 +142,36 @@ const ZOOM_ITEMS = [
 function ZoomMenu() {
   const zoom = useEditor((s) => s.viewport.zoom);
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener('pointerdown', close, true);
-    return () => window.removeEventListener('pointerdown', close, true);
-  }, [open]);
   return (
-    <span className="insp-menu-anchor" ref={ref}>
-      <button
+    <Menu.Root open={open} onOpenChange={setOpen} modal={false}><span className="insp-menu-anchor">
+      <Menu.Trigger asChild><button
         type="button"
         className="insp-zoom"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen(!open)}
+
       >
         {Math.round(zoom * 100)}%
         <ChevronDown size={12} strokeWidth={1.5} />
-      </button>
+      </button></Menu.Trigger>
       {open && (
-        <div className="insp-menu" role="menu">
+        <MenuContent align="end" aria-label="Zoom">
           {ZOOM_ITEMS.map((item) => (
-            <button
+            <Menu.Item
               key={item.label}
-              type="button"
-              role="menuitem"
               className="insp-menu-item"
-              onClick={() => {
+              onSelect={() => {
                 item.run();
                 setOpen(false);
               }}
             >
               <span>{item.label}</span>
               <kbd>{item.kbd}</kbd>
-            </button>
+            </Menu.Item>
           ))}
-        </div>
+        </MenuContent>
       )}
-    </span>
+    </span></Menu.Root>
   );
 }
 

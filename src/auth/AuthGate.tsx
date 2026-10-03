@@ -7,6 +7,7 @@ import { SignIn } from './SignIn.tsx';
 export interface Account {
   readonly name: string;
   readonly email: string;
+  readonly image?: string | null;
   signOut(): Promise<void>;
 }
 
@@ -34,6 +35,7 @@ function Session({ providers, children }: { providers: readonly string[]; childr
   const account: Account = {
     name: data.user.name,
     email: data.user.email,
+    image: data.user.image,
     signOut: async () => {
       await authClient.signOut();
       await refetch();

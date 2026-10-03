@@ -39,7 +39,7 @@ export function duplicateSelection(): void {
 /** "Add auto layout": wrap selected siblings in a flex stack, inferring direction and gap. */
 export function wrapSelectionInStack(): void {
   const { selection, doc, viewport } = state();
-  const ids = topmostIds(doc, selection).filter((id) => !isRoot(doc, id));
+  const ids = topmostIds(doc, selection);
   const first = ids[0];
   if (!first) return;
   const parentId = getParentId(doc, first);
@@ -48,7 +48,7 @@ export function wrapSelectionInStack(): void {
     .filter((id) => getParentId(doc, id) === parentId)
     .map((id) => ({ id, rect: screenRectOf(id) }))
     .filter((i): i is { id: NodeId; rect: Rect } => !!i.rect);
-  if (!items.length || !parentEl) return;
+  if (!items.length || (parentId && !parentEl)) return;
 
   const xs = items.map((i) => i.rect.x + i.rect.width / 2);
   const ys = items.map((i) => i.rect.y + i.rect.height / 2);
@@ -59,12 +59,15 @@ export function wrapSelectionInStack(): void {
     const prev = items[i]!.rect;
     return direction === 'row' ? item.rect.x - (prev.x + prev.width) : item.rect.y - (prev.y + prev.height);
   });
-  const averageGap = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length / viewport.zoom : 12;
+  const averageGap = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length / viewport.zoom : 0;
   const gap = Math.max(0, Math.round(Number.isFinite(averageGap) ? averageGap : 12));
 
   const allFree = items.every((i) => isOutOfFlow(domElement(i.id)));
   let placement = null;
-  if (allFree) {
+  if (!parentId) {
+    const union = unionRects(items.map((i) => i.rect))!;
+    placement = screenToWorld({ x: union.x, y: union.y }, viewport);
+  } else if (allFree && parentEl) {
     const union = unionRects(items.map((i) => i.rect))!;
     const parentRect = screenRectOf(parentId!)!;
     placement = {
@@ -89,7 +92,7 @@ export function addFlexOrWrap(): void {
   const { selection, doc } = state();
   const only = selection.length === 1 ? getElement(doc, selection[0]) : undefined;
   const el = only ? domElement(only.id) : null;
-  if (only && el && elementSpec(only.tag).acceptsChildren && !/flex|grid/.test(styleOf(el).display)) {
+  if (only && el && elementSpec(only.tag).acceptsChildren && !canEditText(doc, only.id) && !/flex|grid/.test(styleOf(el).display)) {
     state().apply('Add flex', (d) => {
       let next = setStyleOnNodes(d, [only.id], 'display', 'flex');
       next = setStyleOnNodes(next, [only.id], 'flex-direction', 'column');
