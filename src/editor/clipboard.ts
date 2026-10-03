@@ -9,9 +9,14 @@ import { createId } from '../document/ids.ts';
 import { VOID_TAGS } from '../document/markup.ts';
 import { getViewportElement } from '../canvas/dom.ts';
 import { screenToWorld } from '../canvas/coords.ts';
-import { getElement, rootOf } from '../document/tree.ts';
+import { getElement, getParentId, rootOf, topmostIds, textContent } from '../document/tree.ts';
 import type { DesignDocument, DocNode, NodeId, Point } from '../document/types.ts';
 import { escapeText, parseHTML } from '../serialization/html.ts';
+import { serializeNode } from '../serialization/html.ts';
+import { pastePlasticNodes } from '../document/clipboardNodes.ts';
+import { removeNodes } from '../document/ops.ts';
+import { domElement, styleOf } from '../canvas/dom.ts';
+import { elementSpec } from '../elements/registry.ts';
 import { notify } from '../canvas/gestureStore.ts';
 import { useEditor } from './store.ts';
 
@@ -156,6 +161,7 @@ export function importClipboardHtml(doc: DesignDocument, artboard: NodeId | null
 export function handleCanvasPaste(e: ClipboardEvent, artboardHint?: NodeId): void {
   const store = useEditor.getState();
   if (e.defaultPrevented || ownsTextPaste(e) || store.editingTextId || store.agentsOpen || store.tx) return;
+  if (pasteNativeSelection(e, artboardHint)) return;
   const html = e.clipboardData?.getData('text/html');
   const text = e.clipboardData?.getData('text/plain');
   if (!html && !text) return;
@@ -171,4 +177,61 @@ export function handleCanvasPaste(e: ClipboardEvent, artboardHint?: NodeId): voi
   } catch (error) {
     notify(error instanceof Error ? error.message : 'Could not paste this content.');
   }
+}
+
+
+const PLASTIC_CLIPBOARD = 'application/x-plastic-selection';
+let captured: { token: string; doc: DesignDocument; ids: NodeId[]; cut: boolean; used: boolean; assetBase: string | null } | null = null;
+
+export function handleCanvasCopy(e: ClipboardEvent, cut = false): void {
+  const state = useEditor.getState();
+  if (e.defaultPrevented || ownsTextPaste(e) || state.editingTextId || state.tx || state.agentsOpen || !e.clipboardData) return;
+  const ids = topmostIds(state.doc, state.selection).filter((id) => getElement(state.doc, id));
+  if (!ids.length) return;
+  try {
+    const token = createId();
+    // A portable computed-style fallback supports other tabs and ordinary HTML destinations.
+    const fragment = new DOMParser().parseFromString(ids.map((id) => serializeNode(state.doc, id)).join(''), 'text/html');
+    for (const el of Array.from(fragment.body.querySelectorAll('[data-pl-id]'))) {
+      const live = domElement(el.getAttribute('data-pl-id'));
+      if (live) {
+        const css = styleOf(live);
+        el.setAttribute('style', Array.from(css).filter((prop) => !prop.startsWith('--')).map((prop) => `${prop}: ${css.getPropertyValue(prop)};`).join(''));
+        for (const attr of ['src', 'poster', 'href']) {
+          const value = el.getAttribute(attr);
+          if (value && !value.startsWith('#')) el.setAttribute(attr, new URL(value, live.ownerDocument.baseURI).href);
+        }
+      }
+    }
+    e.clipboardData.setData(PLASTIC_CLIPBOARD, token);
+    e.clipboardData.setData('text/html', `<x-paper-html>${fragment.body.innerHTML}</x-paper-html>`);
+    e.clipboardData.setData('text/plain', ids.map((id) => textContent(state.doc, id)).join('\n'));
+    captured = { token, doc: state.doc, ids, cut, used: false, assetBase: state.assetBase };
+    e.preventDefault();
+    if (cut) {
+      const parent = getParentId(state.doc, ids[0]!);
+      state.apply('Cut Layers', (doc) => removeNodes(doc, ids), { select: parent ? [parent] : [] });
+      notify('Layers Cut');
+    } else notify('Layers Copied');
+  } catch (error) { notify(error instanceof Error ? error.message : 'Could not copy layers.'); }
+}
+
+function pasteNativeSelection(e: ClipboardEvent, hint?: NodeId): boolean {
+  const token = e.clipboardData?.getData(PLASTIC_CLIPBOARD);
+  if (!captured || !token || token !== captured.token) return false;
+  e.preventDefault();
+  const state = useEditor.getState();
+  const selected = state.selection.length === 1 ? getElement(state.doc, state.selection[0]) : null;
+  const parent = selected && elementSpec(selected.tag).acceptsChildren ? selected.id : hint ?? null;
+  const viewport = getViewportElement();
+  const position = screenToWorld({ x: (viewport?.clientWidth ?? window.innerWidth) / 3,
+    y: (viewport?.clientHeight ?? window.innerHeight) / 3 }, state.viewport);
+  try {
+    const result = pastePlasticNodes(state.doc, captured.doc, captured.ids, parent, state.activePage, position, captured.cut && !captured.used, captured.assetBase !== state.assetBase ? captured.assetBase ?? undefined : undefined);
+    state.apply('Paste Layers', () => result.doc, { select: result.ids });
+    captured.used = true;
+    state.setTool({ kind: 'select' });
+    notify('Layers Pasted');
+  } catch (error) { notify(error instanceof Error ? error.message : 'Could not paste layers.'); }
+  return true;
 }

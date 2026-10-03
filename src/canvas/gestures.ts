@@ -8,7 +8,8 @@ import { instantiate, withRootStyle } from '../document/factory.ts';
 import { insertChild, insertRoot, moveNode, setFrame, setStyleOnNodes } from '../document/ops.ts';
 import { getElement, getParentId, isRoot, topmostIds } from '../document/tree.ts';
 import type { DesignDocument, NodeId, Point } from '../document/types.ts';
-import { FRAME_SIZE, insertable } from '../elements/insertables.ts';
+import { DEFAULT_TEXT_FONT, FRAME_SIZE, insertable } from '../elements/insertables.ts';
+import { selectFont } from '../document/fonts.ts';
 import { elementSpec } from '../elements/registry.ts';
 import { rectFromPoints, rectsIntersect, screenToWorld, unionRects, type Rect } from './coords.ts';
 import { clearGuides, collectTargets, snapRect } from './snap.ts';
@@ -316,18 +317,22 @@ export function insertAt(e: PointerEvent, itemId: string): void {
   const { doc, viewport } = editor();
   const container = containerAt(doc, e.clientX, e.clientY);
   let newId: NodeId = '';
+  const make = (d: DesignDocument, spec = item.spec()) => {
+    const made = instantiate(d, spec);
+    return item.editTextOnInsert ? { ...made, doc: selectFont(made.doc, [made.id], DEFAULT_TEXT_FONT) } : made;
+  };
 
   if (!container) {
     const world = screenToWorld(toScreen(e.clientX, e.clientY), viewport);
     editor().apply(`Insert ${item.label}`, (d) => {
-      const made = instantiate(d, item.spec());
+      const made = make(d);
       newId = made.id;
       return setFrame(insertRoot(made.doc, editor().activePage, Number.MAX_SAFE_INTEGER, made.id), made.id, world);
     });
   } else if (insertsInFlow(doc, container)) {
     const insertion = flowInsertion(doc, container, new Set(), e.clientX, e.clientY);
     editor().apply(`Insert ${item.label}`, (d) => {
-      const made = instantiate(d, item.spec());
+      const made = make(d);
       newId = made.id;
       return insertChild(made.doc, container.id, insertion?.index ?? container.children.length, made.id);
     });
@@ -338,7 +343,7 @@ export function insertAt(e: PointerEvent, itemId: string): void {
     const top = (e.clientY - r.top) / viewport.zoom - el.clientTop;
     const needsPositioning = styleOf(el).position === 'static';
     editor().apply(`Insert ${item.label}`, (d) => {
-      const made = instantiate(d, withRootStyle(item.spec(), { position: 'absolute', left: px(left), top: px(top) }));
+      const made = make(d, withRootStyle(item.spec(), { position: 'absolute', left: px(left), top: px(top) }));
       newId = made.id;
       let next = insertChild(made.doc, container.id, container.children.length, made.id);
       if (needsPositioning) next = setStyleOnNodes(next, [container.id], 'position', 'relative');

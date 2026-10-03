@@ -63,8 +63,8 @@ function InsertMenu() {
       <button
         type="button"
         className={`rail-button${open || activeMenuItem ? ' is-active' : ''}`}
-        title={activeMenuItem ? `Insert ${activeMenuItem.label}` : 'Insert element'}
-        aria-label="Insert element"
+        title={activeMenuItem ? `Insert ${activeMenuItem.label}` : 'Insert Element'}
+        aria-label="Insert Element"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
@@ -73,7 +73,7 @@ function InsertMenu() {
       </button>
       {open && (
         <div className="rail-menu" role="menu">
-          <div className="rail-menu-title">Insert element</div>
+          <div className="rail-menu-title">Insert Element</div>
           {INSERTABLES.filter((i) => !RAIL_ITEMS.has(i.id)).map((item) => {
             const Icon = INSERT_ICONS[item.id];
             return (
@@ -155,7 +155,7 @@ function ShapeMenu() {
       >
         <Icon size={18} strokeWidth={1.5} />
       </button>
-      <button type="button" className="rail-split-toggle" aria-label="Shape tools" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" className="rail-split-toggle" aria-label="Shape Tools" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
         <ChevronDown size={10} strokeWidth={2} />
       </button>
       {open && (

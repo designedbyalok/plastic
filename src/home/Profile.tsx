@@ -97,7 +97,7 @@ export function ProfileView({ profile, onSaved }: { profile: ProfileData | null;
         {!editing && (
           <button type="button" className="profile-edit" onClick={() => setEditing(true)}>
             <Pencil size={13} strokeWidth={1.75} />
-            Edit profile
+            Edit Profile
           </button>
         )}
       </div>
@@ -120,7 +120,7 @@ export function ProfileView({ profile, onSaved }: { profile: ProfileData | null;
               <div className="profile-handle">@{profile.username}</div>
             ) : (
               <button type="button" className="profile-add-handle" onClick={() => setEditing(true)}>
-                Choose a username
+                Choose a Username
               </button>
             )}
           </>
@@ -129,10 +129,10 @@ export function ProfileView({ profile, onSaved }: { profile: ProfileData | null;
 
       <dl className="profile-stats">
         <Stat label="Files" value={activity ? number.format(activity.files) : '–'} />
-        <Stat label="Edits this year" value={activity ? number.format(stats.edits) : '–'} />
-        <Stat label="Active days" value={activity ? number.format(stats.active) : '–'} />
-        <Stat label="Longest streak" value={activity ? `${stats.longest} ${stats.longest === 1 ? 'day' : 'days'}` : '–'} />
-        <Stat label="Current streak" value={activity ? `${stats.current} ${stats.current === 1 ? 'day' : 'days'}` : '–'} />
+        <Stat label="Edits This Year" value={activity ? number.format(stats.edits) : '–'} />
+        <Stat label="Active Days" value={activity ? number.format(stats.active) : '–'} />
+        <Stat label="Longest Streak" value={activity ? `${stats.longest} ${stats.longest === 1 ? 'day' : 'days'}` : '–'} />
+        <Stat label="Current Streak" value={activity ? `${stats.current} ${stats.current === 1 ? 'day' : 'days'}` : '–'} />
       </dl>
 
       <section className="profile-activity" aria-label="Activity">

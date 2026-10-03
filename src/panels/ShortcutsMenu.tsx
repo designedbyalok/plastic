@@ -1,4 +1,4 @@
-/** Keyboard shortcuts, behind a button at the bottom of the tool rail. */
+/** Keyboard Shortcuts, behind a button at the bottom of the tool rail. */
 import { Keyboard } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useEditor } from '../editor/store.ts';
@@ -18,7 +18,7 @@ const GROUPS: readonly { title: string; items: readonly [string, readonly string
       ['Heading', ['H']],
       ['Button', ['B']],
       ['Input', ['I']],
-      ['Labeled field', ['L']],
+      ['Labeled Field', ['L']],
       ['Pan', ['Space']],
     ],
   },
@@ -27,10 +27,14 @@ const GROUPS: readonly { title: string; items: readonly [string, readonly string
     items: [
       ['Undo', ['⌘', 'Z']],
       ['Redo', ['⇧', '⌘', 'Z']],
+      ['Cut', ['⌘', 'X']],
+      ['Copy', ['⌘', 'C']],
+      ['Paste', ['⌘', 'V']],
       ['Duplicate', ['⌘', 'D']],
+      ['Copy Frame / File Link', ['⌘', 'L']],
       ['Delete', ['⌫']],
-      ['Add flex / wrap', ['⇧', 'A']],
-      ['Clip content', ['⌥', 'C']],
+      ['Add Flex / Wrap', ['⇧', 'A']],
+      ['Clip Content', ['⌥', 'C']],
       ['Nudge', ['←', '→', '↑', '↓']],
       ['Nudge 10px', ['⇧', 'Arrows']],
     ],
@@ -38,38 +42,39 @@ const GROUPS: readonly { title: string; items: readonly [string, readonly string
   {
     title: 'Selection',
     items: [
-      ['Edit text', ['Double-click']],
-      ['Add to selection', ['⇧', 'Click']],
-      ['Select child', ['Enter']],
-      ['Select parent', ['Esc']],
+      ['Edit Text', ['Double-Click']],
+      ['Add to Selection', ['⇧', 'Click']],
+      ['Select Child', ['Enter']],
+      ['Select Parent', ['Esc']],
     ],
   },
   {
     title: 'Vectors',
     items: [
-      ['Edit points', ['Double-click']],
-      ['Corner ↔ smooth', ['Double-click point']],
-      ['Add point', ['Click segment']],
-      ['Bend segment', ['⌘', 'Drag']],
-      ['Break handle', ['⌥', 'Drag']],
-      ['Snap to 45° / square', ['⇧', 'Drag']],
-      ['Draw from center', ['⌥', 'Drag']],
+      ['Edit Points', ['Double-Click']],
+      ['Corner ↔ Smooth', ['Double-Click Point']],
+      ['Add Point', ['Click Segment']],
+      ['Bend Segment', ['⌘', 'Drag']],
+      ['Break Handle', ['⌥', 'Drag']],
+      ['Snap to 45° / Square', ['⇧', 'Drag']],
+      ['Draw from Center', ['⌥', 'Drag']],
       ['Union / Subtract', ['⌥', '⇧', 'U / S']],
       ['Intersect / Exclude', ['⌥', '⇧', 'I / X']],
       ['Flatten', ['⌘', 'E']],
-      ['Outline stroke', ['⌥', '⌘', 'O']],
-      ['Finish / done', ['Esc']],
+      ['Outline Stroke', ['⌥', '⌘', 'O']],
+      ['Finish / Done', ['Esc']],
     ],
   },
   {
     title: 'View',
     items: [
-      ['Zoom in / out', ['⌘', '+ / −']],
+      ['Show Rulers', ['⇧', 'R']],
+      ['Zoom In / Out', ['⌘', '+ / −']],
       ['Zoom to 100%', ['⇧', '0']],
-      ['Zoom to fit', ['⇧', '1']],
-      ['Zoom to selection', ['⇧', '2']],
-      ['Show / hide panel', ['⌘', '\\']],
-      ['Save now', ['⌘', 'S']],
+      ['Zoom to Fit', ['⇧', '1']],
+      ['Zoom to Selection', ['⇧', '2']],
+      ['Show / Hide Panel', ['⌘', '\\']],
+      ['Save Now', ['⌘', 'S']],
     ],
   },
 ];
@@ -97,8 +102,8 @@ export function ShortcutsMenu() {
       <button
         type="button"
         className={`rail-button${open ? ' is-active' : ''}`}
-        title="Keyboard shortcuts"
-        aria-label="Keyboard shortcuts"
+        title="Keyboard Shortcuts"
+        aria-label="Keyboard Shortcuts"
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen(!open)}
@@ -106,7 +111,7 @@ export function ShortcutsMenu() {
         <Keyboard size={17} strokeWidth={1.5} />
       </button>
       {open && (
-        <div className="shortcuts-popover" role="dialog" aria-label="Keyboard shortcuts">
+        <div className="shortcuts-popover" role="dialog" aria-label="Keyboard Shortcuts">
           {GROUPS.map((group) => (
             <section key={group.title} className="shortcuts-group">
               <h3>{group.title}</h3>

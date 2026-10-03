@@ -107,7 +107,7 @@ export function shapeSpec(kind: ShapeKind, p: Placement, from: Point, to: Point)
   const stroke = { stroke: STROKE, 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' };
   switch (kind) {
     case 'rectangle':
-      return { tag: 'div', className: 'rectangle', style: boxStyle(p, { background: FILL }) };
+      return { tag: 'div', className: 'rectangle', style: boxStyle(p, { background: '#ffffff' }) };
     case 'ellipse':
       return { tag: 'div', className: 'ellipse', style: boxStyle(p, { background: FILL, 'border-radius': '50%' }) };
     case 'line':

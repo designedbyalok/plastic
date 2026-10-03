@@ -125,7 +125,7 @@ export function CodePanel() {
           <AlignLeft size={12} strokeWidth={1.75} />
           {formatting ? 'Formatting…' : 'Format'}
         </button>
-        <button type="button" className="code-copy" onClick={copy} title={tab === 'page' && clean ? 'Copy without editor ids' : 'Copy'}>
+        <button type="button" className="code-copy" onClick={copy} title={tab === 'page' && clean ? 'Copy Without Editor IDs' : 'Copy'}>
           <Copy size={12} strokeWidth={1.75} />
           Copy
         </button>

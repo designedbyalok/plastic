@@ -84,8 +84,7 @@ export function SourceSection({ el }: { el: ElementNode }) {
     <section className="insp-section insp-source-section">
       <button type="button" className="insp-source-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
         <ChevronRight size={12} strokeWidth={1.5} aria-hidden="true" />
-        <span>Style source</span>
-        <span className="insp-source-hint">Inspect CSS</span>
+        <span>Style Source</span>
       </button>
       {open && (
         <div className="insp-body">
@@ -121,14 +120,14 @@ export function SourceSection({ el }: { el: ElementNode }) {
             ))}
             <p>
               Base controls write to <code>{cls ? `.${cls}` : 'a new class'}</code> in styles.css. Responsive &amp;
-              states controls write to their selected rule.
+              States controls write to their selected rule.
             </p>
             {result?.source &&
               (result.source.file !== 'styles.css' ||
                 result.source.selector !== `.${cls}` ||
                 result.source.contexts.length > 0) && (
                 <p>
-                  This source differs from the base edit target. Use Responsive &amp; states for a matching override, or
+                  This source differs from the base edit target. Use Responsive &amp; States for a matching override, or
                   Code to edit this source.
                 </p>
               )}

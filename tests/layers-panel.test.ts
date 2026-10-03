@@ -3,8 +3,12 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LayersPanel } from '../src/panels/LayersPanel';
+import { Inspector } from '../src/panels/inspector/Inspector';
+import { importClipboardHtml } from '../src/editor/clipboard';
 import { useEditor } from '../src/editor/store';
-import { setTitle } from '../src/document/ops';
+import { instantiate } from '../src/document/factory';
+import { shapeSpec } from '../src/vector/shapes';
+import { insertRoot, setFrame, setTitle } from '../src/document/ops';
 import { docFrom, el } from './helpers';
 
 let root: Root;
@@ -22,6 +26,7 @@ function flushFrames() {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   frames = new Map();
   let nextFrame = 0;
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
@@ -88,4 +93,72 @@ describe('canvas selection in the layers panel', () => {
     flushFrames();
     expect(scroll).toHaveBeenCalledWith({ top: 153, behavior: 'instant' });
   });
+});
+
+describe('imported styles in the inspector', () => {
+  it('populates ordinary fields and keeps advanced tools collapsed below them without duplicating base declarations', () => {
+    const fixture = docFrom({ tag: 'main' });
+    const pasted = importClipboardHtml(fixture.doc, null,
+      '<x-paper-html><div style="display:flex;gap:16px;width:320px;padding:24px;background-color:rgb(30,30,30)">Card</div></x-paper-html>',
+      { page: 'index.html', position: { x: 0, y: 0 } });
+    useEditor.getState().load(pasted.doc);
+    useEditor.getState().select(pasted.ids);
+    act(() => root.render(createElement(Inspector)));
+    flushFrames();
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="width"]')?.value).toBe('320');
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="gap"]')?.value).toBe('16');
+    const responsive = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Responsive & States')!;
+    const source = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Style Source')!;
+    expect(responsive.getAttribute('aria-expanded')).toBe('false');
+    expect(source.getAttribute('aria-expanded')).toBe('false');
+    expect(container.textContent!.indexOf('Layout')).toBeLessThan(container.textContent!.indexOf('Responsive & States'));
+    act(() => responsive.click());
+    expect(responsive.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('[aria-label="Variant width"]')).toBeNull();
+    expect(container.querySelector('[aria-label="New variant declaration"]')).toBeNull();
+    expect(container.textContent).toContain('Base styles are edited in Layout');
+  });
+});
+
+it('maps the alignment pad to CSS for vertical and reversed horizontal layouts', () => {
+  const f = docFrom({ tag: 'main', className: 'layout', style: { display: 'flex', 'flex-direction': 'column', padding: '8px 12px' } });
+  useEditor.getState().load(f.doc); useEditor.getState().select([f.root]);
+  act(() => root.render(createElement(Inspector))); flushFrames();
+  expect(container.querySelectorAll('.flex-alignment button')).toHaveLength(9);
+  expect(container.querySelector<HTMLInputElement>('[aria-label="Padding X"]')?.value).toBe('12');
+  expect(container.querySelector<HTMLInputElement>('[aria-label="Padding Y"]')?.value).toBe('8');
+  act(() => container.querySelector<HTMLButtonElement>('[aria-label="Align Bottom Left"]')!.click());
+  expect(useEditor.getState().doc.styles.rules.layout).toMatchObject({ 'justify-content': 'flex-end', 'align-items': 'flex-start' });
+  act(() => container.querySelector<HTMLButtonElement>('[title="Horizontal"]')!.click());
+  act(() => container.querySelector<HTMLButtonElement>('[aria-label="Reverse Direction"]')!.click());
+  act(() => container.querySelector<HTMLButtonElement>('[aria-label="Align Top Left"]')!.click());
+  expect(useEditor.getState().doc.styles.rules.layout).toMatchObject({ 'flex-direction': 'row-reverse', 'justify-content': 'flex-end', 'align-items': 'flex-start' });
+  act(() => container.querySelector<HTMLButtonElement>('[aria-label="Advanced Flex Options"]')!.click());
+  expect(container.querySelector('[aria-label="Wrap"]')).not.toBeNull();
+  act(() => container.querySelector<HTMLButtonElement>('[aria-label="Remove Flex"]')!.click());
+  expect(useEditor.getState().doc.styles.rules.layout?.display).toBeUndefined();
+  expect(useEditor.getState().doc.styles.rules.layout?.padding).toBe('8px 12px');
+});
+
+it('creates a white rectangle with its drawn height and no carried-over border or shadow controls', () => {
+  const f = docFrom({ tag: 'div', className: 'first', style: { width: '100px', height: '100px' } });
+  useEditor.getState().load(f.doc); useEditor.getState().select([f.root]);
+  act(() => root.render(createElement(Inspector))); flushFrames();
+  act(() => container.querySelector<HTMLButtonElement>('[aria-label="Add border"]')!.click());
+  act(() => container.querySelector<HTMLButtonElement>('[aria-label="Add shadow"]')!.click());
+  const old = useEditor.getState().doc;
+  const spec = shapeSpec('rectangle', { root: true, left: 0, top: 0, width: 240, height: 160 }, { x: 0, y: 0 }, { x: 240, y: 160 });
+  const made = instantiate(old, spec);
+  act(() => useEditor.getState().apply('Add Rectangle', () => setFrame(insertRoot(made.doc, 'index.html', 1, made.id), made.id, { x: 200, y: 0 }), { select: [made.id] }));
+  flushFrames();
+  expect(container.querySelector<HTMLInputElement>('[aria-label="background"]')?.value).toBe('#ffffff');
+  expect(container.querySelector<HTMLInputElement>('[aria-label="height"]')?.value).toBe('160');
+  expect(container.querySelector('[aria-label="border"]')).toBeNull();
+  expect(container.querySelector('[aria-label="box-shadow"]')).toBeNull();
+  expect(container.querySelector('[aria-label="Add border"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="Add shadow"]')).not.toBeNull();
+  expect(useEditor.getState().doc.styles.rules.first).toMatchObject({ border: '1px solid #d1d5db', 'box-shadow': '0 1px 3px rgb(0 0 0 / 0.12)' });
+  const rule = useEditor.getState().doc.styles.rules[el(useEditor.getState().doc, made.id).classes[0]!]!;
+  expect(rule.border).toBeUndefined();
+  expect(rule['box-shadow']).toBeUndefined();
 });

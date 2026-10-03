@@ -1,5 +1,5 @@
 import { serializeStyleSheet, serializeTokenSheet } from '../document/css.ts';
-import { getElement, isRoot, pageOf, subtreeIds } from '../document/tree.ts';
+import { ancestorIds, getElement, pageOf, rootOf, subtreeIds } from '../document/tree.ts';
 import type { DesignDocument } from '../document/types.ts';
 import { layerName } from '../elements/registry.ts';
 import { serializeNode } from './html.ts';
@@ -17,14 +17,16 @@ export function parseFrameLink(link: string): { file: string; frame: string } {
 /** Keep the ordered cascade, global rules, variants and font faces intact for reproduction. */
 export function frameDesign(doc: DesignDocument, id: string) {
   const root = getElement(doc, id);
-  if (!root || !isRoot(doc, id)) throw new Error('This frame no longer exists.');
+  if (!root || !pageOf(doc, id)) throw new Error('This frame no longer exists.');
   const ids = subtreeIds(doc, id);
   return {
     format: 'plastic-frame', version: 1,
     frame: { id, name: layerName(doc, id), page: pageOf(doc, id)!.file, position: doc.frames[id] ?? { x: 0, y: 0 } },
     html: serializeNode(doc, id),
+    contextHtml: serializeNode(doc, rootOf(doc, id)),
+    ancestors: ancestorIds(doc, id).map((key) => doc.nodes[key]!),
     css: serializeStyleSheet(doc.styles), tokensCss: serializeTokenSheet(doc.tokens),
     nodes: ids.map((nodeId) => ({ ...doc.nodes[nodeId]!, ...(doc.names[nodeId] ? { name: doc.names[nodeId] } : {}) })),
-    instructions: 'Use the supplied HTML hierarchy and ordered CSS/token CSS as the design source. Preserve dimensions, flex/grid, typography, SVG paths, images and responsive/state rules. Resolve asset URLs against assetBase. Verify the implementation visually at the supplied viewport size. Font availability and browser rendering affect fidelity; do not claim a pixel-perfect match without comparison.',
+    instructions: 'For nested frames, use contextHtml and ancestors to preserve inherited styles, ancestor selectors and parent layout; the target is identified by frame.id. Use the supplied HTML hierarchy and ordered CSS/token CSS as the design source. Preserve dimensions, flex/grid, typography, SVG paths, images and responsive/state rules. Resolve asset URLs against assetBase. Verify the implementation visually at the supplied viewport size. Font availability and browser rendering affect fidelity; do not claim a pixel-perfect match without comparison.',
   };
 }

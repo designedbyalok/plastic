@@ -9,6 +9,7 @@ import { ArtboardHost } from './ArtboardHost.tsx';
 import { zoomAround } from './coords.ts';
 import { nodeIdAt, setViewportElement, toScreen } from './dom.ts';
 import { insertAt, startFrameDraw, startPan, startSelectGesture } from './gestures.ts';
+import { Rulers } from './Rulers.tsx';
 import { Overlay } from './Overlay.tsx';
 import { finishTextEditing, useTextEditing } from './textEditing.ts';
 import { useGesture } from './gestureStore.ts';
@@ -154,6 +155,7 @@ export function Canvas() {
         ))}
       </div>
       <Overlay />
+      <Rulers />
       {pageEmpty && (
         <div className="canvas-empty">
           <p>

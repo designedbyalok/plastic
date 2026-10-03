@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Diamond, File, PanelLeft, Plus, X } from 'lucide-react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { setName, setTitle } from '../document/ops.ts';
 import { addPage, nextPageName, removePage, renamePage } from '../document/pages.ts';
 import { ancestorIds, elementChildren, getElement } from '../document/tree.ts';
@@ -10,6 +10,7 @@ import { iconFor } from './icons.tsx';
 import { ThemePanel } from './ThemePanel.tsx';
 import { PanelResizer } from './PanelResizer.tsx';
 import { FileMenu } from './FileMenu.tsx';
+import { canMoveLayers, moveLayers, type LayerPlacement } from '../document/layerMove.ts';
 import { ScrollArea } from './ui/ScrollArea.tsx';
 
 export function LayersPanel() {
@@ -36,8 +37,8 @@ export function LayersPanel() {
         <button
           type="button"
           className="icon-button"
-          title="Hide panel  ⌘\\"
-          aria-label="Hide panel"
+          title="Hide Panel  ⌘\\"
+          aria-label="Hide Panel"
           onClick={() => useEditor.getState().setLayersOpen(false)}
         >
           <PanelLeft size={15} strokeWidth={1.5} />
@@ -84,8 +85,8 @@ function CollapsedFileHeader() {
       <button
         type="button"
         className="icon-button"
-        title="Show panel  ⌘\\"
-        aria-label="Show panel"
+        title="Show Panel  ⌘\\"
+        aria-label="Show Panel"
         onClick={() => useEditor.getState().setLayersOpen(true)}
       >
         <PanelLeft size={15} strokeWidth={1.5} />
@@ -100,7 +101,7 @@ function PagesSection() {
   const add = () => {
     const store = useEditor.getState();
     let file = '';
-    store.apply('Add page', (d) => {
+    store.apply('Add Page', (d) => {
       const made = addPage(d, nextPageName(d), store.activePage);
       file = made.file;
       return made.doc;
@@ -114,7 +115,7 @@ function PagesSection() {
           {open ? <ChevronDown size={12} strokeWidth={1.75} /> : <ChevronRight size={12} strokeWidth={1.75} />}
           Pages
         </button>
-        <button type="button" className="icon-button" title="Add page" aria-label="Add page" onClick={add}>
+        <button type="button" className="icon-button" title="Add Page" aria-label="Add Page" onClick={add}>
           <Plus size={13} strokeWidth={1.5} />
         </button>
       </div>
@@ -166,11 +167,11 @@ function PageRow({ page, canDelete }: { page: Page; canDelete: boolean }) {
         <button
           type="button"
           className="icon-button page-delete"
-          title="Delete page"
+          title="Delete Page"
           aria-label={`Delete ${page.name}`}
           onClick={(e) => {
             e.stopPropagation();
-            store().apply('Delete page', (d) => removePage(d, page.file));
+            store().apply('Delete Page', (d) => removePage(d, page.file));
           }}
         >
           <X size={12} strokeWidth={1.5} />
@@ -179,6 +180,8 @@ function PageRow({ page, canDelete }: { page: Page; canDelete: boolean }) {
     </div>
   );
 }
+
+let draggedLayers: readonly NodeId[] = [];
 
 function LayersTree() {
   const roots = useEditor(activeRoots);
@@ -232,10 +235,20 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
   const hovered = useEditor((s) => s.hoverId === id);
   const collapsed = useEditor((s) => !!s.collapsed[id]);
   const [renaming, setRenaming] = useState(false);
+  const [drop, setDrop] = useState<LayerPlacement | null>(null);
+  const expandTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useLayoutEffect(() => () => clearTimeout(expandTimer.current), []);
   const el = getElement(doc, id);
   if (!el) return null;
 
   const children = elementChildren(doc, el);
+  useEffect(() => {
+    if (!drop) return;
+    const clear = () => { setDrop(null); clearTimeout(expandTimer.current); };
+    window.addEventListener('dragend', clear);
+    window.addEventListener('drop', clear);
+    return () => { window.removeEventListener('dragend', clear); window.removeEventListener('drop', clear); };
+  }, [drop]);
   const store = useEditor.getState;
   const rule = el.classes[0] ? doc.styles.rules[el.classes[0]] : undefined;
   const isFlex = rule?.display?.includes('flex');
@@ -247,15 +260,68 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
     <>
       <div
         role="treeitem"
+        draggable={!renaming}
+        onDragStart={(e) => {
+          e.stopPropagation();
+          const state = store();
+          draggedLayers = state.selection.includes(id) ? state.selection : [id];
+          e.dataTransfer.setData('application/x-plastic-layers', JSON.stringify(draggedLayers));
+          e.dataTransfer.effectAllowed = 'move';
+        }}
+        onDragOver={(e) => {
+          if (!draggedLayers.length) return;
+          const bounds = e.currentTarget.getBoundingClientRect();
+          const fraction = (e.clientY - bounds.top) / bounds.height;
+          const placement = fraction < .25 ? 'before' : fraction > .75 ? 'after' : 'inside';
+          if (!canMoveLayers(store().doc, draggedLayers, id, placement)) {
+            setDrop(null);
+            clearTimeout(expandTimer.current);
+            return;
+          }
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (drop !== placement) {
+            clearTimeout(expandTimer.current);
+            setDrop(placement);
+            if (placement === 'inside' && collapsed) expandTimer.current = setTimeout(() => store().setCollapsed(id, false), 550);
+          }
+          const viewport = e.currentTarget.closest('.ui-scroll-viewport');
+          if (viewport) {
+            const area = viewport.getBoundingClientRect();
+            if (e.clientY < area.top + 32) viewport.scrollTop -= 8;
+            else if (e.clientY > area.bottom - 32) viewport.scrollTop += 8;
+          }
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+          setDrop(null); clearTimeout(expandTimer.current);
+        }}
+        onDrop={(e) => {
+          e.preventDefault(); e.stopPropagation();
+          clearTimeout(expandTimer.current);
+          const bounds = e.currentTarget.getBoundingClientRect();
+          const fraction = (e.clientY - bounds.top) / bounds.height;
+          const placement = fraction < .25 ? 'before' : fraction > .75 ? 'after' : 'inside';
+          if (draggedLayers.length && canMoveLayers(store().doc, draggedLayers, id, placement)) {
+            const ids = draggedLayers;
+            store().apply('Move Layers', (doc) => moveLayers(doc, ids, id, placement), { select: ids });
+            if (placement === 'inside') store().setCollapsed(id, false);
+          }
+          draggedLayers = []; setDrop(null);
+        }}
+        onDragEnd={() => { draggedLayers = []; setDrop(null); clearTimeout(expandTimer.current); }}
         data-layer-id={id}
         aria-selected={selected}
         aria-expanded={children.length ? !collapsed : undefined}
-        className={`layer-row${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}`}
+        className={`layer-row${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}${drop ? ` drop-${drop}` : ''}`}
         style={{ paddingLeft: 4 + depth * 12 }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           if (e.shiftKey || e.metaKey) store().toggleSelected(id);
-          else store().select([id]);
+          else if (!store().selection.includes(id)) store().select([id]);
+        }}
+        onClick={(e) => {
+          if (!e.shiftKey && !e.metaKey && store().selection.length > 1 && !(e.target as HTMLElement).closest('button, input')) store().select([id]);
         }}
         onPointerEnter={() => store().setHover(id)}
         onPointerLeave={() => store().setHover(null)}
@@ -278,7 +344,7 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
             size={12}
             strokeWidth={doc.components.definitions[id] ? 2.5 : 1.5}
             className="layer-icon"
-            aria-label={doc.components.definitions[id] ? 'Main component' : 'Component instance'}
+            aria-label={doc.components.definitions[id] ? 'Main Component' : 'Component Instance'}
           />
         ) : (
           <Icon size={12} strokeWidth={1.75} className="layer-icon" />

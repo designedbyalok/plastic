@@ -72,7 +72,7 @@ export function DropOverlay() {
     <div className="import-drop" aria-hidden="true">
       <div className="import-drop-box">
         <FileUp size={22} strokeWidth={1.5} />
-        <div className="import-drop-title">Drop a Figma file to import</div>
+        <div className="import-drop-title">Drop a Figma File to Import</div>
         <div className="import-drop-hint">.fig files become Plastic files: pages, frames, auto layout, text and images stay editable.</div>
       </div>
     </div>
@@ -109,7 +109,7 @@ export function ImportDialog({ state, onClose, onOpen }: { state: Exclude<Import
         )}
         {state.status === 'error' && (
           <>
-            <Header title={`Couldn’t import ${state.name}`} onClose={onClose} />
+            <Header title={`Couldn’t Import ${state.name}`} onClose={onClose} />
             <p className="import-error">{state.message}</p>
             <div className="import-actions">
               <button type="button" className="import-button" onClick={onClose}>
@@ -211,7 +211,7 @@ function Report({ result, onClose, onOpen }: { result: FigmaImportResult; onClos
           Close
         </button>
         <button type="button" className="import-button is-primary" autoFocus onClick={() => onOpen(result.id)}>
-          Open file
+          Open File
         </button>
       </div>
     </>

@@ -5,9 +5,10 @@
  */
 import {
   ALargeSmall, Angle, ArrowDown, ArrowDownToLine, ArrowRight, ArrowUpToLine, Baseline, Bold, Check, ChevronDown, FlipHorizontal2, FlipVertical2, FoldVertical,
-  LayoutGrid, RotateCwSquare, SlidersVertical, Space, Strikethrough, TextAlignCenter, TextAlignEnd, TextAlignStart, TriangleAlert, Type, Underline, X,
+  LayoutGrid, Minus, RotateCcw, RotateCwSquare, SlidersVertical, Space, Strikethrough, TextAlignCenter, TextAlignEnd, TextAlignStart, TriangleAlert, Type, Underline, X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import valueParser from 'postcss-value-parser';
 import { domElement, isOutOfFlow, styleOf } from '../../canvas/dom.ts';
 import { setDeclaration, setFrame, setStyleOnNodes } from '../../document/ops.ts';
 import { getElement, getParentId, isRoot } from '../../document/tree.ts';
@@ -16,12 +17,13 @@ import { elementSpec } from '../../elements/registry.ts';
 import { tokenKind, tokenReference, tokenVar, type TokenKind } from '../../document/tokens.ts';
 import { addFlexOrWrap, setFreePositioning } from '../../editor/commands.ts';
 import { useEditor } from '../../editor/store.ts';
+import { WEB_FONT_OPTIONS, selectFont } from '../../document/fonts.ts';
 import { missingFamily } from '../../app/fonts.ts';
 import { colorWithAlpha, cssGradient, gradientFrom, parseColor, parseCssGradient } from '../../paint/gradient.ts';
 import { GradientEditor } from './GradientEditor.tsx';
 import {
   Checkbox, ColorInput, CssInput, CssSelect, CssSlider, MIXED, Row, Section, Segmented, Select, TextInput, TokenSlot, type Choice,
-  clearStyles, computedValue, setStyle, useAnyDeclared, useDeclared,
+  clearStyles, computedValue, declaredValue, setStyle, useAnyDeclared, useDeclared,
 } from './fields.tsx';
 
 type Ids = { ids: readonly NodeId[] };
@@ -43,8 +45,9 @@ export function LayoutSection({ ids }: Ids) {
   const declaredDisplay = useDeclared(ids, 'display');
   const display = declaredDisplay === MIXED ? '' : declaredDisplay || computedValue(ids[0], 'display');
   const mode = display.includes('flex') ? 'flex' : display.includes('grid') ? 'grid' : 'block';
-  const direction = useDeclared(ids, 'flex-direction');
   const clipped = useDeclared(ids, 'overflow') === 'hidden';
+  const height = useDeclared(ids, 'height');
+  const heightProp = allRoots && !height ? 'min-height' : 'height';
   const singleRoot = allRoots && ids.length === 1 ? ids[0]! : null;
 
   return (
@@ -75,71 +78,96 @@ export function LayoutSection({ ids }: Ids) {
       </Row>
       <Row>
         <CssInput ids={ids} prop="width" prefix="W" numeric />
-        <CssInput ids={ids} prop={allRoots ? 'min-height' : 'height'} prefix="H" numeric />
+        <CssInput ids={ids} prop={heightProp} prefix="H" numeric />
         <TransformButtons ids={ids} />
       </Row>
 
-      {containers && mode !== 'block' ? (
+      {containers && mode === 'flex' ? <FlexLayoutControls ids={ids} /> : containers && mode === 'grid' ? (
         <>
           <Row>
-            <Segmented
-              ariaLabel="Layout"
-              value={mode === 'grid' ? 'grid' : direction.startsWith('column') ? 'column' : 'row'}
-              choices={[
-                { value: 'row', label: <ArrowRight size={13} />, title: 'Flex row' },
-                { value: 'column', label: <ArrowDown size={13} />, title: 'Flex column' },
-                { value: 'grid', label: <LayoutGrid size={12} />, title: 'Grid' },
-              ]}
-              onChange={(v) =>
-                useEditor.getState().apply('Set layout', (d) =>
-                  v === 'grid'
-                    ? setStyleOnNodes(setStyleOnNodes(d, ids, 'display', 'grid'), ids, 'grid-template-columns', 'repeat(2, minmax(0, 1fr))')
-                    : setStyleOnNodes(setStyleOnNodes(d, ids, 'display', 'flex'), ids, 'flex-direction', v),
-                )
-              }
-            />
-            <button
-              type="button"
-              className="icon-button"
-              title="Remove flex (back to block)"
-              aria-label="Remove flex"
-              onClick={() => clearStyles(ids, ['display', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'gap', 'grid-template-columns'], 'Remove flex')}
-            >
-              <X size={12} />
-            </button>
+            <CssInput ids={ids} prop="grid-template-columns" prefix="Cols" mono />
+            <button className="icon-button" title="Switch to Flex" onClick={() => setStyle(ids, 'display', 'flex')}><ArrowRight size={13} /></button>
+            <button className="icon-button" aria-label="Remove Grid" onClick={() => clearStyles(ids, ['display', 'grid-template-columns', 'gap'], 'Remove Grid')}><Minus size={13} /></button>
           </Row>
-          {mode === 'flex' ? (
-            <Row>
-              <CssSelect ids={ids} prop="justify-content" label="Justify" options={JUSTIFY} />
-              <CssSelect ids={ids} prop="align-items" label="Align" options={ALIGN} />
-            </Row>
-          ) : (
-            <Row>
-              <CssInput ids={ids} prop="grid-template-columns" prefix="Cols" mono />
-            </Row>
-          )}
-          <Row>
-            <CssInput ids={ids} prop="gap" prefix="Gap" numeric />
-            <CssInput ids={ids} prop="padding" prefix="Pad" />
-          </Row>
+          <Row><CssInput ids={ids} prop="gap" prefix="Gap" numeric /><CssInput ids={ids} prop="padding" prefix="Pad" /></Row>
         </>
-      ) : (
-        (containers || ids.length > 1) && (
-          <Row>
-            <button type="button" className="insp-button" onClick={addFlexOrWrap}>
-              {containers && ids.length === 1 ? 'Add flex' : 'Wrap in flex'} <span className="insp-kbd">⇧ A</span>
-            </button>
-          </Row>
-        )
+      ) : (containers || ids.length > 1) && (
+        <Row><button type="button" className="insp-button" onClick={addFlexOrWrap}>
+          {containers && ids.length === 1 ? 'Add Flex' : 'Wrap in Flex'} <span className="insp-kbd">⇧ A</span>
+        </button></Row>
       )}
 
       <FlexChildRow ids={ids} />
 
       <div className="insp-row insp-row-check">
-        <Checkbox checked={clipped} onChange={(on) => setStyle(ids, 'overflow', on ? 'hidden' : '')} label="Clip content" hint="⌥ C" />
+        <Checkbox checked={clipped} onChange={(on) => setStyle(ids, 'overflow', on ? 'hidden' : '')} label="Clip Content" hint="⌥ C" />
       </div>
     </Section>
   );
+}
+
+/** Spatial alignment controls map directly to CSS, including reversed main axes. */
+function FlexLayoutControls({ ids }: Ids) {
+  const direction = useDeclared(ids, 'flex-direction') || computedValue(ids[0], 'flex-direction') || 'row';
+  const justify = useDeclared(ids, 'justify-content') || computedValue(ids[0], 'justify-content') || 'flex-start';
+  const align = useDeclared(ids, 'align-items') || computedValue(ids[0], 'align-items') || 'stretch';
+  const wrap = useDeclared(ids, 'flex-wrap') || computedValue(ids[0], 'flex-wrap');
+  const [advanced, setAdvanced] = useState(false);
+  const [padding, setPadding] = useState(false);
+  const column = direction.startsWith('column');
+  const reversed = direction.endsWith('reverse');
+  const axis = ['flex-start', 'center', 'flex-end'];
+  const main = (index: number) => axis[reversed ? 2 - index : index]!;
+  const alignment = (x: number, y: number) => ({ main: main(column ? y : x), cross: axis[column ? x : y]! });
+  return <div className="flex-controls">
+    <div className="flex-heading"><span>Flex</span><button type="button" className="icon-button" aria-label="Remove Flex"
+      onClick={() => clearStyles(ids, ['display', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'gap', 'row-gap', 'column-gap'], 'Remove Flex')}><Minus size={13} /></button></div>
+    <div className="flex-layout">
+      <div className="flex-alignment" role="group" aria-label="Flex Alignment">
+        {[0, 1, 2].flatMap((y) => [0, 1, 2].map((x) => {
+          const value = alignment(x, y);
+          return <button type="button" key={`${x}-${y}`} aria-label={`Align ${['Top', 'Center', 'Bottom'][y]} ${['Left', 'Center', 'Right'][x]}`}
+            aria-pressed={justify === value.main && align === value.cross}
+            onClick={() => useEditor.getState().apply('Align Flex', (d) => setStyleOnNodes(setStyleOnNodes(d, ids, 'justify-content', value.main), ids, 'align-items', value.cross))}><span /></button>;
+        }))}
+      </div>
+      <div className="flex-axis">
+        <Row><Segmented ariaLabel="Flex Direction" value={column ? 'column' : 'row'} choices={[
+          { value: 'column', label: <ArrowDown size={14} />, title: 'Vertical' },
+          { value: 'row', label: <ArrowRight size={14} />, title: 'Horizontal' },
+        ]} onChange={(value) => setStyle(ids, 'flex-direction', value + (reversed ? '-reverse' : ''))} />
+          <button type="button" className="icon-button" aria-label="Reverse Direction" aria-pressed={reversed}
+            onClick={() => setStyle(ids, 'flex-direction', (column ? 'column' : 'row') + (reversed ? '' : '-reverse'))}><RotateCcw size={14} /></button></Row>
+        <Row><CssInput ids={ids} prop="gap" prefix="Gap" numeric /><button type="button" className="icon-button" aria-label="Advanced Flex Options" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}><SlidersVertical size={14} /></button></Row>
+      </div>
+    </div>
+    <Row><PaddingAxis ids={ids} axis="X" /><PaddingAxis ids={ids} axis="Y" /><button type="button" className="icon-button" aria-label="Individual Padding" aria-expanded={padding} onClick={() => setPadding(!padding)}><LayoutGrid size={14} /></button></Row>
+    {padding && <><Row><CssInput ids={ids} prop="padding-top" prefix="Top" numeric /><CssInput ids={ids} prop="padding-right" prefix="Right" numeric /></Row><Row><CssInput ids={ids} prop="padding-bottom" prefix="Bottom" numeric /><CssInput ids={ids} prop="padding-left" prefix="Left" numeric /></Row></>}
+    {advanced && <>
+      <Row><CssSelect ids={ids} prop="justify-content" label="Justify" options={JUSTIFY} /><CssSelect ids={ids} prop="align-items" label="Align" options={ALIGN} /></Row>
+      <Row><CssSelect ids={ids} prop="flex-wrap" label="Wrap" options={['nowrap', 'wrap', 'wrap-reverse']} /><button type="button" className="insp-button" onClick={() => useEditor.getState().apply('Switch to Grid', (d) => setStyleOnNodes(setStyleOnNodes(d, ids, 'display', 'grid'), ids, 'grid-template-columns', 'repeat(2, minmax(0, 1fr))'))}>Grid</button></Row>
+      <Row><CssInput ids={ids} prop="row-gap" prefix="Row" numeric /><CssInput ids={ids} prop="column-gap" prefix="Col" numeric /></Row>
+    </>}
+    {wrap && wrap !== 'nowrap' && <span className="insp-hint">{wrap === 'wrap-reverse' ? 'Reverse Wrap' : 'Wrap'}</span>}
+  </div>;
+}
+
+function PaddingAxis({ ids, axis }: Ids & { axis: 'X' | 'Y' }) {
+  // Read computed longhands so imported shorthand, tokens and asymmetric padding are shown correctly.
+  const doc = useEditor((s) => s.doc);
+  const sides = axis === 'X' ? ['padding-left', 'padding-right'] : ['padding-top', 'padding-bottom'];
+  const values = ids.flatMap((id) => {
+    const shorthand = valueParser(declaredValue(doc, [id], 'padding')).nodes.filter((node) => node.type !== 'space' && node.type !== 'comment').map((node) => valueParser.stringify(node));
+    const [top, right = top, bottom = top, left = right] = shorthand;
+    const fallback = axis === 'X' ? [left, right] : [top, bottom];
+    return sides.map((side, index) => declaredValue(doc, [id], side) || fallback[index] || computedValue(id, side) || '0px');
+  });
+  const mixed = values.some((value) => value !== values[0]);
+  return <TextInput ariaLabel={`Padding ${axis}`} prefix={`Pad ${axis}`} value={mixed ? '' : (values[0] ?? '0').replace(/px$/, '')} placeholder={mixed ? 'Mixed' : '0'}
+    onChange={(value) => {
+      const css = /^-?\d*\.?\d+$/.test(value.trim()) ? `${value.trim()}px` : value.trim();
+      useEditor.getState().apply(`Set Padding ${axis}`, (d) => sides.reduce((next, side) => setStyleOnNodes(next, ids, side, css || null), d), { coalesce: `padding:${axis}:${ids.join(',')}` });
+    }} />;
 }
 
 /** "Layout ⌄": how the element is positioned — in its parent's flow, or freely (absolute). */
@@ -155,8 +183,8 @@ function PositionMenu({ free, onChange }: { free: boolean; onChange(free: boolea
     return () => window.removeEventListener('pointerdown', close, true);
   }, [open]);
   const options = [
-    { free: false, label: 'In flow', hint: 'Positioned by its parent’s layout' },
-    { free: true, label: 'Free position', hint: 'position: absolute' },
+    { free: false, label: 'In Flow', hint: 'Positioned by its parent’s layout' },
+    { free: true, label: 'Free Position', hint: 'position: absolute' },
   ];
   return (
     <span className="insp-menu-anchor" ref={ref}>
@@ -205,13 +233,13 @@ function FramePosition({ id }: { id: NodeId }) {
 
 /**
  * X/Y of an element in flow is decided by its parent's layout, not by CSS on the element, so
- * the measured offset is shown read-only. Switching to Free position makes it editable.
+ * the measured offset is shown read-only. Switching to Free Position makes it editable.
  */
 function FlowOffset({ ids, axis }: Ids & { axis: 'x' | 'y' }) {
   const el = ids.length === 1 ? domElement(ids[0]) : null;
   const value = el ? String(Math.round(axis === 'x' ? el.offsetLeft : el.offsetTop)) : '';
   return (
-    <span className="insp-field" title="Set by the parent's layout. Choose Layout ⌄ Free position to move it freely.">
+    <span className="insp-field" title="Set by the parent's layout. Choose Layout ⌄ Free Position to move it freely.">
       <input className="insp-input has-prefix is-readonly" aria-label={`${axis.toUpperCase()} (from layout)`} value={value} readOnly tabIndex={-1} />
       <span className="insp-prefix">{axis.toUpperCase()}</span>
     </span>
@@ -264,10 +292,10 @@ function TransformButtons({ ids }: Ids) {
       <button type="button" title="Rotate 90°" aria-label="Rotate 90 degrees" onClick={rotateBy90}>
         <RotateCwSquare size={14} strokeWidth={1.5} />
       </button>
-      <button type="button" title="Flip horizontal" aria-label="Flip horizontal" onClick={() => flip(0)}>
+      <button type="button" title="Flip Horizontal" aria-label="Flip Horizontal" onClick={() => flip(0)}>
         <FlipHorizontal2 size={14} strokeWidth={1.5} />
       </button>
-      <button type="button" title="Flip vertical" aria-label="Flip vertical" onClick={() => flip(1)}>
+      <button type="button" title="Flip Vertical" aria-label="Flip Vertical" onClick={() => flip(1)}>
         <FlipVertical2 size={14} strokeWidth={1.5} />
       </button>
     </div>
@@ -347,19 +375,20 @@ export function OpacitySection({ ids }: Ids) {
 /** A section that is collapsed until one of its props is set, or the user presses +. */
 function OptionalSection({ ids, title, props, onAdd, aside, children }: Ids & { title: string; props: readonly string[]; onAdd?(): void; aside?: React.ReactNode; children: React.ReactNode }) {
   const declared = useAnyDeclared(ids, props);
-  const [opened, setOpened] = useState(false);
-  const open = declared || opened;
+  const selectionKey = ids.join(',');
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+  const open = declared || openedFor === selectionKey;
   return (
     <Section
       title={title}
       empty={!open}
       aside={open ? aside : undefined}
       onAdd={() => {
-        setOpened(true);
+        setOpenedFor(selectionKey);
         onAdd?.();
       }}
       onRemove={() => {
-        setOpened(false);
+        setOpenedFor(null);
         if (declared) clearStyles(ids, props, `Remove ${title.toLowerCase()}`);
       }}
     >
@@ -414,7 +443,7 @@ const FONT_FAMILIES: readonly { value: string; label: string }[] = [
   { value: 'system-ui, sans-serif', label: 'System Sans-Serif' },
   { value: 'ui-serif, Georgia, serif', label: 'System Serif' },
   { value: 'ui-monospace, Menlo, monospace', label: 'System Mono' },
-  { value: 'Inter, system-ui, sans-serif', label: 'Inter' },
+  ...WEB_FONT_OPTIONS,
   { value: 'Helvetica, Arial, sans-serif', label: 'Helvetica' },
   { value: 'Georgia, serif', label: 'Georgia' },
   { value: '"Times New Roman", serif', label: 'Times New Roman' },
@@ -474,7 +503,7 @@ function FontFamilySelect({ ids }: Ids) {
       value={declared === MIXED ? '' : declared}
       placeholder={declared === MIXED ? 'Mixed' : computed ? `${familyLabel(computed)} (inherited)` : 'Inherited'}
       options={options}
-      onChange={(v) => setStyle(ids, 'font-family', v)}
+      onChange={(v) => useEditor.getState().apply('Set Font Family', (doc) => selectFont(doc, ids, v))}
     />
   );
 }
@@ -484,7 +513,18 @@ function MissingFontNote({ ids }: Ids) {
   const declared = useDeclared(ids, 'font-family');
   const tokens = useEditor((s) => s.doc.tokens.values);
   const value = declared && declared !== MIXED ? declared : computedValue(ids[0], 'font-family');
-  const missing = value ? missingFamily(value, tokens) : null;
+  const owner = domElement(ids[0])?.ownerDocument;
+  const [, refreshFonts] = useState(0);
+  useEffect(() => {
+    const refresh = () => refreshFonts((version) => version + 1);
+    owner?.fonts?.addEventListener('loadingdone', refresh);
+    owner?.fonts?.addEventListener('loadingerror', refresh);
+    return () => {
+      owner?.fonts?.removeEventListener('loadingdone', refresh);
+      owner?.fonts?.removeEventListener('loadingerror', refresh);
+    };
+  }, [owner]);
+  const missing = value ? missingFamily(value, tokens, owner) : null;
   if (!missing) return null;
   const token = tokenReference(value);
   return (
@@ -574,8 +614,8 @@ export function TextSection({ ids, textual }: Ids & { textual: boolean }) {
     <button
       type="button"
       className={`icon-button${extrasOpen ? ' is-on' : ''}`}
-      title="More text settings: color, decoration, case"
-      aria-label="More text settings"
+      title="More Text Settings: Color, Decoration, Case"
+      aria-label="More Text Settings"
       aria-pressed={extrasOpen}
       onClick={() => setShowExtras(!showExtras)}
     >
@@ -603,9 +643,9 @@ export function TextSection({ ids, textual }: Ids & { textual: boolean }) {
           label="Horizontal alignment"
           fallback="left"
           choices={[
-            { value: 'left', label: <TextAlignStart size={15} strokeWidth={1.5} />, title: 'Align left' },
-            { value: 'center', label: <TextAlignCenter size={15} strokeWidth={1.5} />, title: 'Align center' },
-            { value: 'right', label: <TextAlignEnd size={15} strokeWidth={1.5} />, title: 'Align right' },
+            { value: 'left', label: <TextAlignStart size={15} strokeWidth={1.5} />, title: 'Align Left' },
+            { value: 'center', label: <TextAlignCenter size={15} strokeWidth={1.5} />, title: 'Align Center' },
+            { value: 'right', label: <TextAlignEnd size={15} strokeWidth={1.5} />, title: 'Align Right' },
           ]}
         />
         <TextSegmented
@@ -632,7 +672,7 @@ export function TextSection({ ids, textual }: Ids & { textual: boolean }) {
               label="Decoration"
               fallback="none"
               choices={[
-                { value: 'none', label: <X size={13} strokeWidth={1.5} />, title: 'No decoration' },
+                { value: 'none', label: <X size={13} strokeWidth={1.5} />, title: 'No Decoration' },
                 { value: 'underline', label: <Underline size={13} strokeWidth={1.5} />, title: 'Underline' },
                 { value: 'line-through', label: <Strikethrough size={13} strokeWidth={1.5} />, title: 'Strikethrough' },
               ]}
@@ -643,7 +683,7 @@ export function TextSection({ ids, textual }: Ids & { textual: boolean }) {
               label="Case"
               fallback="none"
               choices={[
-                { value: 'none', label: <X size={13} strokeWidth={1.5} />, title: 'As typed' },
+                { value: 'none', label: <X size={13} strokeWidth={1.5} />, title: 'As Typed' },
                 { value: 'uppercase', label: 'AA', title: 'Uppercase' },
                 { value: 'lowercase', label: 'aa', title: 'Lowercase' },
                 { value: 'capitalize', label: 'Aa', title: 'Capitalize' },
@@ -701,7 +741,7 @@ export function MarginSection({ ids }: Ids) {
 
 export function ConstraintsSection({ ids }: Ids) {
   return (
-    <OptionalSection ids={ids} title="Min / max size" props={['min-width', 'max-width', 'min-height', 'max-height']}>
+    <OptionalSection ids={ids} title="Min / Max Size" props={['min-width', 'max-width', 'min-height', 'max-height']}>
       <Row>
         <CssInput ids={ids} prop="min-width" prefix="Min W" numeric />
         <CssInput ids={ids} prop="max-width" prefix="Max W" numeric />

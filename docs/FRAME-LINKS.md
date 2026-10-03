@@ -4,11 +4,18 @@ Select an artboard and use **Copy frame link** in the inspector. Links use stabl
 
 `/file/<project>?frame=<node-id>`
 
+Nested frames support the same controls. **⌘L** copies the selected element/frame link;
+with nothing selected it copies the file link. Typing controls and dialogs retain their
+keyboard handling. The shortcut is listed in the editor's shortcut menu.
+
 Opening the link selects the frame on its page and zooms to it, regardless of the saved viewport. Renaming does not change the link. Deleted frames produce a notice. Double-click the canvas title to edit the frame name; Enter or blur commits, Escape cancels. Name changes use ordinary undo and persistence.
 
 ## Reading with AI
 
 A coding agent connected to Plastic's local MCP server can call `get_frame` with the copied URL. The tool resolves the file and frame locally; it never fetches an arbitrary supplied host. The result includes every descendant (including text nodes), semantic HTML, ordered CSS, tokens, SVG data, names, and the local assets directory. Global CSS, responsive/state rules and font faces are retained because dropping them can change the frame's rendering.
+
+For nested targets, `contextHtml` includes the containing artboard, and `ancestors` identifies
+the surrounding nodes. This retains inherited styles, ancestor selectors and parent layout.
 
 The development server also provides a read-only, local-request endpoint at `/__plastic/frame/<project>/<frame>`. It returns the same source with the project's HTTP asset base. It does not publish a file publicly.
 

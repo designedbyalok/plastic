@@ -37,17 +37,17 @@ export function ComponentSection({ el }: { el: ElementNode }) {
   const name = source ? doc.components?.definitions[source] : null;
   if (!owner && !canDefineComponent(doc, el.id)) return null;
   return (
-    <Section title={link ? 'Component instance' : owner ? 'Main component' : 'Component'}>
+    <Section title={link ? 'Component Instance' : owner ? 'Main Component' : 'Component'}>
       {!owner ? (
         <Row>
           <button
             type="button"
             className="insp-button"
             onClick={() =>
-              useEditor.getState().apply('Create component', (d) => defineComponent(d, el.id, layerName(d, el.id)))
+              useEditor.getState().apply('Create Component', (d) => defineComponent(d, el.id, layerName(d, el.id)))
             }
           >
-            Create component
+            Create Component
           </button>
         </Row>
       ) : (
@@ -75,7 +75,7 @@ export function ComponentSection({ el }: { el: ElementNode }) {
           </p>
           <Row>
             <button type="button" className="insp-button" onClick={() => insert(source!, owner!)}>
-              Insert instance
+              Insert Instance
             </button>
           </Row>
           {link && (
@@ -90,7 +90,7 @@ export function ComponentSection({ el }: { el: ElementNode }) {
                   state.select([source!]);
                 }}
               >
-                Go to main component
+                Go to Main Component
               </button>
             </Row>
           )}
@@ -100,17 +100,17 @@ export function ComponentSection({ el }: { el: ElementNode }) {
                 type="button"
                 className="insp-button"
                 onClick={() =>
-                  useEditor.getState().apply('Reset instance overrides', (d) => synchronizeComponents(d, owner))
+                  useEditor.getState().apply('Reset Instance Overrides', (d) => synchronizeComponents(d, owner))
                 }
               >
-                Reset instance overrides
+                Reset Instance Overrides
               </button>
             </Row>
           )}
           {owner !== el.id && (
             <Row>
               <button type="button" className="insp-button" onClick={() => useEditor.getState().select([owner])}>
-                Select component root
+                Select Component Root
               </button>
             </Row>
           )}
@@ -121,10 +121,10 @@ export function ComponentSection({ el }: { el: ElementNode }) {
               onClick={() =>
                 useEditor
                   .getState()
-                  .apply(link ? 'Detach instance' : 'Remove component link', (d) => detachComponent(d, owner))
+                  .apply(link ? 'Detach Instance' : 'Remove Component Link', (d) => detachComponent(d, owner))
               }
             >
-              {link ? 'Detach instance' : 'Remove component link'}
+              {link ? 'Detach Instance' : 'Remove Component Link'}
             </button>
           </Row>
         </>

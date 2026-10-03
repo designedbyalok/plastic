@@ -360,7 +360,7 @@ export function TokenSlot({ ids, prop, prefix, children }: { ids: readonly NodeI
     <span className={`insp-field insp-token-slot${open ? ' is-open' : ''}`}>
       {bound ? <TokenChip name={bound} kind={kind} prefix={prefix} onOpen={() => setOpen(true)} onDetach={() => detachToken(ids, prop, bound)} /> : children}
       {!bound && (
-        <button type="button" className="insp-token-button" title="Use a token" aria-label={`Use a token for ${prop}`} onClick={() => setOpen(!open)}>
+        <button type="button" className="insp-token-button" title="Use a Token" aria-label={`Use a token for ${prop}`} onClick={() => setOpen(!open)}>
           <Hexagon size={11} strokeWidth={1.75} />
         </button>
       )}
@@ -449,7 +449,7 @@ function TokenPicker({ ids, prop, kind, current, onClose }: { ids: readonly Node
           onClose();
         }}
       >
-        <span>Edit tokens…</span>
+        <span>Edit Tokens…</span>
       </button>
     </div>
   );

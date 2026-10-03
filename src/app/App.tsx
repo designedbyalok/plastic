@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react';
+import { AppSkeleton } from './Skeleton.tsx';
 import { AuthGate } from '../auth/AuthGate.tsx';
 import { parseRoute, usePathname } from './router.ts';
 
@@ -17,7 +18,7 @@ export function App() {
   }, [route.name]);
   return (
     <AuthGate>
-      <Suspense fallback={null}>{route.name === 'file' ? <Editor key={route.id} projectId={route.id} /> : <Home route={route} />}</Suspense>
+      <Suspense fallback={<AppSkeleton editor={route.name === 'file'} />}>{route.name === 'file' ? <Editor key={route.id} projectId={route.id} /> : <Home route={route} />}</Suspense>
     </AuthGate>
   );
 }

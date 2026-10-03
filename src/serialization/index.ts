@@ -7,7 +7,7 @@ import {
   serializeTokenSheet,
 } from '../document/css.ts';
 import { FIRST_PAGE_FILE } from '../document/factory.ts';
-import type { DesignDocument, NodeId, Page, Point } from '../document/types.ts';
+import type { DesignDocument, NodeId, Page, Point, RulerGuide } from '../document/types.ts';
 import { parseHTML, serializeHTML } from './html.ts';
 import { PROJECT_FORMAT, PROJECT_VERSION, readProjectJson, type ProjectJson, type ViewportMeta } from './project.ts';
 
@@ -52,7 +52,7 @@ export function serializeProject(
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
     files: { styles: STYLES_FILE, tokens: TOKENS_FILE },
-    pages: doc.pages.map((p) => ({ file: p.file, name: p.name, ...(p.canvas ? { canvas: p.canvas } : {}) })),
+    pages: doc.pages.map((p) => ({ file: p.file, name: p.name, ...(p.canvas ? { canvas: p.canvas } : {}), ...(p.guides?.length ? { guides: p.guides.filter((g) => !g.frame || doc.nodes[g.frame]) } : {}) })),
     canvas: { viewport: meta.viewport, activePage: meta.activePage, frames: pick(doc.frames, roots) },
     layers: { names: pick(doc.names, Object.keys(doc.nodes)), collapsed: meta.collapsed.filter((id) => doc.nodes[id]) },
   };
@@ -65,7 +65,7 @@ export function serializeProject(
 }
 
 /** Page order: as listed in project.json, then any other .html files (index.html first). */
-function pageOrder(files: ProjectFiles, project: ProjectJson): { file: string; name: string; canvas?: string }[] {
+function pageOrder(files: ProjectFiles, project: ProjectJson): { file: string; name: string; canvas?: string; guides?: readonly RulerGuide[] }[] {
   const available = Object.keys(files).filter(isPageFile);
   const listed = project.pages.filter((p) => available.includes(p.file));
   const unlisted = available
@@ -90,10 +90,10 @@ export function parseProject(
   const nodes: DesignDocument['nodes'] = {};
   const pages: Page[] = [];
   let title = '';
-  for (const { file, name, canvas } of pageOrder(files, project)) {
+  for (const { file, name, canvas, guides } of pageOrder(files, project)) {
     const markup = parseHTML(files[file] ?? '', seen);
     Object.assign(nodes, markup.nodes);
-    pages.push({ file, name, roots: markup.roots, ...(canvas ? { canvas } : {}) });
+    pages.push({ file, name, roots: markup.roots, ...(canvas ? { canvas } : {}), ...(guides ? { guides: guides.filter((g) => !g.frame || markup.nodes[g.frame]) } : {}) });
     if (!title || file === FIRST_PAGE_FILE) title = files[file] ? markup.title : title;
   }
 

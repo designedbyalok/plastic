@@ -44,7 +44,7 @@ export function SignIn({ providers }: { providers: readonly string[] }) {
         <div className="auth-mark" aria-hidden="true">
           <Logo size={40} />
         </div>
-        <h1 className="auth-title">{mode === 'sign-in' ? 'Sign in to Plastic' : 'Create your Plastic account'}</h1>
+        <h1 className="auth-title">{mode === 'sign-in' ? 'Sign In to Plastic' : 'Create Your Plastic Account'}</h1>
         <p className="auth-subtitle">Design with real HTML and CSS.</p>
 
         {social.length > 0 && (
@@ -91,7 +91,7 @@ export function SignIn({ providers }: { providers: readonly string[] }) {
           )}
           <button type="submit" className="auth-button is-primary" disabled={busy}>
             {busy && <Loader2 size={14} strokeWidth={2} className="auth-spin" />}
-            {mode === 'sign-in' ? 'Sign in' : 'Create account'}
+            {mode === 'sign-in' ? 'Sign In' : 'Create Account'}
           </button>
         </form>
 
@@ -104,7 +104,7 @@ export function SignIn({ providers }: { providers: readonly string[] }) {
               setError(null);
             }}
           >
-            {mode === 'sign-in' ? 'Create an account' : 'Sign in'}
+            {mode === 'sign-in' ? 'Create an Account' : 'Sign In'}
           </button>
         </p>
       </main>

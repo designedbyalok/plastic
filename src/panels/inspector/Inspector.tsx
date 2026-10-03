@@ -2,7 +2,7 @@ import { ComponentSection, ComponentLibrarySection } from './ComponentSection.ts
 import { SourceSection } from './SourceSection.tsx';
 import { ScrollArea } from '../ui/ScrollArea.tsx';
 import { VariantsSection } from './VariantsSection.tsx';
-import { isRoot } from '../../document/tree.ts';
+import { pageOf } from '../../document/tree.ts';
 import { copyFrameContext, copyFrameLink } from '../../editor/frameLinks.ts';
 import { resolvedTheme, useTheme } from '../../app/theme.ts';
 import { ChevronDown, Pipette } from 'lucide-react';
@@ -69,16 +69,15 @@ export function Inspector() {
           ) : (
             <section className="insp-section">
               <div className="insp-header">
-                <span className="insp-title">{elements.length} elements</span>
+                <span className="insp-title">{elements.length} Elements</span>
               </div>
             </section>
           )}
-          {single && isRoot(doc, single.id) && <div className="frame-share-actions">
-            <button type="button" className="insp-chip" onClick={() => void copyFrameLink(single.id)}>Copy frame link</button>
-            <button type="button" className="insp-chip" onClick={() => void copyFrameContext(single.id)}>Copy AI context</button>
+          {single && pageOf(doc, single.id) && <div className="frame-share-actions">
+            <button type="button" className="insp-chip" onClick={() => void copyFrameLink(single.id)}>Copy Frame Link</button>
+            <button type="button" className="insp-chip" onClick={() => void copyFrameContext(single.id)}>Copy AI Context</button>
           </div>}
           {single && <ComponentSection el={single} />}
-          {single && <VariantsSection key={single.id} el={single} />}
           {single && <ContentSection el={single} />}
           {single && <BehaviorSection el={single} />}
           {single && <TableSection el={single} />}
@@ -99,6 +98,7 @@ export function Inspector() {
           <MarginSection ids={ids} />
           <ConstraintsSection ids={ids} />
           {single && <CssSection el={single} />}
+          {single && <VariantsSection key={single.id} el={single} />}
           {single && <SourceSection el={single} />}
           {single && <AttributesSection el={single} />}
         </div>
@@ -144,11 +144,11 @@ function SaveStatus() {
 }
 
 const ZOOM_ITEMS = [
-  { label: 'Zoom in', kbd: '⌘ +', run: () => zoomBy(1.25) },
-  { label: 'Zoom out', kbd: '⌘ −', run: () => zoomBy(0.8) },
+  { label: 'Zoom In', kbd: '⌘ +', run: () => zoomBy(1.25) },
+  { label: 'Zoom Out', kbd: '⌘ −', run: () => zoomBy(0.8) },
   { label: 'Zoom to 100%', kbd: '⇧ 0', run: () => zoomTo(1) },
-  { label: 'Zoom to fit', kbd: '⇧ 1', run: zoomToFit },
-  { label: 'Zoom to selection', kbd: '⇧ 2', run: zoomToSelection },
+  { label: 'Zoom to Fit', kbd: '⇧ 1', run: zoomToFit },
+  { label: 'Zoom to Selection', kbd: '⇧ 2', run: zoomToSelection },
 ];
 
 function ZoomMenu() {
@@ -302,7 +302,7 @@ function EmptyInspector() {
         <div className="insp-body">
           <div className="insp-row">
             <button type="button" className="insp-button" onClick={() => useEditor.getState().setAgentsOpen(true)}>
-              Connect more agents
+              Connect More Agents
             </button>
           </div>
         </div>

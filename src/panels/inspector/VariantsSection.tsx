@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import {
   BASE_VARIANT,
   STYLE_STATES,
@@ -10,18 +10,20 @@ import {
 } from '../../document/variants.ts';
 import type { ElementNode } from '../../document/types.ts';
 import { useEditor } from '../../editor/store.ts';
-import { Row, Section, Select, TextInput } from './fields.tsx';
+import { Row, Select, TextInput } from './fields.tsx';
 
 export function VariantsSection({ el }: { el: ElementNode }) {
   const styles = useEditor((s) => s.doc.styles);
   const preview = useEditor((s) => s.stylePreview);
   const [variant, setVariant] = useState<StyleVariant>(BASE_VARIANT);
+  const [open, setOpen] = useState(false);
   const [customWidth, setCustomWidth] = useState('');
   const [declaration, setDeclaration] = useState('');
   const widths = [
     ...new Set([375, 768, 1024, ...variantWidths(styles), ...(variant.maxWidth ? [variant.maxWidth] : [])]),
   ].sort((a, b) => a - b);
-  const declared = el.classes[0] ? variantDeclarations(styles, el.classes[0], variant) : {};
+  const base = variant.maxWidth === null && variant.state === 'default';
+  const declared = open && !base && el.classes[0] ? variantDeclarations(styles, el.classes[0], variant) : {};
   const active = preview?.id === el.id;
   const update = (next: StyleVariant) => {
     setVariant(next);
@@ -40,13 +42,21 @@ export function VariantsSection({ el }: { el: ElementNode }) {
         coalesce: `variant:${el.id}:${variant.maxWidth}:${variant.state}:${prop}`,
       });
   return (
-    <Section title="Responsive & states">
+    <section className="insp-section">
+      <button type="button" className="insp-source-toggle" aria-expanded={open} onClick={() => {
+        setOpen(!open);
+        if (open && active) useEditor.setState({ stylePreview: null });
+      }}>
+        <ChevronRight size={12} strokeWidth={1.5} aria-hidden="true" />
+        <span>Responsive &amp; States</span>
+      </button>
+      {open && <div className="insp-body">
       <Row>
         <Select
           ariaLabel="Style breakpoint"
           value={variant.maxWidth === null ? 'all' : String(variant.maxWidth)}
           options={[
-            { value: 'all', label: 'All widths' },
+            { value: 'all', label: 'All Widths' },
             ...widths.map((w) => ({ value: String(w), label: `≤ ${w}px` })),
           ]}
           onChange={(v) => update({ ...variant, maxWidth: v === 'all' ? null : Number(v) })}
@@ -65,7 +75,7 @@ export function VariantsSection({ el }: { el: ElementNode }) {
         <input
           className="insp-input"
           aria-label="Custom breakpoint width"
-          placeholder="Custom width (px)"
+          placeholder="Custom Width (px)"
           title="Press Enter to add this breakpoint"
           inputMode="numeric"
           value={customWidth}
@@ -84,7 +94,7 @@ export function VariantsSection({ el }: { el: ElementNode }) {
           aria-pressed={active}
           onClick={() => useEditor.setState({ stylePreview: active ? null : { ...variant, id: el.id } })}
         >
-          {active ? 'Stop preview' : 'Preview'}
+          {active ? 'Stop Preview' : 'Preview'}
         </button>
       </Row>
       <Row>
@@ -94,6 +104,7 @@ export function VariantsSection({ el }: { el: ElementNode }) {
           {variant.maxWidth === null ? '' : ` · ≤ ${variant.maxWidth}px`}
         </code>
       </Row>
+      {base ? <p className="insp-source-body">Base styles are edited in Layout, Fill, Text and the other controls above. Choose a breakpoint or state here to edit overrides.</p> : <>
       <Row>
         <TextInput
           key={`color:${variant.maxWidth}:${variant.state}`}
@@ -153,6 +164,8 @@ export function VariantsSection({ el }: { el: ElementNode }) {
           }}
         />
       </Row>
-    </Section>
+      </>}
+      </div>}
+    </section>
   );
 }

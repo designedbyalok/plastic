@@ -82,6 +82,7 @@ export interface EditorState {
   readonly tool: Tool;
   readonly viewport: Viewport;
   readonly collapsed: Readonly<Record<NodeId, true>>;
+  readonly rulersVisible: boolean;
   readonly codeOpen: boolean;
   readonly layersOpen: boolean;
   /** Left panel width in px (a per-browser preference). */
@@ -112,6 +113,7 @@ export interface EditorState {
   setHover(id: NodeId | null): void;
   setTool(tool: Tool): void;
   setViewport(viewport: Viewport): void;
+  setRulersVisible(visible: boolean): void;
   setCollapsed(id: NodeId, collapsed: boolean): void;
   setEditingText(id: NodeId | null): void;
   setVectorEdit(edit: VectorEdit | null): void;
@@ -177,6 +179,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   tool: { kind: 'select' },
   viewport: { x: 80, y: 80, zoom: 1 },
   collapsed: {},
+  rulersVisible: readPref('plastic:rulers') !== '0',
   codeOpen: false,
   layersOpen: readPref('plastic:layers-open') !== '0',
   layersWidth: clampPanelWidth(Number(readPref('plastic:layers-width')) || PANEL_WIDTH.default),
@@ -306,6 +309,10 @@ export const useEditor = create<EditorState>()((set, get) => ({
   },
   setTool(tool) {
     set({ tool });
+  },
+  setRulersVisible(visible) {
+    writePref('plastic:rulers', visible ? '1' : '0');
+    set({ rulersVisible: visible });
   },
   setViewport(viewport) {
     set({ viewport });

@@ -39,7 +39,7 @@ export function ThemePanel() {
     const doc = editor().doc;
     const existing = byKind(group.kind).length;
     const name = uniqueTokenName(doc, `${group.prefix}${group.kind === 'color' ? 'new' : existing + 1}`);
-    editor().apply(`Add ${group.label.toLowerCase()} token`, (d) => setToken(d, name, group.sample));
+    editor().apply(`Add ${group.label} Token`, (d) => setToken(d, name, group.sample));
     setEditing(name);
   };
 
@@ -75,12 +75,12 @@ function AddTokenMenu({ onAdd }: { onAdd(group: TokenGroup): void }) {
   }, [open]);
   return (
     <span className="insp-menu-anchor" ref={ref}>
-      <button type="button" className="icon-button" title="Add token" aria-label="Add token" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" className="icon-button" title="Add Token" aria-label="Add Token" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Plus size={13} strokeWidth={1.5} />
       </button>
       {open && (
         <div className="insp-menu" role="menu">
-          <div className="rail-menu-title">Add token</div>
+          <div className="rail-menu-title">Add Token</div>
           {GROUPS.map((g) => (
             <button
               key={g.kind}
@@ -122,7 +122,7 @@ function TokenGroupSection({ group, names, order, editing, onEdit, onAdd }: Grou
           {group.label}
         </button>
         {group.kind !== 'other' && (
-          <button type="button" className="icon-button theme-group-add" title={`Add ${group.label.toLowerCase()} token`} aria-label={`Add ${group.label.toLowerCase()} token`} onClick={onAdd}>
+          <button type="button" className="icon-button theme-group-add" title={`Add ${group.label} Token`} aria-label={`Add ${group.label} Token`} onClick={onAdd}>
             <Plus size={13} strokeWidth={1.5} />
           </button>
         )}
@@ -200,7 +200,7 @@ function TokenEditor({ name, kind, onDone }: { name: string; kind: TokenKind; on
   return (
     <div className="token-row is-editing" onBlur={onBlur}>
       {kind === 'color' ? (
-        <label className="token-icon token-swatch" style={{ background: value }} title="Pick a color">
+        <label className="token-icon token-swatch" style={{ background: value }} title="Pick a Color">
           <input
             type="color"
             aria-label={`${name} color`}
@@ -239,10 +239,10 @@ function TokenEditor({ name, kind, onDone }: { name: string; kind: TokenKind; on
         type="button"
         className="icon-button token-delete"
         aria-label={`Delete ${name}`}
-        title="Delete token"
+        title="Delete Token"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => {
-          editor().apply('Delete token', (d) => removeToken(d, name));
+          editor().apply('Delete Token', (d) => removeToken(d, name));
           onDone();
         }}
       >

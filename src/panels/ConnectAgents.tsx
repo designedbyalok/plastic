@@ -1,5 +1,5 @@
 /**
- * "Connect your agent": set up Plastic's MCP server in local coding agents so they can read and
+ * "Connect Your Agent": set up Plastic's MCP server in local coding agents so they can read and
  * write designs and tokens. One click where the agent offers a CLI or an install link; copyable
  * config for everything else.
  */
@@ -57,7 +57,7 @@ const AGENTS: readonly Agent[] = [
     oneClick: { kind: 'cli', cli: 'codex', text: 'Add Plastic to the Codex CLI and IDE extension', label: 'Add to Codex' },
     manual: (s) => [
       { title: 'Codex CLI', steps: ['Run this in your terminal:', { code: `codex mcp add ${SERVER} -- ${shell(s)}` }] },
-      { title: 'Or edit ~/.codex/config.toml', steps: [{ code: `[mcp_servers.${SERVER}]\ncommand = ${JSON.stringify(s.command)}\nargs = ${JSON.stringify(s.args)}` }] },
+      { title: 'Or Edit ~/.codex/config.toml', steps: [{ code: `[mcp_servers.${SERVER}]\ncommand = ${JSON.stringify(s.command)}\nargs = ${JSON.stringify(s.args)}` }] },
     ],
   },
   {
@@ -104,14 +104,14 @@ const AGENTS: readonly Agent[] = [
     name: 'VS Code',
     icon: SquareCode,
     oneClick: { kind: 'link', text: 'Open VS Code and confirm the install', label: 'Add to VS Code', href: vscodeLink },
-    manual: (s) => [{ title: 'Add to .vscode/mcp.json (or your user mcp.json)', steps: [{ code: vscodeJson(s) }] }],
+    manual: (s) => [{ title: 'Add to .vscode/mcp.json (or Your User mcp.json)', steps: [{ code: vscodeJson(s) }] }],
   },
   {
     id: 'other',
     name: 'Other agents',
     icon: Ellipsis,
     manual: (s) => [
-      { title: 'Local command (stdio)', steps: ['Most agents accept a command to launch:', { code: shell(s) }, 'As JSON:', { code: mcpServersJson(s) }] },
+      { title: 'Local Command (stdio)', steps: ['Most agents accept a command to launch:', { code: shell(s) }, 'As JSON:', { code: mcpServersJson(s) }] },
       { title: 'HTTP (Streamable HTTP)', steps: ['While Plastic is running, agents that take a URL can use:', { code: s.url }] },
     ],
   },
@@ -159,7 +159,7 @@ export function ConnectAgents() {
     <div className="dialog-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
       <div className="dialog agents-dialog" role="dialog" aria-modal="true" aria-labelledby="agents-title">
         <header className="dialog-header">
-          <h2 id="agents-title">Connect your agent</h2>
+          <h2 id="agents-title">Connect Your Agent</h2>
         </header>
         <div className="agents-body">
           <nav className="agents-list" aria-label="Agents">
@@ -176,7 +176,7 @@ export function ConnectAgents() {
         </div>
         <footer className="dialog-footer">
           <a className="dialog-link" href="https://github.com/designedbyalok/plastic/blob/main/docs/AGENTS.md" target="_blank" rel="noreferrer">
-            Learn more
+            Learn More
           </a>
           <button type="button" className="dialog-primary" onClick={close}>
             Done
@@ -212,7 +212,7 @@ function AgentSteps({ agent, setup, onRefresh }: { agent: Agent; setup: Setup; o
             ))}
         </div>
       </Step>
-      <Step number={3} title="Run your first prompt">
+      <Step number={3} title="Run Your First Prompt">
         <p className="agents-note">Try one of these in {agent.id === 'other' ? 'your agent' : agent.name} to test the connection:</p>
         <div className="agents-prompts">
           {PROMPTS.map((p) => (
@@ -305,7 +305,7 @@ function CodeBlock({ code }: { code: string }) {
 function CopyChip({ text }: { text: string }) {
   const [copied, copy] = useCopy(text);
   return (
-    <button type="button" className="agents-prompt" onClick={copy} title="Copy prompt">
+    <button type="button" className="agents-prompt" onClick={copy} title="Copy Prompt">
       {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.5} />}
       {text}
     </button>

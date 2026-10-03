@@ -31,7 +31,10 @@ describe('frame links and AI design context', () => {
     expect(context.css).toContain('.hero em');
     expect(context.css).toContain('@media');
     const child = context.nodes.find((n) => n.kind === 'element' && n.tag === 'h1')!;
-    expect(() => frameDesign(doc, child.id)).toThrow('no longer exists');
+    const nested = frameDesign(doc, child.id);
+    expect(nested.frame.id).toBe(child.id);
+    expect(nested.contextHtml).toContain('<section');
+    expect(nested.ancestors.map((node) => node.id)).toContain(f.root);
     expect(() => frameDesign(doc, 'missing')).toThrow();
   });
 });

@@ -8,6 +8,7 @@ import { Inspector } from '../panels/inspector/Inspector.tsx';
 import { LayersPanel } from '../panels/LayersPanel.tsx';
 import { ToolRail } from '../panels/ToolRail.tsx';
 import { ConnectAgents } from '../panels/ConnectAgents.tsx';
+import { AppSkeleton, CodeSkeleton } from './Skeleton.tsx';
 import { linkClick } from './router.ts';
 import { focusLinkedFrame } from '../editor/frameLinks.ts';
 
@@ -22,7 +23,7 @@ export function Editor({ projectId }: { projectId: string }) {
   const title = useEditor((s) => s.doc.title);
   const [status, setStatus] = useState<Status>('opening');
   const [openError, setOpenError] = useState('');
-  useShortcuts();
+  useShortcuts(status === 'open');
 
   useEffect(() => {
     if (status !== 'open') return;
@@ -61,12 +62,14 @@ export function Editor({ projectId }: { projectId: string }) {
     };
   }, [projectId]);
 
+  if (status === 'opening') return <AppSkeleton editor />;
+
   if (status === 'error') {
     return (
       <div className="missing-file" role="alert">
         <p>{openError}</p>
-        <button type="button" onClick={() => location.reload()}>Try again</button>
-        <a href="/" onClick={linkClick}>Back to files</a>
+        <button type="button" onClick={() => location.reload()}>Try Again</button>
+        <a href="/" onClick={linkClick}>Back to Files</a>
       </div>
     );
   }
@@ -76,7 +79,7 @@ export function Editor({ projectId }: { projectId: string }) {
       <div className="missing-file">
         <p>There is no file called “{projectId}” in this workspace.</p>
         <a href="/" onClick={linkClick}>
-          Back to files
+          Back to Files
         </a>
       </div>
     );
@@ -90,11 +93,10 @@ export function Editor({ projectId }: { projectId: string }) {
         <main className="stage">
           {status === 'open' && <Canvas />}
           {codeOpen && (
-            <Suspense fallback={<section className="code-panel" aria-label="Code" />}>
+            <Suspense fallback={<CodeSkeleton />}>
               <CodePanel />
             </Suspense>
           )}
-          {status === 'opening' && <div className="loading">Opening file…</div>}
         </main>
         <Inspector />
       </div>

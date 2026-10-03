@@ -222,14 +222,14 @@ export function VectorFillSection({ shapes }: { shapes: readonly NodeId[] }) {
 }
 
 const CAPS = [
-  { value: 'butt', label: 'No cap' },
-  { value: 'round', label: 'Round cap' },
-  { value: 'square', label: 'Square cap' },
+  { value: 'butt', label: 'No Cap' },
+  { value: 'round', label: 'Round Cap' },
+  { value: 'square', label: 'Square Cap' },
 ];
 const JOINS = [
-  { value: 'miter', label: 'Miter join' },
-  { value: 'round', label: 'Round join' },
-  { value: 'bevel', label: 'Bevel join' },
+  { value: 'miter', label: 'Miter Join' },
+  { value: 'round', label: 'Round Join' },
+  { value: 'bevel', label: 'Bevel Join' },
 ];
 
 export function VectorStrokeSection({ shapes }: { shapes: readonly NodeId[] }) {
@@ -399,7 +399,7 @@ export function PointSection() {
     editor().apply('Corner radius', (d) => writePath(d, edit.id, setRadius(readPath(d, edit.id), anchors, n)), { coalesce: 'point-radius' });
   };
   return (
-    <Section title={anchors.length > 1 ? `${anchors.length} points` : 'Point'}>
+    <Section title={anchors.length > 1 ? `${anchors.length} Points` : 'Point'}>
       {anchor ? (
         <Row>
           <TextInput ariaLabel="Point X" prefix="X" value={fmt(anchor.x)} onChange={(v) => move('x', v)} />

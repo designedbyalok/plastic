@@ -1,3 +1,4 @@
+import { FileSkeletons } from '../app/Skeleton.tsx';
 /**
  * Home: the person's files. Recents (everything, most recently edited first), Files (organized
  * in folders), the Archive, and their Profile. Each file is a folder of HTML and CSS; its name
@@ -295,7 +296,7 @@ export function Home({ route }: { route: HomeRoute }) {
         onDropFile={(id, target) => void run((w) => (target === 'archive' ? w.place(id, { archived: true }) : w.place(id, { folderId: null, archived: false })))}
       />
       <main className="home-main">
-        {loadError && <div className="home-empty" role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Try again</button></div>}
+        {loadError && <div className="home-empty" role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Try Again</button></div>}
         {route.name === 'profile' && !searching ? (
           <section className="home-files" aria-label="Profile">
             <ProfileView profile={profile} onSaved={() => void refresh()} />
@@ -341,12 +342,12 @@ export function Home({ route }: { route: HomeRoute }) {
                     {route.name === 'files' && !folderId && (
                       <button type="button" className="home-import" onClick={newFolder}>
                         <FolderPlus size={13} strokeWidth={1.75} />
-                        New folder
+                        New Folder
                       </button>
                     )}
                     <button type="button" className="home-new" onClick={() => void newFile()} disabled={creating}>
                       <Plus size={12} strokeWidth={2} />
-                      New file
+                      New File
                     </button>
                     <div className="home-view-toggle" role="radiogroup" aria-label="View">
                       {(['grid', 'list'] as const).map((v) => (
@@ -355,7 +356,7 @@ export function Home({ route }: { route: HomeRoute }) {
                           type="button"
                           role="radio"
                           aria-checked={view === v}
-                          aria-label={v === 'grid' ? 'Grid view' : 'List view'}
+                          aria-label={v === 'grid' ? 'Grid View' : 'List View'}
                           className={`home-view-option${view === v ? ' is-active' : ''}`}
                           onClick={() => changeView(v)}
                         >
@@ -405,7 +406,7 @@ export function Home({ route }: { route: HomeRoute }) {
 
                 {route.name === 'files' && folderId && !folder && files !== null && <p className="home-empty">This folder doesn’t exist anymore.</p>}
 
-                {files === null ? null : visible.length === 0 ? (
+                {files === null ? (loadError ? null : <FileSkeletons list={view === 'list'} />) : visible.length === 0 ? (
                   <EmptyState route={route} searching={searching} hasFolders={folders.length > 0} onNew={() => void newFile()} />
                 ) : view === 'grid' ? (
                   <div className="home-grid">
@@ -490,7 +491,7 @@ function FileMenu({ file, folders, onMove, onArchive, onDelete }: { file: FileEn
               </MenuItem>
               <MenuDivider />
               <MenuItem icon={<Trash2 size={14} strokeWidth={1.75} />} danger onSelect={close(onDelete)}>
-                Delete forever
+                Delete Forever
               </MenuItem>
             </>
           ) : (
@@ -499,7 +500,7 @@ function FileMenu({ file, folders, onMove, onArchive, onDelete }: { file: FileEn
                 Open
               </MenuItem>
               <MenuDivider />
-              <MenuHeading>Move to</MenuHeading>
+              <MenuHeading>Move To</MenuHeading>
               <MenuItem icon={<FolderInput size={14} strokeWidth={1.75} />} disabled={!file.folderId} onSelect={close(() => onMove(null))}>
                 Files
               </MenuItem>
@@ -605,7 +606,7 @@ function FolderTile({
                 onDelete();
               }}
             >
-              Delete folder
+              Delete Folder
             </MenuItem>
           </div>
         )}
@@ -661,7 +662,7 @@ function Sidebar({
 
           {!cardDismissed && (
             <div className="home-card-note">
-              <div className="home-card-note-title">Your files are plain HTML</div>
+              <div className="home-card-note-title">Your Files Are Plain HTML</div>
               <div className="home-card-note-body">
                 Each file is a folder of HTML pages and CSS. Open it in any editor, or commit it to Git.
               </div>
@@ -727,7 +728,7 @@ function EmptyState({ route, searching, hasFolders, onNew }: { route: HomeRoute;
       <p>No files yet.</p>
       <button type="button" className="home-new" onClick={onNew}>
         <Plus size={12} strokeWidth={2} />
-        New file
+        New File
       </button>
     </div>
   );

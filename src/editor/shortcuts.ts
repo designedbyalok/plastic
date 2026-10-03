@@ -12,7 +12,8 @@ import { deleteAnchors, moveRefs } from '../vector/path.ts';
 import { runOutlineStroke, runPathOp } from '../vector/pathOps.ts';
 import { setSnapPref, snapPrefs } from '../canvas/snap.ts';
 import { notify } from '../canvas/gestureStore.ts';
-import { handleCanvasPaste } from './clipboard.ts';
+import { copyFrameLink } from './frameLinks.ts';
+import { handleCanvasCopy, handleCanvasPaste } from './clipboard.ts';
 
 /** Keys in vector edit mode. Returns whether the key was handled. */
 function handleVectorKey(e: KeyboardEvent, key: string, mod: boolean): boolean {
@@ -69,8 +70,9 @@ function isTyping(e: KeyboardEvent): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || !!target.closest('[role="combobox"], [role="listbox"], [data-plastic-select]');
 }
 
-export function useShortcuts(): void {
+export function useShortcuts(enabled = true): void {
   useEffect(() => {
+    if (!enabled) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const store = useEditor.getState();
       const mod = e.metaKey || e.ctrlKey;
@@ -84,6 +86,18 @@ export function useShortcuts(): void {
       if (isTyping(e)) return;
       // A dialog owns the keyboard while open.
       if (store.agentsOpen) return;
+
+      if (mod && !e.shiftKey && !e.altKey && key === 'l') {
+        e.preventDefault();
+        void copyFrameLink(store.selection.at(-1));
+        return;
+      }
+
+      if (!mod && !e.altKey && e.shiftKey && e.code === 'KeyR') {
+        e.preventDefault();
+        store.setRulersVisible(!store.rulersVisible);
+        return;
+      }
 
       if (e.code === 'Space') {
         e.preventDefault();
@@ -207,15 +221,21 @@ export function useShortcuts(): void {
     };
     const onBlur = () => useEditor.getState().setSpacePressed(false);
     const onPaste = (e: ClipboardEvent) => handleCanvasPaste(e);
+    const onCopy = (e: ClipboardEvent) => handleCanvasCopy(e);
+    const onCut = (e: ClipboardEvent) => handleCanvasCopy(e, true);
+    window.addEventListener('copy', onCopy);
+    window.addEventListener('cut', onCut);
     window.addEventListener('paste', onPaste);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
     return () => {
+      window.removeEventListener('copy', onCopy);
+      window.removeEventListener('cut', onCut);
       window.removeEventListener('paste', onPaste);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, []);
+  }, [enabled]);
 }

@@ -40,9 +40,9 @@ const attr = {
   name: { name: 'name', label: 'Name', kind: 'text', group: 'semantics', placeholder: 'form field name' },
   required: { name: 'required', label: 'Required', kind: 'boolean', group: 'behavior' },
   disabled: { name: 'disabled', label: 'Disabled', kind: 'boolean', group: 'behavior' },
-  readonly: { name: 'readonly', label: 'Read only', kind: 'boolean', group: 'behavior' },
+  readonly: { name: 'readonly', label: 'Read Only', kind: 'boolean', group: 'behavior' },
   placeholder: { name: 'placeholder', label: 'Placeholder', kind: 'text', group: 'content' },
-  ariaLabel: { name: 'aria-label', label: 'Accessible name', kind: 'text', group: 'semantics', placeholder: 'aria-label' },
+  ariaLabel: { name: 'aria-label', label: 'Accessible Name', kind: 'text', group: 'semantics', placeholder: 'aria-label' },
 } satisfies Record<string, AttrSpec>;
 
 function spec(tag: string, label: string, category: ElementCategory, extra: Partial<ElementSpec> = {}): ElementSpec {
@@ -63,7 +63,7 @@ const SPECS: readonly ElementSpec[] = [
     attrs: [
       { name: 'action', label: 'Action', kind: 'text', group: 'semantics', placeholder: '/submit' },
       { name: 'method', label: 'Method', kind: 'enum', group: 'semantics', options: ['get', 'post'] },
-      { name: 'novalidate', label: 'No validation', kind: 'boolean', group: 'behavior' },
+      { name: 'novalidate', label: 'No Validation', kind: 'boolean', group: 'behavior' },
     ],
   }),
   spec('fieldset', 'Fieldset', 'container', { attrs: [attr.disabled] }),
@@ -77,7 +77,7 @@ const SPECS: readonly ElementSpec[] = [
   spec('h6', 'Heading 6', 'text'),
   spec('p', 'Paragraph', 'text'),
   spec('span', 'Text', 'text'),
-  spec('small', 'Small text', 'text'),
+  spec('small', 'Small Text', 'text'),
   spec('strong', 'Strong', 'text'),
   spec('em', 'Emphasis', 'text'),
   spec('blockquote', 'Quote', 'text'),
@@ -113,7 +113,7 @@ const SPECS: readonly ElementSpec[] = [
       { ...attr.readonly, when: isTextLike },
     ],
   }),
-  spec('textarea', 'Text area', 'form', {
+  spec('textarea', 'Text Area', 'form', {
     editableText: false,
     attrs: [attr.name, attr.placeholder, { name: 'rows', label: 'Rows', kind: 'number', group: 'content' }, attr.required, attr.disabled, attr.readonly],
   }),
@@ -124,7 +124,7 @@ const SPECS: readonly ElementSpec[] = [
   spec('img', 'Image', 'media', {
     attrs: [
       { name: 'src', label: 'Source', kind: 'text', group: 'content', placeholder: 'https:// or assets/…' },
-      { name: 'alt', label: 'Alt text', kind: 'text', group: 'content', placeholder: 'Describe the image' },
+      { name: 'alt', label: 'Alt Text', kind: 'text', group: 'content', placeholder: 'Describe the image' },
       { name: 'loading', label: 'Loading', kind: 'enum', group: 'behavior', options: ['eager', 'lazy'] },
     ],
   }),
@@ -140,21 +140,21 @@ const SPECS: readonly ElementSpec[] = [
   }),
   spec('svg', 'Vector', 'media'),
   spec('table', 'Table', 'table'),
-  spec('thead', 'Table head', 'table'),
-  spec('tbody', 'Table body', 'table'),
-  spec('tfoot', 'Table foot', 'table'),
+  spec('thead', 'Table Head', 'table'),
+  spec('tbody', 'Table Body', 'table'),
+  spec('tfoot', 'Table Foot', 'table'),
   spec('tr', 'Row', 'table'),
-  spec('th', 'Header cell', 'table', {
+  spec('th', 'Header Cell', 'table', {
     editableText: true,
-    attrs: [{ name: 'scope', label: 'Scope', kind: 'enum', group: 'semantics', options: ['col', 'row'] }, { name: 'colspan', label: 'Col span', kind: 'number', group: 'semantics' }],
+    attrs: [{ name: 'scope', label: 'Scope', kind: 'enum', group: 'semantics', options: ['col', 'row'] }, { name: 'colspan', label: 'Column Span', kind: 'number', group: 'semantics' }],
   }),
   spec('td', 'Cell', 'table', {
     editableText: true,
-    attrs: [{ name: 'colspan', label: 'Col span', kind: 'number', group: 'semantics' }, { name: 'rowspan', label: 'Row span', kind: 'number', group: 'semantics' }],
+    attrs: [{ name: 'colspan', label: 'Column Span', kind: 'number', group: 'semantics' }, { name: 'rowspan', label: 'Row Span', kind: 'number', group: 'semantics' }],
   }),
   spec('ul', 'List', 'list'),
-  spec('ol', 'Numbered list', 'list', { attrs: [{ name: 'start', label: 'Start', kind: 'number', group: 'semantics' }, { name: 'reversed', label: 'Reversed', kind: 'boolean', group: 'behavior' }] }),
-  spec('li', 'List item', 'text', { acceptsChildren: true }),
+  spec('ol', 'Numbered List', 'list', { attrs: [{ name: 'start', label: 'Start', kind: 'number', group: 'semantics' }, { name: 'reversed', label: 'Reversed', kind: 'boolean', group: 'behavior' }] }),
+  spec('li', 'List Item', 'text', { acceptsChildren: true }),
 ];
 
 const BY_TAG = new Map(SPECS.map((s) => [s.tag, s]));

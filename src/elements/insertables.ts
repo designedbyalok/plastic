@@ -15,6 +15,21 @@ export interface Insertable {
   readonly editTextOnInsert?: boolean;
 }
 
+export const DEFAULT_TEXT_FONT = 'Inter, system-ui, sans-serif';
+
+/** Plain text owns its typography and hugs its content, including outside a frame. */
+const textStyle = {
+  all: 'unset',
+  display: 'block',
+  width: 'max-content',
+  'font-family': DEFAULT_TEXT_FONT,
+  'font-size': '16px',
+  'font-weight': '400',
+  'line-height': '1.5',
+  color: '#111827',
+  'white-space': 'pre-wrap',
+};
+
 const controlStyle = {
   'box-sizing': 'border-box',
   width: '240px',
@@ -67,7 +82,7 @@ export const INSERTABLES: readonly Insertable[] = [
     spec: () => ({
       tag: 'h2',
       className: 'heading',
-      style: { margin: '0', 'font-size': '28px', 'font-weight': '600', 'line-height': '1.2', 'letter-spacing': '-0.01em' },
+      style: { ...textStyle, 'font-size': '28px', 'font-weight': '600', 'line-height': '1.2', 'letter-spacing': '-0.01em' },
       children: ['Heading'],
     }),
   },
@@ -76,7 +91,7 @@ export const INSERTABLES: readonly Insertable[] = [
     label: 'Text',
     shortcut: 't',
     editTextOnInsert: true,
-    spec: () => ({ tag: 'p', className: 'text', style: { margin: '0', 'line-height': '1.5' }, children: ['Text'] }),
+    spec: () => ({ tag: 'p', className: 'text', style: textStyle, children: ['Text'] }),
   },
   {
     id: 'button',
@@ -103,7 +118,7 @@ export const INSERTABLES: readonly Insertable[] = [
   },
   {
     id: 'field',
-    label: 'Labeled field',
+    label: 'Labeled Field',
     shortcut: 'l',
     spec: () => ({
       tag: 'label',
@@ -114,7 +129,7 @@ export const INSERTABLES: readonly Insertable[] = [
   },
   {
     id: 'textarea',
-    label: 'Text area',
+    label: 'Text Area',
     spec: () => ({ tag: 'textarea', attrs: { rows: '3', placeholder: 'Placeholder' }, className: 'textarea', style: { ...controlStyle, resize: 'vertical' } }),
   },
   {

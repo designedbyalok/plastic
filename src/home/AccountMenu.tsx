@@ -82,7 +82,7 @@ export function AccountMenu({ profile }: { profile: Profile | null }) {
             <>
               <MenuDivider />
               <MenuItem icon={<LogOut size={14} strokeWidth={1.75} />} onSelect={() => void account.signOut()}>
-                Sign out
+                Sign Out
               </MenuItem>
             </>
           )}

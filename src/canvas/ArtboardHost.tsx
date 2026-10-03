@@ -1,3 +1,5 @@
+import loadingCss from '../app/loading.css?raw';
+import { ImageLoading } from './imageLoading.ts';
 /**
  * One artboard = one root element rendered into its own same-origin <iframe>.
  *
@@ -18,15 +20,15 @@ import { useEditor } from '../editor/store.ts';
 import { domElement, onRerenderRequest, registerHost } from './dom.ts';
 import { DomRenderer } from './renderer.ts';
 import { finishTextEditing } from './textEditing.ts';
-import { handleCanvasPaste } from '../editor/clipboard.ts';
+import { handleCanvasCopy, handleCanvasPaste } from '../editor/clipboard.ts';
 
 /**
  * Editor-only rules, placed *before* the design CSS and wrapped in :where() (zero specificity)
  * so any rule in styles.css overrides them.
  */
 const EDITOR_CSS = `
-/* Keep the browser's default white page canvas: an artboard looks like its root on a real page. */
-:where(html, body) { margin: 0; padding: 0; overflow: hidden; }
+/* Transparent document surfaces let unfilled roots (such as text) show the canvas. */
+:where(html, body) { margin: 0; padding: 0; overflow: hidden; background: transparent; }
 [contenteditable] { outline: none; cursor: text; }
 `;
 
@@ -101,10 +103,13 @@ export function ArtboardHost({ id }: { id: NodeId }) {
       const style = doc.createElement('style');
       tokens.dataset.plasticSource = 'tokens.css';
       style.dataset.plasticSource = 'styles.css';
-      guard.textContent = EDITOR_CSS;
+      guard.textContent = EDITOR_CSS + loadingCss + `
+[data-plastic-image-loading] { position: absolute; pointer-events: none; z-index: 2147483647; background-color: #eff0f3; }
+`;
       // Same order as the exported page: tokens.css, then styles.css.
       doc.head.append(guard, tokens, style);
       const renderer = new DomRenderer(doc.body);
+      const imageLoading = new ImageLoading(doc);
       const unblock = blockNativeInteraction(doc);
       const unregister = registerHost(id, iframe);
 
@@ -118,6 +123,7 @@ export function ArtboardHost({ id }: { id: NodeId }) {
       const fit = () => {
         const root = domElement(id);
         if (!root) return;
+        imageLoading.position();
         const r = root.getBoundingClientRect();
         const state = useEditor.getState();
         const preview = state.stylePreview;
@@ -150,6 +156,7 @@ export function ArtboardHost({ id }: { id: NodeId }) {
         const css = preview && cls ? previewVariantCss(design.styles, cls, preview) : cached(design.styles, serializeStyleSheet);
         if (style.textContent !== css) style.textContent = css;
         renderer.render(design, id);
+        imageLoading.sync();
         observe();
       };
       render();
@@ -166,6 +173,10 @@ export function ArtboardHost({ id }: { id: NodeId }) {
       };
       doc.addEventListener('pointerdown', onPointerDown);
       const onPaste = (e: ClipboardEvent) => handleCanvasPaste(e, id);
+      const onCopy = (e: ClipboardEvent) => handleCanvasCopy(e);
+      const onCut = (e: ClipboardEvent) => handleCanvasCopy(e, true);
+      doc.addEventListener('copy', onCopy);
+      doc.addEventListener('cut', onCut);
       doc.addEventListener('paste', onPaste);
 
       teardown = () => {
@@ -176,7 +187,10 @@ export function ArtboardHost({ id }: { id: NodeId }) {
         resize.disconnect();
         win.cancelAnimationFrame(fitFrame);
         doc.removeEventListener('pointerdown', onPointerDown);
+        doc.removeEventListener('copy', onCopy);
+        doc.removeEventListener('cut', onCut);
         doc.removeEventListener('paste', onPaste);
+        imageLoading.dispose();
         renderer.dispose();
         guard.remove();
         tokens.remove();

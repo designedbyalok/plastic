@@ -150,6 +150,12 @@ code editor, tokens, pages, undo/redo, local files, cloud accounts, and MCP tool
 
 ## Dropdown and inspector polish
 
+- The font picker includes 20 free Google Fonts families for interface typography. Selecting
+  a family adds its CSS API import (400/500/600/700, `display=swap`) to design CSS; opening
+  the menu makes no font requests. System/bundled fonts need no Google request. Imports are
+  deduplicated, undoable and survive saving/export. Availability checks use the selected
+  artboard's font environment and refresh when web fonts finish loading.
+
 - Inspector selects share the Radix Select primitive, styled with existing Plastic light/dark
   surface, text, radius, shadow and hover tokens. Portal positioning avoids inspector clipping;
   long menus scroll. Existing file, tool, token, zoom and dashboard action menus use matching
@@ -173,3 +179,61 @@ code editor, tokens, pages, undo/redo, local files, cloud accounts, and MCP tool
 - React regression tests cover ancestor expansion, active-row state, scrolling, focus
   preservation, reduced motion and avoiding re-anchoring on unrelated edits. Browser checks
   selected a deeply nested item on the canvas and verified its layer appeared in view.
+
+## Clipboard, Layer Dragging and Flex Controls
+
+- Native copy/cut events work from both the editor and artboard documents. Cut deletes only
+  after writing the clipboard successfully; paste restores editable nodes, CSS, names and
+  component links. Repeated pastes receive independent node/class/SVG identities. Both cut
+  and paste are undoable. Text inputs and inline text editing retain native clipboard behavior.
+- Layer rows support dragging selected layers: the top/bottom quarters insert before/after,
+  while the middle nests into a container. Drop indicators distinguish these actions; collapsed
+  targets expand on hover and the panel scrolls near its edges. Cycles and void destinations
+  are rejected. Nesting preserves names and removes only canvas placement metadata.
+- Applied Flex uses a spatial alignment pad, vertical/horizontal direction, reverse, gap and
+  paired horizontal/vertical padding. Advanced options retain distributed alignment, baseline,
+  stretch, wrapping, separate gaps and Grid conversion; individual padding remains available.
+  Controls write plain CSS and participate in normal undo/save/export.
+- Regression checks cover clipboard failure, cut/paste undo, repeated copies, responsive CSS,
+  SVG/asset references, component synchronization, sibling ordering, nesting and alignment.
+  Browser checks include native shortcuts, root-to-child and child-to-root dragging, and the
+  206-descendant Paper capture retaining its 280×289 size and background after cut/paste.
+
+## Plain Rectangle Defaults
+
+- New rectangles start with a white fill and their drawn width/height. Border and shadow are
+  opt-in. The canvas host no longer adds a synthetic outline or shadow around top-level items,
+  so existing designs display only their authored effects.
+- Root elements with an explicit height expose that height in Layout; artboards using
+  min-height retain their existing height control. Optional inspector controls track the
+  selection that opened them.
+
+## Canvas Rulers and Guides
+
+- Horizontal and vertical rulers overlay the canvas without shifting its camera. Tick density
+  adapts to zoom; labels track pan, negative coordinates and the selected artboard's origin.
+  Selected bounds highlight both rulers, with a live pointer marker. Shift+R or Menu → Show
+  Rulers toggles visibility; the preference persists in the browser.
+- Drag from the top ruler to create a horizontal guide, or from the left ruler to create a
+  vertical guide. Guides dropped inside an artboard are relative to its origin and clipped to
+  its bounds; canvas guides use world coordinates. Frame guides move with their frame and
+  follow copies and structural moves across pages.
+- Drag guides to reposition, Alt/Option-drag to duplicate, Shift-drag to snap to ruler ticks,
+  arrow keys to nudge (Shift ×10), and Delete/Backspace to remove. Returning a guide to a ruler
+  or choosing Remove Guide from its context menu also removes it. Escape cancels a drag.
+- Guides feed existing shape/move/resize snapping. They are stored per page in project.json,
+  support undo/redo and save/reload, and never add elements or declarations to exported designs.
+  Hiding rulers also hides guides and disables guide snapping.
+- Validation covers coordinate math across zoom levels, negative labels, persistence, invalid
+  metadata, snapping, copying/moving frame guides, drag cancellation and duplication. Browser
+  checks cover both axes, nudging, deletion/undo, menu and ruler-return removal, Shift+R,
+  reload and a rectangle drawn with its right edge snapping exactly to a vertical guide.
+- Behavior reference: [Figma rulers and guides](https://help.figma.com/hc/en-us/articles/360040449713-Add-guides-to-the-canvas-or-frames).
+
+### Plain Text Insertion
+
+New Text and Heading layers hug their content and own a neutral typography baseline. They have no wrapper, fill, border, padding, or shadow, and standalone roots render over a transparent iframe surface. Text defaults to 16px regular Inter; headings retain their heading size and weight. Inter Variable is bundled under its SIL Open Font License and added to the document only when chosen or new text is inserted. Its WOFF2 subsets are embedded in saved/exported CSS, so the default font works offline and travels with the design. Existing authored text is preserved. See [Google Fonts variable font API](https://developers.google.com/fonts/docs/css2) and the bundled `src/assets/fonts/inter/OFL.txt` license.
+
+### Subtle Chrome Loading Skeletons
+
+Startup/session checks, lazy app routes, file opening, the file grid/list, and the code panel now use layout-shaped skeletons with a slow, low-contrast metallic shimmer. Reduced-motion preferences stop the shimmer. Opening files no longer briefly display another project's layer controls. Pending canvas images receive measured, editor-only masks until loading and decoding finish; failures, replacement sources, deleted images and iframe teardown clear their masks safely. Loading decorations stay out of the document model and saved/exported design.

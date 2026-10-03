@@ -150,7 +150,7 @@ function ImageUpload({ el }: { el: ElementNode }) {
   return (
     <Row>
       <label className="insp-button insp-file" title="Embeds the image as a data URL. Asset folders come later.">
-        Choose image…
+        Choose Image…
         <input
           type="file"
           accept="image/*"
@@ -200,7 +200,7 @@ export function TableSection({ el }: { el: ElementNode }) {
   return (
     <Section
       title="Table"
-      aside={table.id !== el.id ? <button type="button" className="insp-link" onClick={() => useEditor.getState().select([table.id])}>Select table</button> : undefined}
+      aside={table.id !== el.id ? <button type="button" className="insp-link" onClick={() => useEditor.getState().select([table.id])}>Select Table</button> : undefined}
     >
       {counter('Rows', shape.bodyRows.length, () => apply('Add row', (d) => addTableRow(d, table.id)), () => apply('Remove row', (d) => removeTableRow(d, table.id)))}
       {counter('Columns', shape.columns, () => apply('Add column', (d) => addTableColumn(d, table.id)), () => apply('Remove column', (d) => removeTableColumn(d, table.id)))}

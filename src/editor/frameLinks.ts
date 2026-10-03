@@ -1,25 +1,25 @@
 import { frameDesign } from '../serialization/frame.ts';
-import { domElement, screenRectOf, styleOf } from '../canvas/dom.ts';
+import { domElement, getViewportElement, styleOf } from '../canvas/dom.ts';
 import { notify } from '../canvas/gestureStore.ts';
-import { pageOf } from '../document/tree.ts';
+import { pageOf, rootOf } from '../document/tree.ts';
 import { saveNow } from './persistence.ts';
 import { useEditor } from './store.ts';
-import { zoomToSelection } from './commands.ts';
+import { fitRect } from '../canvas/coords.ts';
 
-export function frameLink(id: string): string {
+export function frameLink(id?: string): string {
   const url = new URL(location.href);
   url.search = '';
   url.hash = '';
-  url.searchParams.set('frame', id);
+  if (id) url.searchParams.set('frame', id);
   return url.href;
 }
 
-export async function copyFrameLink(id: string): Promise<void> {
+export async function copyFrameLink(id?: string): Promise<void> {
   try {
     await saveNow();
     if (useEditor.getState().saveStatus === 'error') throw new Error('Save the file before copying its frame link.');
     await navigator.clipboard.writeText(frameLink(id));
-    notify('Frame link copied');
+    notify(id ? 'Frame Link Copied' : 'File Link Copied');
   } catch (error) { notify(error instanceof Error ? error.message : 'Could not copy frame link.'); }
 }
 
@@ -53,9 +53,16 @@ export function focusLinkedFrame(): boolean {
   let tries = 0;
   const focus = () => {
     if (useEditor.getState().selection[0] !== id) return;
-    if (screenRectOf(id)) zoomToSelection();
+    const el = domElement(id), viewport = getViewportElement();
+    if (el && viewport) {
+      // Use local DOM geometry and canvas metadata, independent of a stale camera transform.
+      const bounds = el.getBoundingClientRect();
+      const position = useEditor.getState().doc.frames[rootOf(useEditor.getState().doc, id)] ?? { x: 0, y: 0 };
+      useEditor.getState().setViewport(fitRect({ x: position.x + bounds.x, y: position.y + bounds.y,
+        width: bounds.width, height: bounds.height }, { width: viewport.clientWidth, height: viewport.clientHeight }, 96, 4));
+    }
     else if (++tries < 30) requestAnimationFrame(focus);
   };
-  requestAnimationFrame(focus);
+  requestAnimationFrame(() => requestAnimationFrame(focus));
   return true;
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { handleCanvasPaste, importClipboardHtml, ownsTextPaste, pasteArtboard } from '../src/editor/clipboard';
+import { handleCanvasCopy, handleCanvasPaste, importClipboardHtml, ownsTextPaste, pasteArtboard } from '../src/editor/clipboard';
 import { useEditor } from '../src/editor/store';
 import { emptyDocument } from '../src/document/factory';
 import { parseProject, serializeProject } from '../src/serialization';
@@ -143,5 +143,58 @@ describe('artboard clipboard import', () => {
     expect(rule.position).toBe('relative');
     expect(rule.left).toBeUndefined();
     expect(rule.top).toBeUndefined();
+  });
+});
+
+describe('native layer cut and copy', () => {
+  function clipboard(target: HTMLElement = document.body, fail = false) {
+    const data = new Map<string, string>();
+    const event = (type: string) => {
+      const e = new Event(type, { cancelable: true }) as ClipboardEvent;
+      Object.defineProperty(e, 'clipboardData', { value: { getData: (key: string) => data.get(key) ?? '', setData: (key: string, value: string) => { if (fail) throw new Error('Clipboard unavailable'); data.set(key, value); } } });
+      Object.defineProperty(e, 'composedPath', { value: () => [target] });
+      return e;
+    };
+    return { event, data };
+  }
+  it('cuts, pastes with original identity/styles, and makes repeated pastes independent', () => {
+    const f = docFrom({ tag: 'main', children: [{ tag: 'section', className: 'card', style: { display: 'flex', gap: '16px' }, children: ['Card'] }, { tag: 'section' }] });
+    const [card, destination] = el(f.doc, f.root).children;
+    useEditor.getState().load(f.doc);
+    useEditor.getState().select([card!]);
+    const cb = clipboard();
+    const cut = cb.event('cut');
+    handleCanvasCopy(cut, true);
+    expect(cut.defaultPrevented).toBe(true);
+    expect(useEditor.getState().doc.nodes[card!]).toBeUndefined();
+    useEditor.getState().select([destination!]);
+    handleCanvasPaste(cb.event('paste'));
+    expect(el(useEditor.getState().doc, destination).children).toEqual([card]);
+    expect(useEditor.getState().doc.styles.rules.card).toMatchObject({ display: 'flex', gap: '16px' });
+    useEditor.getState().undo();
+    expect(useEditor.getState().doc.nodes[card!]).toBeUndefined();
+    useEditor.getState().undo();
+    expect(el(useEditor.getState().doc, f.root).children).toEqual([card, destination]);
+    useEditor.getState().redo();
+    useEditor.getState().redo();
+    useEditor.getState().select([destination!]);
+    handleCanvasPaste(cb.event('paste'));
+    const children = el(useEditor.getState().doc, destination).children;
+    expect(children).toHaveLength(2);
+    expect(children[1]).not.toBe(card);
+    expect(el(useEditor.getState().doc, children[1]).classes).not.toEqual(['card']);
+    const saved = parseProject(serializeProject(useEditor.getState().doc, { viewport: null, collapsed: [], activePage: null })).doc;
+    expect(textContent(saved, destination!)).toBe('CardCard');
+  });
+  it('does not delete on a clipboard write failure or intercept editable text', () => {
+    const f = docFrom({ tag: 'div', children: ['Keep'] });
+    useEditor.getState().load(f.doc); useEditor.getState().select([f.root]);
+    handleCanvasCopy(clipboard(document.body, true).event('cut'), true);
+    expect(useEditor.getState().doc).toBe(f.doc);
+    const input = document.createElement('input');
+    const event = clipboard(input).event('cut');
+    handleCanvasCopy(event, true);
+    expect(event.defaultPrevented).toBe(false);
+    expect(useEditor.getState().doc).toBe(f.doc);
   });
 });

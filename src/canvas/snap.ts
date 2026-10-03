@@ -3,7 +3,7 @@
  * (with a guide line), and otherwise round to whole document pixels. Everything is in screen
  * space; targets are collected once when a gesture starts.
  */
-import { getElement, getParentId } from '../document/tree.ts';
+import { ancestorIds, getElement, getParentId } from '../document/tree.ts';
 import type { NodeId, Point } from '../document/types.ts';
 import { useEditor } from '../editor/store.ts';
 import type { Rect } from './coords.ts';
@@ -84,7 +84,15 @@ export function collectTargets(near: NodeId | null, exclude: readonly NodeId[], 
   const origin = root ? screenRectOf(root) : null;
   const xs: number[] = points.map((p) => p.x);
   const ys: number[] = points.map((p) => p.y);
-  if (!prefs.objects) return { xs: [], ys: [], origin: origin ? { x: origin.x, y: origin.y } : null };
+  const state = useEditor.getState();
+  if (state.rulersVisible) for (const guide of state.doc.pages.find((p) => p.file === state.activePage)?.guides ?? []) {
+    const rect = guide.frame ? screenRectOf(guide.frame) : null;
+    // Frame guides apply inside that frame, canvas guides apply across the whole page.
+    if (guide.frame && (!rect || !near || exclude.includes(guide.frame) || ![near, ...ancestorIds(state.doc, near)].includes(guide.frame))) continue;
+    const position = guide.frame ? rect![guide.axis] + guide.value * state.viewport.zoom : guide.value * state.viewport.zoom + state.viewport[guide.axis];
+    (guide.axis === 'x' ? xs : ys).push(position);
+  }
+  if (!prefs.objects) return { xs, ys, origin: origin ? { x: origin.x, y: origin.y } : null };
   if (root) {
     const { doc } = useEditor.getState();
     const skip = new Set(exclude);

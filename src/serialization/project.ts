@@ -2,7 +2,7 @@
  * project.json: editor metadata only. Deleting it loses canvas placement, page names and order,
  * and layer names, never the design itself.
  */
-import type { ComponentLibrary, NodeId, Point } from '../document/types.ts';
+import type { ComponentLibrary, NodeId, Point, RulerGuide } from '../document/types.ts';
 
 export const PROJECT_FORMAT = 'plastic';
 export const PROJECT_VERSION = 2;
@@ -17,6 +17,7 @@ export interface PageMeta {
   readonly file: string;
   readonly name: string;
   readonly canvas?: string;
+  readonly guides?: readonly RulerGuide[];
 }
 
 export interface ProjectJson {
@@ -81,7 +82,7 @@ export function readProjectJson(text: string): ProjectJson {
   const pages: PageMeta[] = Array.isArray(raw.pages)
     ? raw.pages.flatMap((p) =>
         isRecord(p) && typeof p.file === 'string' && typeof p.name === 'string'
-          ? [{ file: p.file, name: p.name, ...(typeof p.canvas === 'string' ? { canvas: p.canvas } : {}) }]
+          ? [{ file: p.file, name: p.name, ...(typeof p.canvas === 'string' ? { canvas: p.canvas } : {}), ...(Array.isArray(p.guides) ? { guides: readGuides(p.guides) } : {}) }]
           : [],
       )
     : [];
@@ -135,4 +136,15 @@ function readComponents(raw: unknown): ComponentLibrary | undefined {
     instances[id] = { source: link.source, baseline: link.baseline, elements: link.elements as Record<string, string> };
   }
   return { definitions, instances };
+}
+
+function readGuides(raw: unknown[]): RulerGuide[] {
+  const ids = new Set<string>();
+  return raw.flatMap((guide) => {
+    if (!isRecord(guide) || typeof guide.id !== 'string' || !/^[\w-]{1,64}$/.test(guide.id) || ids.has(guide.id) ||
+      (guide.axis !== 'x' && guide.axis !== 'y') || typeof guide.value !== 'number' || !Number.isFinite(guide.value) ||
+      (guide.frame !== undefined && (typeof guide.frame !== 'string' || !/^[\w-]{1,64}$/.test(guide.frame)))) return [];
+    ids.add(guide.id);
+    return [{ id: guide.id, axis: guide.axis, value: guide.value, ...(typeof guide.frame === 'string' ? { frame: guide.frame } : {}) }];
+  });
 }

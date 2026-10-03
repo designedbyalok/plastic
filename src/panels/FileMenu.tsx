@@ -14,6 +14,7 @@ export function FileMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const layersOpen = useEditor((s) => s.layersOpen);
+  const rulersVisible = useEditor((s) => s.rulersVisible);
   const codeOpen = useEditor((s) => s.codeOpen);
   const snap = useSyncExternalStore(onSnapPrefs, snapPrefs);
   const store = useEditor.getState;
@@ -58,32 +59,33 @@ export function FileMenu() {
       {open && (
         <div className="file-menu" role="menu" aria-label="File">
           <Item onClick={run(() => navigate('/'))} keys="⇧⌘D">
-            Back to dashboard
+            Back to Dashboard
           </Item>
           <div className="file-menu-divider" role="separator" />
           <Item checked={layersOpen} onClick={run(() => store().setLayersOpen(!layersOpen))} keys="⌘\">
-            Show layers panel
+            Show Layers Panel
           </Item>
           <Item checked={codeOpen} onClick={run(() => store().setCodeOpen(!codeOpen))}>
-            Show code
+            Show Code
           </Item>
+          <Item checked={rulersVisible} onClick={run(() => store().setRulersVisible(!rulersVisible))} keys="⇧R">Show Rulers</Item>
           <div className="file-menu-divider" role="separator" />
           <Item checked={snap.pixel} onClick={run(() => setSnapPref('pixel', !snap.pixel))} keys="⇧⌘'">
-            Snap to pixel grid
+            Snap to Pixel Grid
           </Item>
           <Item checked={snap.objects} onClick={run(() => setSnapPref('objects', !snap.objects))}>
-            Snap to objects
+            Snap to Objects
           </Item>
           <div className="file-menu-divider" role="separator" />
-          <Item onClick={run(() => store().setAgentsOpen(true))}>Connect agents…</Item>
-          <Item onClick={run(() => store().setShortcutsOpen(true))}>Keyboard shortcuts…</Item>
+          <Item onClick={run(() => store().setAgentsOpen(true))}>Connect Agents…</Item>
+          <Item onClick={run(() => store().setShortcutsOpen(true))}>Keyboard Shortcuts…</Item>
           <div className="file-menu-divider" role="separator" />
           <Item
             onClick={run(() => {
               void duplicateOpenProject().then((id) => id && navigate(fileHref(id)));
             })}
           >
-            Duplicate file
+            Duplicate File
           </Item>
         </div>
       )}

@@ -57,6 +57,14 @@ export interface TokenSheet {
   readonly preserved: string;
 }
 
+/** Editor-only alignment guide, in canvas coordinates or relative to a frame origin. */
+export interface RulerGuide {
+  readonly id: string;
+  readonly axis: 'x' | 'y';
+  readonly value: number;
+  readonly frame?: NodeId;
+}
+
 /** A page is one HTML file of the project. Its file name is its stable id. */
 export interface Page {
   readonly file: string;
@@ -66,6 +74,7 @@ export interface Page {
   readonly roots: readonly NodeId[];
   /** Canvas background behind the artboards (editor metadata, project.json). */
   readonly canvas?: string;
+  readonly guides?: readonly RulerGuide[];
 }
 
 export interface Point {

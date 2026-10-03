@@ -1,6 +1,7 @@
 /** Shows the sign-in screen until there's a session, on deployments that have accounts. */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { authClient, detectBackend, type Backend } from './client.ts';
+import { AppSkeleton } from '../app/Skeleton.tsx';
 import { SignIn } from './SignIn.tsx';
 
 export interface Account {
@@ -21,14 +22,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     void detectBackend().then(setBackend);
   }, []);
-  if (!backend) return null;
+  if (!backend) return <AppSkeleton />;
   if (!backend.auth) return <>{children}</>;
   return <Session providers={backend.providers}>{children}</Session>;
 }
 
 function Session({ providers, children }: { providers: readonly string[]; children: ReactNode }) {
   const { data, isPending, refetch } = authClient.useSession();
-  if (isPending) return null;
+  if (isPending) return <AppSkeleton />;
   if (!data) return <SignIn providers={providers} />;
   const account: Account = {
     name: data.user.name,
