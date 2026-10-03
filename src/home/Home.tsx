@@ -58,7 +58,7 @@ function writePref(key: string, value: string): void {
 function toEntry(summary: ProjectSummary, workspace: Workspace): FileEntry | null {
   try {
     const { doc } = parseProject(summary.files);
-    // Thumbnails render the first page with the project's tokens and styles, in cascade order.
+    // Unset thumbnails render the first page; selected frames use their saved snapshot.
     const css = `${summary.files[TOKENS_FILE] ?? ''}\n${summary.files[STYLES_FILE] ?? ''}`;
     return {
       id: summary.id,

@@ -21,7 +21,7 @@ it('copies a nested selection link with Cmd+L and the file link with no selectio
   useEditor.getState().load(fixture.doc);
   useEditor.getState().select([child]);
   useEditor.setState({ agentsOpen: false, saveStatus: 'saved' });
-  history.replaceState(null, '', '/file/demo?frame=old');
+  history.replaceState(null, '', '/file/demo?frame=old&preview=abc123');
   function Shortcuts() { useShortcuts(); return null; }
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -40,7 +40,8 @@ it('copies a nested selection link with Cmd+L and the file link with no selectio
     await vi.waitFor(() => expect(clipboard).toHaveBeenCalledTimes(2));
     const link = new URL(clipboard.mock.calls[1]![0] as string);
     expect(link.pathname).toBe('/file/demo');
-    expect(link.search).toBe('');
+    expect(link.searchParams.get('frame')).toBeNull();
+    expect(link.searchParams.get('preview')).toBe('abc123');
   } finally { act(() => root.unmount()); }
 });
 

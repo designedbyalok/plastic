@@ -1,6 +1,6 @@
 /**
- * A live thumbnail: the project's own HTML and CSS rendered in a sandboxed iframe (no scripts),
- * with artboards placed as on the canvas, then scaled to fit. No screenshots to keep in sync.
+ * Use the same selected-frame snapshot as shared links. Files without a selection retain
+ * their live first-page preview, rendered in a sandboxed iframe and scaled to fit.
  */
 import { useEffect, useMemo, useRef } from 'react';
 import type { DesignDocument } from '../document/types.ts';
@@ -11,8 +11,8 @@ const PADDING = 12;
 const LAYOUT_WIDTH = 1440;
 
 function thumbnailDocument(doc: DesignDocument, css: string, base: string | null): string {
-  const roots = doc.thumbnail && doc.nodes[doc.thumbnail.frame] ? [doc.thumbnail.frame] : doc.pages[0]?.roots ?? [];
-  const frames = roots.map((id) => doc.thumbnail ? { x: 0, y: 0 } : doc.frames[id] ?? { x: 0, y: 0 });
+  const roots = doc.pages[0]?.roots ?? [];
+  const frames = roots.map((id) => doc.frames[id] ?? { x: 0, y: 0 });
   const minX = Math.min(0, ...frames.map((f) => f.x));
   const minY = Math.min(0, ...frames.map((f) => f.y));
   const markup = roots

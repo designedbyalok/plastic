@@ -62,7 +62,7 @@ export async function useAsThumbnail(id: string): Promise<void> {
     const { doc, assetBase } = useEditor.getState();
     const thumbnail = await captureThumbnail(doc, id, assetBase);
     const current = useEditor.getState();
-    if (await thumbnailSource(current.doc, id) !== thumbnail.source) throw new Error('The frame changed while rendering. Try again.');
+    if (await thumbnailSource(current.doc, id) !== thumbnail.source || useEditor.getState().doc !== current.doc || useEditor.getState().tx || useEditor.getState().editingTextId) throw new Error('The frame changed while rendering. Try again.');
     current.apply('Set file thumbnail', (d) => ({ ...d, thumbnail }));
     await saveNow();
     if (useEditor.getState().saveStatus === 'error') throw new Error('Could not save the thumbnail. Try again.');

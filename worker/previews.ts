@@ -57,6 +57,7 @@ export async function serveFilePreview(request: Request, env: Env): Promise<Resp
   const html = previewHtml(await response.text(), preview.row.title, image, preview.thumbnail);
   const headers = new Headers(response.headers);
   headers.delete('content-length');
+  headers.delete('content-encoding');
   headers.delete('etag');
   headers.set('cache-control', 'no-store');
   return new Response(request.method === 'HEAD' ? null : html, { status: response.status, headers });

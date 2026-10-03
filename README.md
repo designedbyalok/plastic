@@ -64,10 +64,24 @@ Claude, Codex, Cursor, GitHub Copilot and other local agents can read and write 
 and tokens through Plastic's MCP server; their edits show up live in the editor. Deselect
 everything and press **Connect more agents**, or see [docs/AGENTS.md](docs/AGENTS.md).
 
+## File thumbnails and link previews
+
+Select a frame on the canvas and choose **Use as Thumbnail** in the inspector. The saved
+frame image becomes the file's dashboard cover and refreshes when its design changes.
+**Update Thumbnail** recaptures it; **Remove Thumbnail** restores the default file cover.
+
+For cloud files, copied file/frame links and the editor's address bar include a unique preview
+identifier. Shared links show the saved thumbnail and **File Name • Plastic** in Open Graph
+and Twitter previews. Only the preview image is public; editing still requires the owner's
+account. Local files have dashboard covers but need cloud hosting for external link previews.
+
+Apply `migrations/0006_project_previews.sql` with `bun run db:migrate:remote` before deploying
+the preview feature. Sharing services may cache a previously fetched preview.
+
 ## Deploy (Cloudflare)
 
 Plastic deploys to Cloudflare Workers only: the built app is served as static assets, and the
-Worker in `worker/` handles `/api/*` — accounts with [Better Auth](https://better-auth.com),
+Worker in `worker/` handles `/api/*` and file-link preview metadata, with accounts using [Better Auth](https://better-auth.com),
 stored in D1. Local `bun run dev` has no accounts; files stay in `workspace/`.
 
 ```bash

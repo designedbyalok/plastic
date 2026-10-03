@@ -39,6 +39,7 @@ function schedule(delay = storage?.saveDelayMs ?? AUTOSAVE_MS): void {
 export async function saveNow(): Promise<void> {
   const state = useEditor.getState();
   const savingStorage = storage;
+  const savingSync = sync;
   if (!sync) return;
   if (state.tx || state.editingTextId) return schedule();
   try {
@@ -49,12 +50,16 @@ export async function saveNow(): Promise<void> {
         try {
           const thumbnail = await captureThumbnail(state.doc, frame, state.assetBase);
           const current = useEditor.getState();
-          if (storage === savingStorage && await thumbnailSource(current.doc, frame) === hash && current.doc.thumbnail?.frame === frame)
-            current.apply('Refresh file thumbnail', (doc) => ({ ...doc, thumbnail }));
+          const unchanged = current.doc.nodes[frame] && await thumbnailSource(current.doc, frame) === hash;
+          const latest = useEditor.getState();
+          if (storage === savingStorage && unchanged && latest.doc === current.doc && !latest.tx && !latest.editingTextId && latest.doc.thumbnail?.frame === frame) {
+            // The image is derived data. Refresh it without adding a separate undo step.
+            useEditor.setState({ doc: { ...latest.doc, thumbnail }, revision: latest.revision + 1 });
+          }
         } catch (error) { console.error('Could not refresh the file thumbnail', error); }
       }
     }
-    await sync?.save();
+    if (sync === savingSync) await savingSync?.save();
   } catch (error) {
     console.error(error);
   }

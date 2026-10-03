@@ -98,9 +98,10 @@ export function readProjectJson(text: string): ProjectJson {
   const activePage = typeof canvas.activePage === 'string' ? canvas.activePage : null;
 
   const components = readComponents(raw.components);
+  const thumbnail = readThumbnail(raw.thumbnail);
   return {
     ...base,
-    ...(readThumbnail(raw.thumbnail) ? { thumbnail: readThumbnail(raw.thumbnail) } : {}),
+    ...(thumbnail ? { thumbnail } : {}),
     ...(components ? { components } : {}),
     pages,
     canvas: { viewport, activePage, frames },
