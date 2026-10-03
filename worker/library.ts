@@ -110,7 +110,10 @@ export async function deleteProject(env: Env, owner: string, id: string): Promis
     if (page.objects.length) await env.FILES.delete(page.objects.map((o) => o.key));
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
-  await env.DB.prepare('delete from project where owner_id = ? and id = ?').bind(owner, id).run();
+  await env.DB.batch([
+    env.DB.prepare('delete from comment where owner_id = ? and project_id = ?').bind(owner, id),
+    env.DB.prepare('delete from project where owner_id = ? and id = ?').bind(owner, id),
+  ]);
   return empty(204);
 }
 

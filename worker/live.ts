@@ -152,7 +152,7 @@ export class ProjectRoom extends DurableObject<Env> {
     return [...byId.values()];
   }
 
-  private broadcast(message: RoomMessage | { type: 'changed'; files: Readonly<Record<string, string>> }, from: string): number {
+  private broadcast(message: RoomMessage | { type: 'changed'; files: Readonly<Record<string, string>> } | { type: 'comments' }, from: string): number {
     const text = JSON.stringify(message);
     let sent = 0;
     for (const ws of this.ctx.getWebSockets()) {
@@ -165,6 +165,11 @@ export class ProjectRoom extends DurableObject<Env> {
       }
     }
     return sent;
+  }
+
+  /** Something kept beside the files changed (comments): everyone in the room fetches it again. */
+  signal(kind: 'comments'): number {
+    return this.broadcast({ type: kind }, '');
   }
 }
 

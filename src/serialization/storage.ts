@@ -822,6 +822,8 @@ class CloudWorkspace implements Workspace {
             } catch {
               return;
             }
+            // Comments live beside the files; the comments store fetches them again.
+            if (message?.type === 'comments') return void window.dispatchEvent(new Event('plastic:comments'));
             if (message && typeof message.t === 'string') return emit(message);
             if (message?.type !== 'changed' || !message.files) return;
             const versions = Object.fromEntries(Object.entries(message.files).filter(([n, v]) => PROJECT_FILE_NAME.test(n) && typeof v === 'string'));

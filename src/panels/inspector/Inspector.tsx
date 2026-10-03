@@ -1,4 +1,5 @@
 import { EditorPresence } from '../../app/EditorPresence.tsx';
+import { CommentsPanel } from '../../comments/CommentsPanel.tsx';
 import { Menu, MenuContent } from '../ui/Menu.tsx';
 import { ComponentSection, ComponentLibrarySection } from './ComponentSection.tsx';
 import { SourceSection } from './SourceSection.tsx';
@@ -46,6 +47,7 @@ export function Inspector() {
   // Computed-value placeholders read the live DOM; re-read once after new artboards mount.
   const [, refresh] = useReducer((n: number) => n + 1, 0);
   const rootCount = useEditor((s) => activeRoots(s).length);
+  const commenting = useEditor((s) => s.tool.kind === 'comment');
   useEffect(() => {
     const raf = requestAnimationFrame(refresh);
     return () => cancelAnimationFrame(raf);
@@ -65,7 +67,9 @@ export function Inspector() {
     <aside className="panel inspector" aria-label="Inspector">
       <ScrollArea className="inspector-scroll" viewportClassName="inspector-content">
       <InspectorHeader />
-      {!elements.length ? (
+      {commenting ? (
+        <CommentsPanel />
+      ) : !elements.length ? (
         <fieldset className="insp-readonly" disabled={readOnly}><EmptyInspector /></fieldset>
       ) : (
         <div key={ids.join(',')}>

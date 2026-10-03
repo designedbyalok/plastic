@@ -18,11 +18,13 @@
  *   GET    /api/projects/<id>/assets/<name>      → the image (names are content hashes: immutable)
  *   PUT    /api/projects/<id>/assets/<name>      raw bytes → 204
  *   GET    /api/projects/<id>/live?client=<id>   WebSocket for live sync (see live.ts)
+ *   *      /api/projects/<id>/comments/…         comment threads (see comments.ts)
  */
 import type { Env } from './env.ts';
 import { CLIENT_ID, room, withPeer } from './live.ts';
 import { participantFor } from '../src/editor/presenceProtocol.ts';
 import { deleteProject, placeProject, recordEdit } from './library.ts';
+import { handleComments } from './comments.ts';
 
 /** Same rules as the local workspace (server/projectStore.ts). */
 const PROJECT_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -213,6 +215,9 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
   const id = path[0]!;
   if (!PROJECT_ID.test(id)) return error(404, 'Not found.');
   const prefix = projectPrefix(owner, id);
+
+  // Comments (see comments.ts). Viewers comment through the shared link (shared.ts).
+  if (path[1] === 'comments') return handleComments(request, env, owner, id, owner, path.slice(2));
 
   if (path.length === 2 && path[1] === 'place') {
     if (method !== 'PATCH') return error(405, 'Method not allowed.');

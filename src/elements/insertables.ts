@@ -67,7 +67,8 @@ export const INSERTABLES: readonly Insertable[] = [
   {
     id: 'container',
     label: 'Container',
-    shortcut: 'c',
+    // C is Comment, as in Figma and Paper.
+    shortcut: 'd',
     spec: () => ({
       tag: 'div',
       className: 'container',

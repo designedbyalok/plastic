@@ -22,7 +22,8 @@ export type Tool =
   | { readonly kind: 'frame' }
   | { readonly kind: 'pen' }
   | { readonly kind: 'shape'; readonly shape: ShapeKind }
-  | { readonly kind: 'insert'; readonly itemId: string };
+  | { readonly kind: 'insert'; readonly itemId: string }
+  | { readonly kind: 'comment' };
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -322,7 +323,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     if (get().hoverId !== id) set({ hoverId: id });
   },
   setTool(tool) {
-    if (get().readOnly && tool.kind !== 'select' && tool.kind !== 'hand') return;
+    if (get().readOnly && tool.kind !== 'select' && tool.kind !== 'hand' && tool.kind !== 'comment') return;
     set({ tool });
   },
   setRulersVisible(visible) {

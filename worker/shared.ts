@@ -1,7 +1,7 @@
 /**
  * Opening a file through its shared link (/file/<id>?preview=<preview id>). Plastic is
  * invite-only, so these need a session (any account); the preview id is the key to one file.
- * Everything here is read-only: only GET (and the WebSocket upgrade, itself a GET) is
+ * Everything here except comments is read-only: only GET (and the WebSocket upgrade, itself a GET) is
  * accepted, and only the file's current revisions are served, not its history.
  *
  *   GET /api/shared/<preview>                      → { id, title, owner: { name }, owned, files: { name: version } }
@@ -9,10 +9,12 @@
  *   GET /api/shared/<preview>/assets/<name>        → an image of the file
  *   GET /api/shared/<preview>/live?client=<id>     WebSocket: presence and cursor chat in the file's
  *                                                  room, and its owner's saves as they happen (live.ts)
+ *   *   /api/shared/<preview>/comments/…           comments, which viewers can leave too (comments.ts)
  */
 import type { Env } from './env.ts';
 import { CLIENT_ID, room, withPeer } from './live.ts';
 import { PREVIEW_ID } from './previews.ts';
+import { handleComments } from './comments.ts';
 import { ASSET_NAME, FILE_NAME, REVISION, backfill, projectPrefix, serveAsset, serveFile, type Member, type Row } from './projects.ts';
 import { participantFor } from '../src/editor/presenceProtocol.ts';
 
@@ -34,9 +36,11 @@ async function sharedRow(env: Env, previewId: string): Promise<SharedRow | null>
 }
 
 export async function handleShared(request: Request, env: Env, user: Member, path: string[]): Promise<Response> {
-  if (request.method !== 'GET' && request.method !== 'HEAD') return error(405, 'This file is view-only.');
   const row = await sharedRow(env, path[0] ?? '');
   if (!row) return error(404, 'This link doesn’t open a file. Ask its owner for a new link.');
+  // Anyone who can view a file can comment on it, as in Figma; the comment is theirs.
+  if (path[1] === 'comments') return handleComments(request, env, row.owner_id, row.id, user.id, path.slice(2));
+  if (request.method !== 'GET' && request.method !== 'HEAD') return error(405, 'This file is view-only.');
   const owned = row.owner_id === user.id;
   const prefix = projectPrefix(row.owner_id, row.id);
   const versions = await backfill(env, row.owner_id, row);

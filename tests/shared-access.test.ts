@@ -19,6 +19,13 @@ vi.mock('../worker/live.ts', () => ({
     },
   }),
 }));
+const commentCalls: { owner: string; project: string; actor: string; path: string[]; method: string }[] = [];
+vi.mock('../worker/comments.ts', () => ({
+  handleComments: async (request: Request, _env: unknown, owner: string, project: string, actor: string, path: string[]) => {
+    commentCalls.push({ owner, project, actor, path, method: request.method });
+    return new Response(null, { status: 201 });
+  },
+}));
 // Loosely typed: the Worker is checked with its own types (tsconfig.worker.json).
 const sharedPath = '../worker/shared.ts';
 const { handleShared } = (await import(/* @vite-ignore */ sharedPath)) as {
@@ -145,5 +152,17 @@ describe('read-only editor', () => {
     } finally {
       store.setReadOnly(false);
     }
+  });
+});
+
+describe('commenting through a shared link', () => {
+  it('lets a viewer comment on the owner’s file as themselves, while files stay read-only', async () => {
+    const h = harness();
+    commentCalls.length = 0;
+    const posted = await h.call([PREVIEW, 'comments'], { method: 'POST', body: JSON.stringify({ body: 'Nice' }) });
+    expect(posted.status).toBe(201);
+    expect(commentCalls).toEqual([{ owner: 'owner', project: 'demo', actor: 'viewer', path: [], method: 'POST' }]);
+    expect((await h.call([PREVIEW, 'files', 'index.html'], { method: 'PUT', body: 'x' })).status).toBe(405);
+    expect((await h.call(['0'.repeat(32), 'comments'], { method: 'POST', body: '{}' })).status).toBe(404);
   });
 });

@@ -13,6 +13,7 @@ import { ConnectAgents } from '../panels/ConnectAgents.tsx';
 import { AppSkeleton, CodeSkeleton } from './Skeleton.tsx';
 import { linkClick } from './router.ts';
 import { focusLinkedFrame } from '../editor/frameLinks.ts';
+import { startComments } from '../comments/store.ts';
 
 // The code editor (CodeMirror) loads when the Code panel is first opened.
 const CodePanel = lazy(() => import('../panels/CodePanel.tsx').then((m) => ({ default: m.CodePanel })));
@@ -29,6 +30,8 @@ export function Editor({ projectId }: { projectId: string }) {
   useShortcuts(status === 'open');
   useAiActivity(projectId, status === 'open');
   useAiFavicon();
+
+  useEffect(() => (status === 'open' ? startComments(projectId) : undefined), [status, projectId]);
 
   useEffect(() => {
     if (status !== 'open') return;

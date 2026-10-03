@@ -6,6 +6,8 @@ import { AiReadingOverlay } from './AiReadingOverlay.tsx';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { selectableTarget } from '../editor/layerActions.ts';
 import { CanvasMenu, type CanvasMenuAt } from './CanvasMenu.tsx';
+import { CommentLayer, anchorAt } from '../comments/CommentLayer.tsx';
+import { useComments } from '../comments/store.ts';
 import { canEditText } from '../editor/commands.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
 import { ArtboardHost } from './ArtboardHost.tsx';
@@ -33,6 +35,7 @@ export function Canvas() {
   const readOnly = useEditor((s) => s.readOnly);
   const owner = useEditor((s) => s.storageLocation);
   const [menuAt, setMenuAt] = useState<CanvasMenuAt>(null);
+  const uiHidden = useEditor((s) => s.uiHidden);
   useTextEditing();
 
   useEffect(() => {
@@ -42,6 +45,8 @@ export function Canvas() {
     setHitFilter((id) => selectableTarget(useEditor.getState().doc, id));
     // Wheel pans; pinch (ctrl+wheel on trackpads) or cmd/ctrl+wheel zooms around the pointer.
     const onWheel = (e: WheelEvent) => {
+      // A comment thread scrolls itself.
+      if ((e.target as Element | null)?.closest?.('.comment-card')) return;
       finishTextEditing(true);
       e.preventDefault();
       const store = useEditor.getState();
@@ -90,6 +95,13 @@ export function Canvas() {
     }
     if (e.button !== 0) return;
     e.preventDefault();
+    if (store.tool.kind === 'comment') {
+      // A click closes an open thread (or an unsent comment); the next one leaves a comment.
+      const comments = useComments.getState();
+      if (comments.openId || comments.draft) comments.set({ openId: null, draft: null });
+      else comments.set({ draft: { ...anchorAt(native.clientX, native.clientY), page: store.activePage } });
+      return;
+    }
     if (store.tool.kind === 'pen') return penDown(native);
     if (store.tool.kind === 'shape') {
       if (store.vectorEdit) exitVectorEdit();
@@ -125,6 +137,7 @@ export function Canvas() {
       useGesture.getState().set({ pen: { ...toScreen(at.x, at.y), shift: e.shiftKey } });
     }
     if (e.buttons) return;
+    if (store.tool.kind === 'comment') return store.setHover(null);
     const hit = nodeIdAt(e.clientX, e.clientY);
     // Shapes inside an svg hover (and select) as the whole vector, like Figma's groups.
     store.setHover(store.vectorEdit ? null : (vectorRootOf(store.doc, hit) ?? hit));
@@ -186,6 +199,7 @@ export function Canvas() {
         ))}
       </div>
       <Overlay />
+      {!uiHidden && <CommentLayer />}
       <AiReadingOverlay />
       <PresenceOverlay />
       {readOnly && (

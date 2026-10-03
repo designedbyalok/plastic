@@ -32,6 +32,7 @@
   "exclude": [
     "tests/auth-emails.test.ts",
     "tests/waitlist.test.ts",
+    "tests/comments.test.ts",
     "tests/release-notes.test.ts",
     "tests/members.test.ts",
     "tests/email-check.test.ts",

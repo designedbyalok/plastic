@@ -15,6 +15,7 @@ import { setSnapPref, snapPrefs } from '../canvas/snap.ts';
 import { notify } from '../canvas/gestureStore.ts';
 import { copyFrameLink } from './frameLinks.ts';
 import { handleCanvasCopy, handleCanvasPaste, pasteFromSystemClipboard, setNextPasteMode } from './clipboard.ts';
+import { setCommentsVisible, useComments } from '../comments/store.ts';
 import { copyStyles, frameSelection, pasteStyles, reorderSelection, toggleHidden, toggleLocked, ungroupSelection } from './layerActions.ts';
 
 /** Keys in vector edit mode. Returns whether the key was handled. */
@@ -181,7 +182,8 @@ export function useShortcuts(enabled = true): void {
           e.preventDefault();
           return;
         }
-        if (key === 'a') addFlexOrWrap();
+        if (key === 'c') setCommentsVisible(!useComments.getState().visible);
+        else if (key === 'a') addFlexOrWrap();
         else if (key === 'n') cycleArtboard(-1);
         else if (e.code === 'Digit0') zoomTo(1);
         else if (e.code === 'Digit1') zoomToFit();
@@ -203,7 +205,8 @@ export function useShortcuts(enabled = true): void {
           deleteSelection();
           break;
         case 'escape':
-          if (store.tool.kind !== 'select') store.setTool({ kind: 'select' });
+          if (useComments.getState().openId || useComments.getState().draft) useComments.getState().set({ openId: null, draft: null });
+          else if (store.tool.kind !== 'select') store.setTool({ kind: 'select' });
           else selectParent();
           break;
         case 'enter':
@@ -239,6 +242,10 @@ export function useShortcuts(enabled = true): void {
           break;
         case 'n':
           cycleArtboard(1);
+          break;
+        case 'c':
+          if (useComments.getState().endpoint) store.setTool({ kind: 'comment' });
+          else notify('Comments are available for files saved to your account.');
           break;
         case '.':
           toggleUi();

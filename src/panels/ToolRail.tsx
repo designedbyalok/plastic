@@ -2,16 +2,17 @@
  * Vertical tool rail. Primary tools are one click; the semantic elements (button, input,
  * field, select…) live in a single Insert menu so the rail stays short.
  */
-import { ChevronDown, Circle, CirclePlus, Frame, Hand, Heading, Image, Minus, MousePointer2, MoveUpRight, PenTool, RectangleHorizontal, Square, Star, Triangle, Type, type LucideIcon } from 'lucide-react';
+import { ChevronDown, Circle, CirclePlus, MessageCircle, Frame, Hand, Image, Minus, MousePointer2, MoveUpRight, PenTool, RectangleHorizontal, Square, Star, Triangle, Type, type LucideIcon } from 'lucide-react';
 import { SHAPES, type ShapeKind } from '../vector/shapes.ts';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { INSERTABLES, insertable } from '../elements/insertables.ts';
 import { useEditor, type Tool } from '../editor/store.ts';
 import { INSERT_ICONS } from './icons.tsx';
 import { ShortcutsMenu } from './ShortcutsMenu.tsx';
+import { useComments } from '../comments/store.ts';
 
 /** Elements that get their own rail button; everything else is in the Insert menu. */
-const RAIL_ITEMS = new Set(['container', 'text', 'heading', 'image']);
+const RAIL_ITEMS = new Set(['container', 'text', 'image']);
 
 function sameTool(a: Tool, b: Tool): boolean {
   return a.kind === b.kind && (a.kind !== 'insert' || (b.kind === 'insert' && a.itemId === b.itemId));
@@ -179,9 +180,10 @@ function ShapeMenu() {
 
 export function ToolRail() {
   const layersOpen = useEditor((s) => s.layersOpen);
+  const comments = useComments((s) => !!s.endpoint);
   const readOnly = useEditor((s) => s.readOnly);
   if (readOnly) {
-    // Viewing someone else's file: look around, nothing to draw with.
+    // Viewing someone else's file: look around and comment, nothing to draw with.
     return (
       <nav className={`rail${layersOpen ? '' : ' is-floating'}`} aria-label="Tools">
         <div className="rail-group">
@@ -191,6 +193,11 @@ export function ToolRail() {
           <RailButton tool={{ kind: 'hand' }} label="Hand (or hold Space)">
             <Hand size={18} strokeWidth={1.5} />
           </RailButton>
+          {comments && (
+            <RailButton tool={{ kind: 'comment' }} label="Comment" shortcut="C">
+              <MessageCircle size={18} strokeWidth={1.5} />
+            </RailButton>
+          )}
         </div>
         <div className="rail-group">
           <ShortcutsMenu />
@@ -216,15 +223,17 @@ export function ToolRail() {
         <RailButton tool={{ kind: 'pen' }} label="Pen" shortcut="P">
           <PenTool size={18} strokeWidth={1.5} />
         </RailButton>
-        <RailButton tool={insertTool('container')} label="Container" shortcut="C">
+        <RailButton tool={insertTool('container')} label="Container" shortcut="D">
           <Square size={16} strokeWidth={1.5} />
         </RailButton>
         <RailButton tool={insertTool('text')} label="Text" shortcut="T">
           <Type size={18} strokeWidth={1.5} />
         </RailButton>
-        <RailButton tool={insertTool('heading')} label="Heading" shortcut="H">
-          <Heading size={18} strokeWidth={1.5} />
-        </RailButton>
+        {comments && (
+          <RailButton tool={{ kind: 'comment' }} label="Comment" shortcut="C">
+            <MessageCircle size={18} strokeWidth={1.5} />
+          </RailButton>
+        )}
         <div className="rail-divider" />
         <RailButton tool={insertTool('image')} label="Image">
           <Image size={18} strokeWidth={1.5} />
