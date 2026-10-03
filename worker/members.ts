@@ -36,6 +36,7 @@ export interface MemberDetails {
     lastActive: string | null;
     activeSessions: number;
     releaseNotes: { edition: string; received: boolean; unsubscribed: boolean };
+    suspension: { startsAt: number; reason: string | null; by: string } | null;
   } | null;
   files: { active: number; archived: number; folders: number; lastEdited: number | null } | null;
   activity: { savesLast30Days: number; savesLast365Days: number; activeDaysLast30: number } | null;
@@ -71,7 +72,7 @@ export async function memberDetails(env: Env, email: string): Promise<MemberDeta
 
   const now = Date.now();
   const day = (offset: number) => new Date(now - offset * DAY).toISOString().slice(0, 10);
-  const [providers, sessions, projects, folders, activity, releaseNotes] = await env.DB.batch<Record<string, unknown>>([
+  const [providers, sessions, projects, folders, activity, releaseNotes, suspension] = await env.DB.batch<Record<string, unknown>>([
     env.DB.prepare('select providerId from account where userId = ?').bind(user.id),
     env.DB.prepare(
       'select max(createdAt) as lastSignIn, max(updatedAt) as lastActive, sum(case when expiresAt > ? then 1 else 0 end) as active from session where userId = ?',
@@ -86,6 +87,7 @@ export async function memberDetails(env: Env, email: string): Promise<MemberDeta
     env.DB.prepare(
       'select (select count(*) from release_note_send where email = ? and release = ?) as received, (select release_notes_opt_out from email_preference where email = ?) as unsubscribed',
     ).bind(address, RELEASE_NOTES_EDITION, address),
+    env.DB.prepare('select starts_at, reason, created_by from suspension where user_id = ?').bind(user.id),
   ]);
   const one = (result: D1Result<Record<string, unknown>> | undefined) => result?.results?.[0] ?? {};
   const num = (value: unknown) => Number(value ?? 0) || 0;
@@ -105,6 +107,9 @@ export async function memberDetails(env: Env, email: string): Promise<MemberDeta
       lastActive: (s.lastActive as string | null) ?? null,
       activeSessions: num(s.active),
       releaseNotes: { edition: RELEASE_NOTES_EDITION, received: num(r.received) > 0, unsubscribed: num(r.unsubscribed) > 0 },
+      suspension: suspension?.results?.[0]
+        ? { startsAt: num(one(suspension).starts_at), reason: (one(suspension).reason as string | null) ?? null, by: String(one(suspension).created_by) }
+        : null,
     },
     files: { active: num(p.active), archived: num(p.archived), folders: num(one(folders).n), lastEdited: (p.lastEdited as number | null) ?? null },
     activity: { savesLast30Days: num(a.d30), savesLast365Days: num(a.d365), activeDaysLast30: num(a.days30) },

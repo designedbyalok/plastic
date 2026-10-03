@@ -14,6 +14,8 @@ afterEach(() => vi.unstubAllGlobals());
 function d1(database: DatabaseSync) {
   return new Proxy(database, {
     get(target, key) {
+      // D1's batch(): run the prepared statements in order.
+      if (key === 'batch') return async (statements: { all(): Promise<unknown> }[]) => Promise.all(statements.map((statement) => statement.all()));
       if (key !== 'prepare') return Reflect.get(target, key).bind?.(target) ?? Reflect.get(target, key);
       return (sql: string) => {
         const statement = target.prepare(sql);
@@ -34,6 +36,8 @@ function harness(invited: readonly string[] = ['user@example.com', 'magic@exampl
   database.exec(readFileSync('migrations/0001_better_auth.sql', 'utf8'));
   database.exec(readFileSync('migrations/0004_username.sql', 'utf8'));
   database.exec(readFileSync('migrations/0007_waitlist.sql', 'utf8'));
+  database.exec(readFileSync('migrations/0009_waitlist_decisions.sql', 'utf8'));
+  database.exec(readFileSync('migrations/0010_suspensions.sql', 'utf8'));
   database.exec(readFileSync('migrations/0008_release_notes.sql', 'utf8'));
   // Plastic is invite-only: the accounts these tests create were invited first.
   for (const email of invited) database.prepare('insert into waitlist (email, created_at, invited_at) values (?, 0, 1)').run(email);
@@ -214,6 +218,72 @@ describe('approved email delivery', () => {
     expect(magic.status).toBe(200);
     expect(h.database.prepare('select count(*) as n from "user"').get()).toEqual({ n: 0 });
     expect(h.outbox).toHaveLength(0);
+  });
+
+  it('signs an accepted person straight in from the invite link, with no magic-link email', async () => {
+    const h = harness(['accepted@example.com']);
+    const { inviteLink } = await import('../worker/inviteLink.ts');
+    const { handleInviteLink } = await import('../worker/invites.ts');
+    const link = await inviteLink(h.env, 'accepted@example.com', 1);
+    const response = await handleInviteLink(new Request(link), h.env);
+    const location = new URL(response.headers.get('location')!);
+    expect(location.pathname).toBe('/api/auth/magic-link/verify');
+    expect(h.outbox).toHaveLength(0);
+    // Following it creates a verified account and a session.
+    const verified = await h.request(`${location.pathname.replace('/api/auth', '')}${location.search}`);
+    expect(verified.status).toBe(302);
+    expect(verified.headers.get('set-cookie')).toContain('session_token=');
+    expect(h.database.prepare('select emailVerified from "user" where email = ?').get('accepted@example.com')).toEqual({ emailVerified: 1 });
+  });
+
+  it('suspends now (signed out everywhere, no sign-in) or later, and lifts it', async () => {
+    const { suspend, unsuspend, startDueSuspensions } = await import('../worker/suspensions.ts');
+    const h = harness(['member@example.com']);
+    // Mail off for this account: sign up and sign in with a password directly.
+    h.database.prepare("insert into \"user\" (id, name, email, emailVerified, createdAt, updatedAt) values ('m1', 'Member', 'member@example.com', 1, '2026-10-01', '2026-10-01')").run();
+    const { hashPassword } = await import('better-auth/crypto');
+    h.database.prepare("insert into account (id, accountId, providerId, userId, password, createdAt, updatedAt) values ('a1', 'm1', 'credential', 'm1', ?, '2026-10-01', '2026-10-01')").run(await hashPassword('correct-horse-battery'));
+    const signIn = () => h.request('/sign-in/email', { email: 'member@example.com', password: 'correct-horse-battery' });
+    expect((await signIn()).status).toBe(200);
+    const sessions = () => (h.database.prepare('select count(*) as n from session').get() as { n: number }).n;
+    expect(sessions()).toBe(1);
+
+    // Later: nothing changes until the start, then the hourly job signs them out.
+    const now = Date.now();
+    expect(await suspend(h.env, 'boss@example.com', 'member@example.com', '30d', 'Spam', now)).toMatchObject({ ok: true, startsAt: now + 30 * 86_400_000 });
+    expect((await signIn()).status).toBe(200);
+    expect(await startDueSuspensions(h.env, now + 31 * 86_400_000)).toBe(1);
+    expect(sessions()).toBe(0);
+
+    // Now: signed out at once, and every sign-in is refused with the reason.
+    expect((await signIn()).status).toBe(200);
+    await suspend(h.env, 'boss@example.com', 'member@example.com', 'now', null);
+    expect(sessions()).toBe(0);
+    const refused = await signIn();
+    expect(refused.status).toBe(403);
+    expect(((await refused.json()) as { message: string }).message).toContain('suspended');
+
+    // A magic link sent before the suspension lands on the sign-in screen, not a raw error.
+    await unsuspend(h.env, 'member@example.com');
+    await h.request('/sign-in/magic-link', { email: 'member@example.com', callbackURL: '/', errorCallbackURL: '/?auth=sign-in' });
+    const early = h.link('Your sign-in link • Plastic');
+    await suspend(h.env, 'boss@example.com', 'member@example.com', 'now', null);
+    const { friendlyAuthError } = await import('../worker/suspensions.ts');
+    const verifyRequest = new Request(early.href);
+    const clicked = await friendlyAuthError(verifyRequest, await h.request(early.href.replace('https://plastic.test/api/auth', '')), h.env);
+    expect(clicked.status).toBe(302);
+    expect(clicked.headers.get('location')).toBe('https://plastic.test/?auth=sign-in&error=account_suspended');
+
+    // A magic link can't get around it, and none is even sent (no email spent on it).
+    const before = h.outbox.length;
+    await h.request('/sign-in/magic-link', { email: 'member@example.com', callbackURL: '/', errorCallbackURL: '/?auth=sign-in' });
+    expect(h.outbox).toHaveLength(before);
+    expect(sessions()).toBe(0);
+
+    await unsuspend(h.env, 'member@example.com');
+    expect((await signIn()).status).toBe(200);
+    // Admins can't be suspended.
+    expect(await suspend(h.env, 'boss@example.com', 'admin@example.com', 'now', null)).toMatchObject({ status: 409 });
   });
 
   it('lets admins and invited emails create accounts', async () => {

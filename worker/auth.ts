@@ -6,9 +6,10 @@ import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { customSession, magicLink, username } from 'better-auth/plugins';
 import type { Env } from './env.ts';
-import { deliverInBackground, emailContext, sendEmail, signInDevice } from './emails.ts';
+import { deliverInBackground, emailContext, magicLinkCapture, sendEmail, signInDevice } from './emails.ts';
 import { canCreateAccount, isAdmin } from './waitlist.ts';
 import { sendReleaseNotes } from './releaseNotes.ts';
+import { SUSPENDED_MESSAGE, isSuspended } from './suspensions.ts';
 
 /** Names people could mistake for Plastic itself, or that clash with app routes. */
 const RESERVED_USERNAMES = new Set([
@@ -41,6 +42,10 @@ export function createAuth(env: Env) {
   const appURL = (path = '/') => new URL(path, env.BETTER_AUTH_URL).href;
   // Invite-only: every way of creating an account (email, magic link, Google, GitHub) creates a
   // user row, so the gate sits there. Existing accounts are never affected.
+  // Suspended members: every sign-in creates a session, so refusing it here covers them all.
+  const notSuspended = async (session: { userId: string }) => {
+    if (await isSuspended(env, session.userId)) throw new APIError('FORBIDDEN', { message: SUSPENDED_MESSAGE, code: 'ACCOUNT_SUSPENDED' });
+  };
   const inviteOnly = async (user: { email: string }) => {
     if (!(await canCreateAccount(env, user.email))) throw new APIError('FORBIDDEN', { message: INVITE_ONLY_MESSAGE, code: 'INVITE_ONLY' });
   };
@@ -118,6 +123,7 @@ export function createAuth(env: Env) {
             },
             session: {
               create: {
+                before: notSuspended,
                 after: async (session, context) => {
                   if (!context) return;
                   // Session refreshes must not cause another sign-in notification.
@@ -152,7 +158,7 @@ export function createAuth(env: Env) {
             },
           },
         }
-      : { databaseHooks: { user: { create: { before: inviteOnly } } } }),
+      : { databaseHooks: { user: { create: { before: inviteOnly } }, session: { create: { before: notSuspended } } } }),
     plugins: [
       // @handles for profiles: 3–30 characters, letters, numbers, dots and underscores. Unique
       // regardless of case (the plugin compares lowercased names).
@@ -163,10 +169,18 @@ export function createAuth(env: Env) {
               expiresIn: 15 * 60,
               storeToken: 'hashed',
               sendMagicLink: async ({ email, url, token }) => {
+                // An invite link is signing this person in directly: hand the link back, no email.
+                const capture = magicLinkCapture.getStore();
+                if (capture) {
+                  capture.url = url;
+                  return;
+                }
                 // A link for someone who can't have an account would be refused on arrival; don't
                 // spend an email on it (the response stays the same, so nothing is revealed).
-                const known = await env.DB.prepare('select 1 from "user" where email = ?').bind(email.toLowerCase()).first();
+                const known = await env.DB.prepare('select id from "user" where email = ?').bind(email.toLowerCase()).first<{ id: string }>();
                 if (!known && !(await canCreateAccount(env, email))) return;
+                // Nor for a suspended account: the sign-in would be refused.
+                if (known && (await isSuspended(env, known.id))) return;
                 await deliverInBackground(sendEmail(env, 'magic-link', email, { actionUrl: url }, token));
               },
             }),

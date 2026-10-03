@@ -30,6 +30,7 @@ interface Details {
     readonly lastActive: string | null;
     readonly activeSessions: number;
     readonly releaseNotes: { readonly edition: string; readonly received: boolean; readonly unsubscribed: boolean };
+    readonly suspension: { readonly startsAt: number; readonly reason: string | null; readonly by: string } | null;
   } | null;
   readonly files: { readonly active: number; readonly archived: number; readonly folders: number; readonly lastEdited: number | null } | null;
   readonly activity: { readonly savesLast30Days: number; readonly savesLast365Days: number; readonly activeDaysLast30: number } | null;
@@ -150,6 +151,18 @@ export function MemberPanel({ email, onClose }: { email: string; onClose(): void
             <Section title="Sign-in">
               <Row label="Last signed in" value={ago(account.lastSignIn)} title={exact(account.lastSignIn)} />
               <Row label="Last active" value={ago(account.lastActive)} title={exact(account.lastActive)} />
+              <Row
+                label="Status"
+                value={
+                  !account.suspension
+                    ? 'Active'
+                    : account.suspension.startsAt <= Date.now()
+                      ? `Suspended ${ago(account.suspension.startsAt)}`
+                      : `Suspends ${ago(account.suspension.startsAt)}`
+                }
+                title={account.suspension ? `${exact(account.suspension.startsAt)} • by ${account.suspension.by}` : undefined}
+              />
+              {account.suspension?.reason && <p className="member-quote">“{account.suspension.reason}”</p>}
               <Row label="Active sessions" value={String(account.activeSessions)} />
               <Row label="Signs in with" value={account.signInMethods.map((m) => METHOD_LABELS[m] ?? m).join(', ') || 'Unknown'} />
               <Row label="Email" value={account.emailVerified ? 'Verified' : 'Not verified'} />

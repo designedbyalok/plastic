@@ -22,8 +22,8 @@
       "id": "invite",
       "page": "invite.html",
       "frame": "invite-1",
-      "subject": "You’re invited to Plastic",
-      "preheader": "Your spot on the waitlist came up. Create your account and open your workspace.",
+      "subject": "Your Plastic invite has been accepted",
+      "preheader": "You’re in. One click signs you in to your workspace.",
       "category": "transactional"
     },
     {

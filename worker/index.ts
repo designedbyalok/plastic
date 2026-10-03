@@ -11,6 +11,7 @@
  *   POST /api/waitlist     → join the waitlist (public); /api/admin/* → waitlist and invites
  *                             for ADMIN_EMAILS (see waitlist.ts)
  *   GET/POST /api/unsubscribe → release-notes opt-out (see releaseNotes.ts)
+ *   GET  /api/invite       → an "invite accepted" link: signs the person in (see invites.ts)
  *   PUT/DELETE /api/profile/avatar, GET /api/avatars/* → profile photos (see avatar.ts)
  *   GET  /, /changelog, /download → the public site for visitors (see site.ts)
  */
@@ -18,6 +19,7 @@ import { serveFilePreview, servePreviewImage } from './previews.ts';
 import { getAuth, providers } from './auth.ts';
 import { emailContext } from './emails.ts';
 import { scheduledSweep } from './cleanup.ts';
+import { friendlyAuthError, startDueSuspensions } from './suspensions.ts';
 import type { Env } from './env.ts';
 import { handleProjects } from './projects.ts';
 import { activity, handleFolders } from './library.ts';
@@ -25,6 +27,7 @@ import { serveSite } from './site.ts';
 import { handleAdmin, joinWaitlist } from './waitlist.ts';
 import { handleUnsubscribe } from './releaseNotes.ts';
 import { handleAvatarUpload, serveAvatar } from './avatar.ts';
+import { handleInviteLink } from './invites.ts';
 
 export { ProjectRoom } from './live.ts';
 
@@ -44,6 +47,7 @@ export default {
     // Emails go out after the response (waitUntil), so joining and inviting stay fast.
     if (url.pathname === '/api/waitlist') return emailContext.run(context, () => joinWaitlist(request, env));
     if (url.pathname === '/api/unsubscribe') return handleUnsubscribe(request, env);
+    if (url.pathname === '/api/invite') return handleInviteLink(request, env);
     const avatar = /^\/api\/avatars\/([^/]+)\/([^/]+)$/.exec(url.pathname);
     if (avatar) return serveAvatar(request, env, avatar[1]!, avatar[2]!);
     if (url.pathname === '/api/health') {
@@ -52,7 +56,8 @@ export default {
     }
     if (url.pathname.startsWith('/api/auth/')) {
       if (!env.BETTER_AUTH_SECRET) return json({ error: 'BETTER_AUTH_SECRET is not set.' }, 500);
-      return emailContext.run(context, () => getAuth(env).handler(request));
+      const response = await emailContext.run(context, () => getAuth(env).handler(request));
+      return friendlyAuthError(request, response, env);
     }
     const scoped = ['/api/projects', '/api/folders', '/api/activity', '/api/admin', '/api/profile'].find((p) => url.pathname === p || url.pathname.startsWith(`${p}/`));
     if (scoped) {
@@ -81,8 +86,8 @@ export default {
     return env.ASSETS.fetch(request);
   },
 
-  /** Cron: delete file revisions no manifest references anymore (see cleanup.ts). */
+  /** Cron: delete unreferenced file revisions (see cleanup.ts) and start scheduled suspensions. */
   async scheduled(controller, env): Promise<void> {
-    await scheduledSweep(env, controller.cron, controller.scheduledTime);
+    await Promise.all([scheduledSweep(env, controller.cron, controller.scheduledTime), startDueSuspensions(env, controller.scheduledTime)]);
   },
 } satisfies ExportedHandler<Env>;

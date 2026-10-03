@@ -33,6 +33,14 @@ function errorMessage(code: string): string {
   if (code === 'account_not_linked')
     return 'This email already has a Plastic account that isn’t verified yet. Sign in with a magic link or your password once to verify it, then Continue with Google will work.';
   if (code === 'email_not_verified') return 'Your Google email isn’t verified. Verify it with Google, or sign in with email instead.';
+  if (code === 'account_suspended') return 'This account is suspended. If you think that’s a mistake, reply to any email from Plastic.';
+  // A sign-in refused when creating the session: in Plastic, that's a suspended account.
+  if (code === 'unable_to_create_session' || code === 'failed_to_create_session')
+    return 'We couldn’t sign you in. This account may be suspended; reply to any email from Plastic if you think that’s a mistake.';
+  // Invite links from the "invite accepted" email.
+  if (code === 'invite_expired') return 'This invite link has expired. Your invite still stands: use a magic link below to sign in.';
+  if (code === 'invite_cancelled') return 'This invite is no longer active. If you think that’s a mistake, reply to the invite email.';
+  if (code === 'invite_invalid') return 'This invite link is incomplete. Open it again from the email, or sign in with a magic link below.';
   return 'This link has expired or is invalid. Request a new one below.';
 }
 

@@ -5,6 +5,11 @@ import type { Env } from './env.ts';
 export type EmailTemplate = keyof typeof emailTemplates;
 export const EMAIL_FROM = 'Plastic <hello@useplastic.app>';
 export const emailContext = new AsyncLocalStorage<ExecutionContext>();
+/**
+ * While set, a magic link is handed back here instead of being emailed: the invite link
+ * (invites.ts) signs people in directly. Server-side only; no request can set it.
+ */
+export const magicLinkCapture = new AsyncLocalStorage<{ url: string | null }>();
 export interface EmailFields {
   name?: string;
   email?: string;

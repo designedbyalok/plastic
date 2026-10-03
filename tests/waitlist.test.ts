@@ -2,6 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The invite-link tests never reach Better Auth (they stop before signing in).
+vi.mock('../worker/auth.ts', () => ({ getAuth: () => ({ api: { signInMagicLink: vi.fn() } }) }));
+
 // Worker modules are imported by path so the browser typecheck doesn't pull in Worker types.
 const waitlistPath = '../worker/waitlist.ts';
 const sitePath = '../worker/site.ts';
@@ -21,8 +24,11 @@ beforeEach(() => vi.stubGlobal('fetch', withMailDns()));
 /** In-memory SQLite with D1's prepare().bind() API. */
 function db() {
   const database = new DatabaseSync(':memory:');
-  database.exec('create table "user" (id text primary key, email text not null unique)');
+  database.exec('create table "user" (id text primary key, email text not null unique, emailVerified integer not null default 0, createdAt text)');
   database.exec(readFileSync('migrations/0007_waitlist.sql', 'utf8'));
+  database.exec(readFileSync('migrations/0008_release_notes.sql', 'utf8'));
+  database.exec(readFileSync('migrations/0009_waitlist_decisions.sql', 'utf8'));
+  database.exec(readFileSync('migrations/0010_suspensions.sql', 'utf8'));
   return {
     database,
     DB: {
@@ -151,7 +157,7 @@ describe('invites', () => {
     expect((await admin(e, ['waitlist'], {}, 'someone@example.com')).status).toBe(403);
   });
 
-  it('invites from the list or directly, and gates account creation on it', async () => {
+  it('adds and accepts people directly, and gates account creation on it', async () => {
     const { env: e, database } = env();
     await join(e, { email: 'ada@example.com' });
     expect(await canCreateAccount(e, 'ada@example.com')).toBe(false);
@@ -165,9 +171,91 @@ describe('invites', () => {
 
     database.prepare('insert into "user" (id, email) values (?, ?)').run('u1', 'ada@example.com');
     const page = await (await admin(e, ['waitlist'], {}, 'boss@example.com')).json();
-    expect(page.counts).toEqual({ total: 2, waiting: 0, invited: 1, joined: 1 });
+    // ada (accepted from the list, now a member) is Joined; direct@ (added by hand) is Invited.
+    expect(page.counts).toEqual({ total: 2, waiting: 0, invited: 1, joined: 1, rejected: 0 });
     const joined = await (await handleAdmin(new Request(`${ORIGIN}/api/admin/waitlist?filter=joined`), e, { email: 'boss@example.com', name: 'Boss' }, ['waitlist'])).json();
     expect(joined.entries.map((x: { email: string }) => x.email)).toEqual(['ada@example.com']);
+  });
+});
+
+describe('waitlist decisions', () => {
+  const decide = (e: unknown, email: string, action: string) => {
+    const text = JSON.stringify({ email, action });
+    return handleAdmin(
+      new Request(`${ORIGIN}/api/admin/decide`, { method: 'POST', body: text, headers: { 'content-type': 'application/json', 'content-length': String(text.length) } }),
+      e,
+      { email: 'boss@example.com', name: 'Boss' },
+      ['decide'],
+    );
+  };
+  const counts = async (e: unknown) =>
+    (await (await handleAdmin(new Request(`${ORIGIN}/api/admin/waitlist`), e, { email: 'boss@example.com', name: 'Boss' }, ['waitlist'])).json()).counts;
+
+  it('accepts (with a sign-in link email), cancels back to waiting, rejects and restores', async () => {
+    const sent: { to: string[]; subject: string; html: string }[] = [];
+    vi.stubGlobal('fetch', withMailDns(async (_url, init) => (sent.push(JSON.parse(String(init.body))), Response.json({ id: 'x' }))));
+    const { env: e, database } = env({ RESEND_API_KEY: 'test-key', BETTER_AUTH_SECRET: 'test-only-secret-with-at-least-32-characters' });
+    await join(e, { email: 'ada@example.com' });
+    sent.length = 0; // the thank-you
+
+    expect(await (await decide(e, 'ada@example.com', 'accept')).json()).toEqual({ ok: true, emailed: true });
+    expect(sent.map((m) => m.subject)).toEqual(['Your Plastic invite has been accepted']);
+    expect(sent[0]!.html).toContain('https://plastic.test/api/invite?e=ada%40example.com&amp;t=');
+    expect(await canCreateAccount(e, 'ada@example.com')).toBe(true);
+    // Accepted from the list: straight to Joined, even before they sign in.
+    expect(await counts(e)).toMatchObject({ waiting: 0, joined: 1, invited: 0 });
+
+    expect(await (await decide(e, 'ada@example.com', 'cancel')).json()).toEqual({ ok: true, removed: false });
+    expect(await canCreateAccount(e, 'ada@example.com')).toBe(false);
+    expect(await counts(e)).toMatchObject({ waiting: 1, joined: 0 });
+
+    expect((await decide(e, 'ada@example.com', 'reject')).status).toBe(200);
+    expect(await counts(e)).toMatchObject({ waiting: 0, rejected: 1 });
+    // Joining again changes nothing for a rejected person.
+    await join(e, { email: 'ada@example.com' });
+    expect(await counts(e)).toMatchObject({ waiting: 0, rejected: 1 });
+
+    await decide(e, 'ada@example.com', 'restore');
+    expect(await counts(e)).toMatchObject({ waiting: 1, rejected: 0 });
+    expect(database.prepare('select invited_at, rejected_at from waitlist').get()).toEqual({ invited_at: null, rejected_at: null });
+  });
+
+  it('removes people added by mistake when their invite is cancelled, and leaves members alone', async () => {
+    const { env: e, database } = env();
+    const text = JSON.stringify({ email: 'typo@example.com' });
+    await handleAdmin(
+      new Request(`${ORIGIN}/api/admin/invite`, { method: 'POST', body: text, headers: { 'content-type': 'application/json', 'content-length': String(text.length) } }),
+      e,
+      { email: 'boss@example.com', name: 'Boss' },
+      ['invite'],
+    );
+    expect(await (await decide(e, 'typo@example.com', 'cancel')).json()).toEqual({ ok: true, removed: true });
+    expect(database.prepare('select count(*) as n from waitlist').get()).toEqual({ n: 0 });
+
+    await join(e, { email: 'member@example.com' });
+    database.prepare('insert into "user" (id, email) values (?, ?)').run('u1', 'member@example.com');
+    expect((await decide(e, 'member@example.com', 'reject')).status).toBe(409);
+  });
+});
+
+describe('invite links', () => {
+  const linkPath = '../worker/inviteLink.ts';
+  const invitesPath = '../worker/invites.ts';
+
+  it('refuse tampered, expired and cancelled links, without signing anyone in', async () => {
+    const { inviteLink } = await import(linkPath);
+    const { handleInviteLink } = await import(invitesPath);
+    const { env: e, database } = env({ BETTER_AUTH_SECRET: 'test-only-secret-with-at-least-32-characters' });
+    database.prepare('insert into waitlist (email, created_at, invited_at) values (?, 0, ?)').run('ada@example.com', 1000);
+    const open = async (url: string) => new URL((await handleInviteLink(new Request(url), e)).headers.get('location')!);
+
+    const good = await inviteLink(e, 'ada@example.com', 1000);
+    // Without email configured, a valid link goes to sign-up with the address filled in.
+    expect((await open(good)).searchParams.get('auth')).toBe('sign-up');
+    expect((await open(good.replace(/s=[^&]+/, 's=forged'))).searchParams.get('error')).toBe('invite_invalid');
+    expect((await open(await inviteLink(e, 'ada@example.com', 1000, Date.now() - 8 * 86_400_000))).searchParams.get('error')).toBe('invite_expired');
+    database.prepare('update waitlist set invited_at = null').run();
+    expect((await open(good)).searchParams.get('error')).toBe('invite_cancelled');
   });
 });
 
