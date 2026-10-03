@@ -14,6 +14,8 @@ import type { DesignDocument, NodeId } from '../document/types.ts';
 import { frameSpec } from '../elements/insertables.ts';
 import { elementSpec } from '../elements/registry.ts';
 import { activeRoots, useEditor } from './store.ts';
+import { selectFont } from '../document/fonts.ts';
+import { DEFAULT_TEXT_FONT } from '../elements/insertables.ts';
 
 const px = (n: number) => `${Math.round(n)}px`;
 const state = () => useEditor.getState();
@@ -221,10 +223,11 @@ export function createFrame(rect: Rect): void {
   let id: NodeId = '';
   state().apply('Add Frame', (d) => {
     const spec = frameSpec(rect.width, rect.height);
-    const made = instantiate(d, { ...spec, style: { ...spec.style, height: px(rect.height),
+    const created = instantiate(d, { ...spec, style: { ...spec.style, height: px(rect.height),
       ...(parent && !flow ? { position: 'absolute', left: px(left), top: px(top) } : {}),
       ...(flow ? { 'flex-shrink': '0' } : {}),
     } });
+    const made = { ...created, doc: selectFont(created.doc, [created.id], DEFAULT_TEXT_FONT) };
     id = made.id;
     if (parent) {
       let next = insertChild(made.doc, parent.id, index ?? parent.children.length, made.id);

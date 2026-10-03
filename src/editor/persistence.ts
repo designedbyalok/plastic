@@ -6,6 +6,7 @@
 import { parseProject, serializeProject, sameFiles, type ProjectFiles } from '../serialization/index.ts';
 import { connectWorkspace, type ProjectStorage } from '../serialization/storage.ts';
 import { setTitle } from '../document/ops.ts';
+import { bundledFontsReady, loadInterFont } from '../document/fonts.ts';
 import { starterDocument } from '../elements/insertables.ts';
 import { ProjectSync } from './projectSync.ts';
 import { finishTextEditing } from '../canvas/textEditing.ts';
@@ -94,8 +95,11 @@ export async function openProject(id: string): Promise<OpenedProject> {
   const workspace = await connectWorkspace();
   const project = workspace.open(id);
   const files = await project.load();
+  await bundledFontsReady;
   if (!files || ticket !== opening) return { found: false, restoredViewport: false, stop: () => {} };
-  const { doc, meta } = parseProject(files);
+  const parsedFile = parseProject(files);
+  const { meta } = parsedFile;
+  const doc = loadInterFont(parsedFile.doc);
   useEditor.getState().load(doc, { viewport: meta.viewport, collapsed: meta.collapsed, activePage: meta.activePage });
   storage = project;
   useEditor.setState({ assetBase: project.assetBase });
@@ -125,7 +129,7 @@ export async function openProject(id: string): Promise<OpenedProject> {
       applying = true;
       try {
         const parsed = parseProject(incoming);
-        useEditor.getState().apply('External change', () => parsed.doc);
+        useEditor.getState().apply('External change', () => loadInterFont(parsed.doc));
       } finally {
         applying = false;
       }

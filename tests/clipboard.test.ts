@@ -198,3 +198,9 @@ describe('native layer cut and copy', () => {
     expect(useEditor.getState().doc).toBe(f.doc);
   });
 });
+it('uses Inter for bare canvas paste and normalizes imported Inter face weights', () => {
+  const bare = importClipboardHtml(emptyDocument(), null, '<p>Text</p>', { page: 'index.html', position: { x: 0, y: 0 } });
+  expect(bare.doc.styles.rules[el(bare.doc, bare.ids[0]).classes[0]!]!['font-family']).toBe('Inter, system-ui, sans-serif');
+  const medium = importClipboardHtml(emptyDocument(), null, '<p style="font-family: Inter Medium; font-weight:400">Medium</p>', { page: 'index.html', position: { x: 0, y: 0 } });
+  expect(medium.doc.styles.rules[el(medium.doc, medium.ids[0]).classes[0]!]!).toMatchObject({ 'font-family': 'Inter', 'font-weight': '500' });
+});

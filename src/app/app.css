@@ -1,6 +1,8 @@
 /* Editor chrome. The design itself renders inside artboard iframes and never sees these rules.
    Values follow the Paper editor reference: dark panels, hairline dividers, 24px controls. */
 
+@import '../assets/fonts/inter/inter.css';
+
 :root {
   /* Theme tokens. Dark is the default; [data-theme="light"] below swaps them. */
   --ink: 255 255 255;
@@ -101,7 +103,7 @@ body,
 body {
   background: var(--ui-panel);
   color: var(--ui-text);
-  font: 12px/16px system-ui, sans-serif;
+  font: 12px/16px Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }

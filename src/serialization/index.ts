@@ -1,4 +1,5 @@
 import { synchronizeComponents } from '../document/components.ts';
+import { normalizeInterFonts } from '../document/fontNames.ts';
 import {
   extractStyleTokens,
   parseStyleSheet,
@@ -130,7 +131,7 @@ export function parseProject(
   };
   const activePage = pages.some((p) => p.file === project.canvas.activePage) ? project.canvas.activePage : null;
   return {
-    doc: options.syncComponents === false ? doc : synchronizeComponents(doc),
+    doc: normalizeInterFonts(options.syncComponents === false ? doc : synchronizeComponents(doc)),
     meta: { viewport: project.canvas.viewport, collapsed: project.layers.collapsed, activePage },
   };
 }

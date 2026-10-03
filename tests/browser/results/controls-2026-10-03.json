@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-03",
+  "fixture": "tests/browser/controls.html",
+  "checks": [
+    "PASS Local Inter Regular and Medium",
+    "PASS Select, Hand, Frame, Pen, Text, Heading, Image, Container Tool Buttons",
+    "PASS All Six Shape Tools and Undo",
+    "PASS Every Semantic Insert Tool and Inter Defaults",
+    "PASS Text Caret, Empty Cancellation, Fit Width, Inline Editing",
+    "PASS Font Weight Menu, Typography, Fill",
+    "PASS Size Fields, Rotation, Flips, Radius and Opacity",
+    "PASS Pen Path Creation and Editing Mode",
+    "PASS Hand Pan, Rulers and Keyboard Undo",
+    "PASS Code Tabs and Live CSS Edits",
+    "PASS Pages and Component Controls",
+    "PASS Width Sizing Modes, Margin and Min / Max Controls",
+    "PASS Table Row and Column Controls",
+    "PASS Flex, Alignment, Padding, Gap, Clip, Border, Shadow",
+    "PASS Persistence Roundtrip and Font Weights"
+  ],
+  "testFiles": 48,
+  "testsPassed": 274,
+  "productionBuild": "passed"
+}

@@ -85,3 +85,18 @@ it('embeds an uploaded image, sets image sizing, and retains undo', async () => 
   act(() => useEditor.getState().undo());
   expect(css().background).toBe('#123456');
 });
+it('cancels a pending image read when the user switches fill type', () => {
+  const readers: { abort: ReturnType<typeof vi.fn>; onload?: () => void; result: string }[] = [];
+  vi.stubGlobal('FileReader', class {
+    result = 'data:image/png;base64,late'; onload?: () => void; abort = vi.fn(); readAsDataURL() {}
+    constructor() { readers.push(this); }
+  });
+  mount({ background: '#123456' }); click('Image');
+  const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(input, 'files', { value: [new File(['x'], 'x.png', { type: 'image/png' })] });
+  act(() => input.dispatchEvent(new Event('change', { bubbles: true })));
+  click('Solid');
+  expect(readers[0]!.abort).toHaveBeenCalled();
+  act(() => readers[0]!.onload?.());
+  expect(css().background).toBe('#123456');
+});

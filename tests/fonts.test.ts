@@ -4,9 +4,35 @@ import { bundledFontsReady, googleFontUrl, selectFont, WEB_FONT_OPTIONS } from '
 import { parseStyleSheet, serializeStyleSheet } from '../src/document/css';
 import { parseProject, serializeProject } from '../src/serialization';
 import { docFrom, el } from './helpers';
+import { normalizeInterFonts } from '../src/document/fontNames';
+import { insertable, INSERTABLES, DEFAULT_TEXT_FONT } from '../src/elements/insertables';
 
 const meta = { viewport: null, collapsed: [], activePage: null };
 describe('on-demand UI fonts', () => {
+  it('defaults every semantic insert tool to Inter without changing its weight', () => {
+    for (const item of INSERTABLES) expect(insertable(item.id)!.spec().style?.['font-family']).toBe(DEFAULT_TEXT_FONT);
+    expect(insertable('button')!.spec().style?.['font-weight']).toBe('500');
+  });
+  it('normalizes Regular and Medium desktop faces, preserving explicit weights and custom faces', () => {
+    const f = docFrom({ tag: 'div' });
+    const doc = { ...f.doc, styles: parseStyleSheet('.regular {font-family: "Inter Regular", sans-serif} .medium {font-family: "Inter Medium"; font-weight: 400} .bold {font-family: "Inter Medium"; font-weight: 700}') };
+    const normalized = normalizeInterFonts(doc);
+    expect(normalized.styles.rules.regular).toMatchObject({ 'font-family': 'Inter, sans-serif', 'font-weight': '400' });
+    expect(normalized.styles.rules.medium).toMatchObject({ 'font-family': 'Inter', 'font-weight': '500' });
+    expect(normalized.styles.rules.bold!['font-weight']).toBe('700');
+    const custom = { ...f.doc, styles: parseStyleSheet('@font-face {font-family: "Inter Medium"; src: url(custom.woff2)} .custom {font-family: "Inter Medium"}') };
+    expect(normalizeInterFonts(custom)).toBe(custom);
+  });
+  it('normalizes token-backed Medium faces and remains stable after save/reload', () => {
+    const f = docFrom({ tag: 'div', className: 'sample', style: { 'font-family': 'var(--font-ui)' } });
+    const doc = { ...f.doc, tokens: { ...f.doc.tokens, values: { 'font-ui': '"Inter Medium", sans-serif' } } };
+    const normalized = normalizeInterFonts(doc);
+    expect(normalized.tokens.values['font-ui']).toBe('Inter, sans-serif');
+    expect(normalized.styles.rules.sample!['font-weight']).toBe('500');
+    expect(normalized.styles.rules.sample!['font-family']).toBe('var(--font-ui)');
+    const roundtrip = parseProject(serializeProject(normalized, meta)).doc;
+    expect(roundtrip.styles.rules.sample!['font-weight']).toBe('500');
+  });
   it('adds only the selected family, keeps imports valid and survives reload/export', () => {
     const f = docFrom({ tag: 'h1', children: ['Font sample'] });
     expect(serializeStyleSheet(f.doc.styles)).not.toContain('fonts.googleapis.com');

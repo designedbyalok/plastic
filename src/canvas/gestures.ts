@@ -336,7 +336,7 @@ export function insertAt(e: PointerEvent, itemId: string, text?: string): void {
   let newId: NodeId = '';
   const make = (d: DesignDocument, spec = item.spec()) => {
     const made = instantiate(d, item.editTextOnInsert ? { ...spec, style: { ...spec.style, width: 'max-content', color }, children: [text ?? ''] } : spec);
-    return item.editTextOnInsert ? { ...made, doc: selectFont(made.doc, [made.id], DEFAULT_TEXT_FONT) } : made;
+    return { ...made, doc: selectFont(made.doc, [made.id], DEFAULT_TEXT_FONT) };
   };
 
   if (!container) {

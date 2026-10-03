@@ -51,6 +51,13 @@ export function selectFont(doc: DesignDocument, ids: readonly NodeId[], value: s
       if (decl.value.replace(/^["']|["']$/g, '') === family) present = true;
     });
   });
+  if (family === 'Inter' && interCss) {
+    // Replace a startup fallback import once the local variable font is available.
+    root.walkAtRules('import', rule => { if (rule.params.includes(url)) { rule.remove(); present = false; } });
+    root.walkAtRules('font-face', rule => {
+      rule.walkDecls('font-family', decl => { if (decl.value.replace(/^["']|["']$/g, '') === family) present = true; });
+    });
+  }
   if (present) return next;
   if (family === 'Inter' && interCss) {
     root.append(safeParse(interCss).nodes);
@@ -61,4 +68,10 @@ export function selectFont(doc: DesignDocument, ids: readonly NodeId[], value: s
   if (charset) root.insertAfter(charset, rule);
   else root.prepend(rule);
   return { ...next, styles: parseStyleSheet(root.toString()) };
+}
+
+/** Load Inter only if the design actually uses it, including normalized desktop face names. */
+export function loadInterFont(doc: DesignDocument): DesignDocument {
+  const css = serializeStyleSheet(doc.styles) + Object.values(doc.tokens.values).join(';');
+  return /(?:^|[\s"',:])Inter(?:[\s"',;]|$)/.test(css) ? selectFont(doc, [], 'Inter, sans-serif') : doc;
 }

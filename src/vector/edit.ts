@@ -197,8 +197,8 @@ export function createVectorAt(clientX: number, clientY: number): NodeId | null 
     className: 'vector',
     attrs: { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 1 1', fill: 'none' },
     style: root
-      ? { width: '1px', height: '1px', overflow: 'visible' }
-      : { position: 'absolute', left: px(left), top: px(top), width: '1px', height: '1px', overflow: 'visible' },
+      ? { width: '1px', height: '1px', overflow: 'visible', 'font-family': 'Inter, system-ui, sans-serif' }
+      : { position: 'absolute', left: px(left), top: px(top), width: '1px', height: '1px', overflow: 'visible', 'font-family': 'Inter, system-ui, sans-serif' },
     children: [{ tag: 'path', attrs: { d: 'M0 0', stroke: '#000000', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' } }],
   });
 

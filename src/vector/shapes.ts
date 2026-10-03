@@ -16,6 +16,7 @@ import { clientRectOf, domElement, nodeIdAt, styleOf, toScreen } from '../canvas
 import { clearGuides, collectTargets, snapPoint, toClient } from '../canvas/snap.ts';
 import { trackPointer, transactional } from '../canvas/gestures.ts';
 import { containerAt } from '../canvas/layout.ts';
+import { DEFAULT_TEXT_FONT } from '../elements/insertables.ts';
 
 export type ShapeKind = 'rectangle' | 'ellipse' | 'line' | 'arrow' | 'polygon' | 'star';
 
@@ -86,8 +87,8 @@ interface Placement {
 
 function boxStyle(p: Placement, extra: Record<string, string>): Record<string, string> {
   return p.root
-    ? { width: px(p.width), height: px(p.height), ...extra }
-    : { position: 'absolute', left: px(p.left), top: px(p.top), width: px(p.width), height: px(p.height), ...extra };
+    ? { width: px(p.width), height: px(p.height), 'font-family': DEFAULT_TEXT_FONT, ...extra }
+    : { position: 'absolute', left: px(p.left), top: px(p.top), width: px(p.width), height: px(p.height), 'font-family': DEFAULT_TEXT_FONT, ...extra };
 }
 
 /**

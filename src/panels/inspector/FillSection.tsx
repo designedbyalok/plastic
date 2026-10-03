@@ -1,5 +1,5 @@
 import { Image, ImagePlus, RectangleHorizontal, SquareSplitHorizontal } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import valueParser from 'postcss-value-parser';
 import type { NodeId } from '../../document/types.ts';
 import { setStyleOnNodes } from '../../document/ops.ts';
@@ -91,6 +91,8 @@ function FillControls({ ids, textual = false, title = 'Fill' }: Ids & { textual?
 
 function ImageFill({ ids, raw, onChange }: Ids & { raw: string; onChange(value: string): void }) {
   const input = useRef<HTMLInputElement>(null);
+  const pending = useRef<FileReader | null>(null);
+  useEffect(() => () => { pending.current?.abort(); pending.current = null; }, [raw]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const assetBase = useEditor(state => state.assetBase);
@@ -109,9 +111,13 @@ function ImageFill({ ids, raw, onChange }: Ids & { raw: string; onChange(value: 
       if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { setError('Choose an image smaller than 10 MB.'); return; }
       setLoading(true); setError(null);
       const nodes = ids.map(id => useEditor.getState().doc.nodes[id]);
+      pending.current?.abort();
       const reader = new FileReader();
+      pending.current = reader;
       reader.onerror = () => { setLoading(false); setError('Couldn’t read this image. Try another file.'); };
       reader.onload = () => {
+        if (pending.current !== reader) return;
+        pending.current = null;
         setLoading(false);
         // A file chooser may outlive navigation. Never write into a different document.
         if (!ids.every((id, i) => useEditor.getState().doc.nodes[id] === nodes[i])) return;

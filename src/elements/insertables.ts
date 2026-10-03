@@ -57,7 +57,7 @@ export function frameSpec(width = FRAME_SIZE.width, height = FRAME_SIZE.height):
       'min-height': `${Math.round(height)}px`,
       background: '#ffffff',
       color: '#111827',
-      'font-family': 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif',
+      'font-family': DEFAULT_TEXT_FONT,
       'font-size': '15px',
     },
   };
@@ -204,7 +204,11 @@ export const INSERTABLES: readonly Insertable[] = [
 ];
 
 export function insertable(id: string): Insertable | undefined {
-  return INSERTABLES.find((i) => i.id === id);
+  const item = INSERTABLES.find((i) => i.id === id);
+  return item && { ...item, spec: () => {
+    const spec = item.spec();
+    return { ...spec, style: { ...spec.style, 'font-family': DEFAULT_TEXT_FONT } };
+  } };
 }
 
 /** A new project: one empty artboard. */

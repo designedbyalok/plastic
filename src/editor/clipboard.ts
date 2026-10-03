@@ -19,6 +19,8 @@ import { domElement, styleOf } from '../canvas/dom.ts';
 import { elementSpec } from '../elements/registry.ts';
 import { notify } from '../canvas/gestureStore.ts';
 import { useEditor } from './store.ts';
+import { normalizeInterFonts } from '../document/fontNames.ts';
+import { loadInterFont } from '../document/fonts.ts';
 
 /** Snapshot omits values matching its neutral capture baseline, not each tag's UA defaults.
  * Keep this in each editable rule before captured declarations; never reset the whole artboard.
@@ -133,6 +135,8 @@ export function importClipboardHtml(doc: DesignDocument, artboard: NodeId | null
         declarations = rootRule.nodes.map((n) => n.toString() + ';').join('\n');
       }
       declarations += '\nposition: relative;';
+      // Bare HTML/text pasted onto the canvas has no parent typography to inherit.
+      if (!/(?:^|;)\s*font(?:-family)?\s*:/i.test(declarations)) declarations += '\nfont-family: Inter, system-ui, sans-serif;';
     }
     delete attrs.style;
     if (attrs['layer-name']) names[node.id] = attrs['layer-name'];
@@ -144,7 +148,7 @@ export function importClipboardHtml(doc: DesignDocument, artboard: NodeId | null
   const styles = parseStyleSheet(serializeStyleSheet(doc.styles) + '\n' + rules.join('\n'));
   if (parent) {
     nodes[parent.id] = { ...parent, children: [...parent.children, ...parsed.roots] };
-    return { doc: { ...doc, nodes, names, styles }, ids: parsed.roots };
+    return { doc: loadInterFont(normalizeInterFonts({ ...doc, nodes, names, styles })), ids: parsed.roots };
   }
   const frames = { ...doc.frames };
   let x = canvas!.position.x;
@@ -155,7 +159,7 @@ export function importClipboardHtml(doc: DesignDocument, artboard: NodeId | null
     x += (width && /^\d+(\.\d+)?px$/.test(width) ? parseFloat(width) : 320) + 32;
   }
   const pages = doc.pages.map((p) => p.file === canvas!.page ? { ...p, roots: [...p.roots, ...parsed.roots] } : p);
-  return { doc: { ...doc, nodes, names, styles, frames, pages }, ids: parsed.roots };
+  return { doc: loadInterFont(normalizeInterFonts({ ...doc, nodes, names, styles, frames, pages })), ids: parsed.roots };
 }
 
 export function handleCanvasPaste(e: ClipboardEvent, artboardHint?: NodeId): void {
