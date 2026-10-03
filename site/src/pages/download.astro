@@ -4,17 +4,16 @@ import Base from '../layouts/Base.astro';
 import WaitlistForm from '../components/WaitlistForm.astro';
 import { SITE } from '../data/site';
 
-const description = 'Download Plastic for macOS, Windows and Linux. The desktop app is coming soon; use Plastic in your browser today with an invite.';
+const description = 'Download Plastic for macOS and Windows. The desktop app is coming soon; use Plastic in your browser today with an invite.';
 
 /** No builds yet: each platform shows its status. Add `href` and `size` when a release exists. */
 const platforms = [
   { id: 'macos', icon: 'simple-icons:apple', name: 'macOS', detail: 'Apple silicon and Intel', file: 'Universal .dmg' },
   { id: 'windows', icon: 'simple-icons:windows', name: 'Windows', detail: '64-bit', file: '.msi installer' },
-  { id: 'linux', icon: 'simple-icons:linux', name: 'Linux', detail: 'x86-64', file: '.AppImage and .deb' },
 ];
 
 const desktop = [
-  { icon: 'lucide:folder-git-2', title: 'Your folders, on your disk', body: 'Open any folder of Plastic files directly. Edit them in Plastic, a text editor or Git — the editor follows every change.' },
+  { icon: 'lucide:folder-git-2', title: 'Your folders, on your disk', body: 'Open any folder of Plastic files directly. Edit them in Plastic, a text editor or Git, and the editor follows every change.' },
   { icon: 'lucide:wifi-off', title: 'Works offline', body: 'Design on a plane or a train. Files are local first; nothing waits on a connection.' },
   { icon: 'lucide:plug', title: 'Local agents, zero setup', body: 'Coding agents on your machine connect over MCP to the designs on your disk, with their edits live on the canvas.' },
   { icon: 'lucide:zap', title: 'Native and light', body: 'A small native shell around the same editor you use in the browser, with system menus and shortcuts.' },
@@ -40,11 +39,10 @@ const schema = [
 
 <Base title="Download" description={description} path="/download" schema={schema}>
   <section class="dl-hero">
-    <div class="hero-glow" aria-hidden="true"></div>
     <div class="wrap dl-hero-inner">
-      <p class="kicker reveal"><span class="dot warn"></span>Desktop app • Coming soon</p>
-      <h1 class="display reveal">Plastic,<br /><span class="chrome-text">on your desktop.</span></h1>
-      <p class="lede reveal">A native app for macOS, Windows and Linux is on the way — local files, offline work and your agents, all on your machine. Leave your email and we’ll tell you the day it’s ready.</p>
+      <p class="pill">Desktop app • Coming soon</p>
+      <h1 class="display">Plastic on your desktop</h1>
+      <p class="lede">A native app for macOS and Windows is on the way, with local files, offline work and your agents on your own machine. Leave your email and we’ll tell you the day it’s ready.</p>
     </div>
   </section>
 
@@ -53,7 +51,7 @@ const schema = [
       <ul class="platform-grid">
         {
           platforms.map((p) => (
-            <li class="platform card reveal" id={p.id}>
+            <li class="platform card" id={p.id}>
               <span class="platform-icon"><Icon name={p.icon} aria-hidden="true" /></span>
               <h2>{p.name}</h2>
               <p>{p.detail}</p>
@@ -71,11 +69,11 @@ const schema = [
 
   <section class="dl-notify">
     <div class="wrap">
-      <div class="dl-notify-inner card reveal">
+      <div class="dl-notify-inner card">
         <div>
           <span class="icon-chip"><Icon name="lucide:bell" aria-hidden="true" /></span>
           <h2>Get the desktop app first</h2>
-          <p>Join the waitlist and we’ll email you when the first desktop build is ready — along with your invite.</p>
+          <p>Join the waitlist and we’ll email you when the first desktop build is ready, along with your invite.</p>
         </div>
         <WaitlistForm id="download-join" source="download" page="/download" cta="Notify me" />
       </div>
@@ -84,14 +82,13 @@ const schema = [
 
   <section class="dl-why hairline">
     <div class="wrap">
-      <div class="section-head reveal">
-        <p class="kicker">Why desktop</p>
-        <h2 class="title">Everything you like about Plastic,<br />closer to your files.</h2>
+      <div class="section-head">
+        <h2 class="title">Everything you like about Plastic, closer to your files.</h2>
       </div>
       <ul class="why-grid">
         {
           desktop.map((d) => (
-            <li class="reveal">
+            <li >
               <span class="icon-chip"><Icon name={d.icon} aria-hidden="true" /></span>
               <h3>{d.title}</h3>
               <p>{d.body}</p>
@@ -104,9 +101,8 @@ const schema = [
 
   <section class="dl-web hairline">
     <div class="wrap dl-web-inner">
-      <div class="reveal">
-        <p class="kicker">Available now</p>
-        <h2 class="title">No need to wait.<br />Plastic runs in your browser.</h2>
+      <div >
+        <h2 class="title">Plastic already runs in your browser.</h2>
         <p class="lede">The full editor works today in any modern browser, with cloud storage and live sync between your devices. Invited already? Sign in and keep going.</p>
         <div class="dl-web-actions">
           <a class="button primary large" href={SITE.signIn}>
@@ -116,7 +112,7 @@ const schema = [
           <a class="button large" href="/#waitlist">Request an invite</a>
         </div>
       </div>
-      <ul class="browsers reveal" aria-label="Supported browsers">
+      <ul class="browsers" aria-label="Supported browsers">
         <li><Icon name="simple-icons:googlechrome" aria-hidden="true" />Chrome</li>
         <li><Icon name="simple-icons:safari" aria-hidden="true" />Safari</li>
         <li><Icon name="simple-icons:firefoxbrowser" aria-hidden="true" />Firefox</li>
@@ -132,17 +128,6 @@ const schema = [
     overflow: hidden;
   }
 
-  .hero-glow {
-    position: absolute;
-    inset: -30% -10% auto;
-    height: 700px;
-    background:
-      radial-gradient(40% 50% at 30% 40%, color-mix(in srgb, var(--peach) 14%, transparent), transparent 70%),
-      radial-gradient(40% 50% at 70% 30%, color-mix(in srgb, var(--ice) 16%, transparent), transparent 70%);
-    filter: blur(20px);
-    pointer-events: none;
-  }
-
   .dl-hero-inner {
     position: relative;
     text-align: center;
@@ -152,18 +137,13 @@ const schema = [
     margin-inline: auto;
   }
 
-  .dot.warn {
-    background: var(--warn);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 18%, transparent);
-  }
-
   .dl-platforms {
     padding: 0 0 clamp(40px, 6vw, 64px);
   }
 
   .platform-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
     margin: 0;
     padding: 0;

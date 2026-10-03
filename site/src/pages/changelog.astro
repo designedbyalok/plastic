@@ -44,9 +44,9 @@ const schema = [
 <Base title="Changelog" description={description} path="/changelog" schema={schema}>
   <section class="cl-hero">
     <div class="wrap">
-      <p class="kicker reveal"><span class="dot"></span>{RELEASES.length} releases • Updated {date.format(new Date(RELEASES[0]!.date))}</p>
-      <h1 class="display reveal">What’s new<br /><span class="chrome-text">in Plastic.</span></h1>
-      <p class="lede reveal">Everything we ship, newest first. Plastic is in an invite-only preview, and it changes fast.</p>
+      <p class="pill">{RELEASES.length} releases • Updated {date.format(new Date(RELEASES[0]!.date))}</p>
+      <h1 class="display">What’s new in Plastic</h1>
+      <p class="lede">Everything we ship, newest first. Plastic is in an invite-only preview, and it changes fast.</p>
     </div>
   </section>
 
@@ -61,7 +61,7 @@ const schema = [
       <div class="cl-entries">
         {
           RELEASES.map((release) => (
-            <article id={release.id} class="cl-entry reveal">
+            <article id={release.id} class="cl-entry">
               <div class="cl-meta">
                 <time datetime={release.date}>{date.format(new Date(release.date))}</time>
                 <ul class="cl-tags">
@@ -96,12 +96,11 @@ const schema = [
 
   <section class="cl-join hairline">
     <div class="wrap cl-join-inner">
-      <div class="reveal">
-        <p class="kicker">Want in?</p>
+      <div >
         <h2 class="title">Try what’s new<br />before everyone else.</h2>
         <p class="lede">Join the waitlist and we’ll email you an invite to the preview.</p>
       </div>
-      <div class="reveal">
+      <div >
         <WaitlistForm id="changelog-join" source="changelog" page="/changelog" cta="Join the waitlist" />
       </div>
     </div>

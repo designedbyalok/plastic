@@ -14,8 +14,8 @@ export default defineConfig({
     icon({
       iconDir: 'site/src/icons',
       include: {
-        lucide: ["arrow-right", "arrow-up-right", "bell", "blend", "bot", "braces", "check", "chevron-down", "chevron-right", "circle-check", "circle-plus", "clock", "code-xml", "component", "file", "file-code-2", "folder-git-2", "frame", "gauge", "globe", "hand", "hash", "heading", "image", "layout-grid", "lock", "magnet", "mail-check", "menu", "messages-square", "minus", "monitor-smartphone", "mouse-pointer-2", "mouse-pointer-click", "palette", "pen-tool", "pencil", "plug", "plus", "rectangle-horizontal", "refresh-cw", "rocket", "rows-3", "scan-eye", "shield-check", "sliders-horizontal", "sparkles", "square", "square-dashed-mouse-pointer", "squares-unite", "tag", "terminal", "text-cursor-input", "type", "wand-sparkles", "wifi-off", "wrench", "zap"],
-        'simple-icons': ["apple", "claude", "cloudflare", "css", "cursor", "figma", "firefoxbrowser", "git", "githubcopilot", "googlechrome", "html5", "linux", "openai", "safari", "windows"],
+        lucide: ["arrow-right", "bell", "blend", "braces", "check", "chevron-down", "chevron-right", "circle-check", "circle-plus", "clock", "code-xml", "component", "file", "file-code-2", "folder-git-2", "frame", "gauge", "globe", "hand", "hash", "heading", "image", "layout-grid", "magnet", "menu", "monitor-smartphone", "mouse-pointer-2", "mouse-pointer-click", "palette", "pen-tool", "pencil", "plug", "plus", "rectangle-horizontal", "refresh-cw", "rows-3", "scan-eye", "shield-check", "sparkles", "square", "squares-unite", "tag", "text-cursor-input", "type", "wand-sparkles", "wifi-off", "wrench", "zap"],
+        'simple-icons': ["apple", "claude", "css", "cursor", "figma", "firefoxbrowser", "git", "githubcopilot", "googlechrome", "html5", "openai", "safari", "windows"],
       },
     }),
   ],

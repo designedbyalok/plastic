@@ -1,6 +1,6 @@
 ---
 /**
- * The Plastic editor, drawn with real HTML and CSS — fitting for a tool whose designs are HTML
+ * The Plastic editor, drawn with real HTML and CSS, fitting for a tool whose designs are HTML
  * and CSS. Decorative: hidden from assistive tech, described by the surrounding copy.
  */
 import { Icon } from 'astro-icon/components';
@@ -133,7 +133,12 @@ const tools = ['lucide:mouse-pointer-2', 'lucide:hand', 'lucide:hash', 'lucide:s
     flex: none;
   }
 
+  /* A 16:9 window, like a real screen; never shorter than the canvas content needs. */
   .mock-window {
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: 16 / 9;
+    min-height: 520px;
     overflow: hidden;
     border: 1px solid rgb(255 255 255 / 0.1);
     border-radius: 16px;
@@ -141,8 +146,7 @@ const tools = ['lucide:mouse-pointer-2', 'lucide:hand', 'lucide:hash', 'lucide:s
     background: var(--m-panel);
     box-shadow:
       0 0 0 1px #000000,
-      0 40px 120px -30px #000000,
-      0 0 120px -40px color-mix(in srgb, var(--ice) 40%, transparent);
+      0 40px 100px -30px #000000;
   }
 
   .mock-titlebar {
@@ -215,10 +219,15 @@ const tools = ['lucide:mouse-pointer-2', 'lucide:hand', 'lucide:hash', 'lucide:s
     font-weight: 500;
   }
 
+  .mock-titlebar {
+    flex: none;
+  }
+
   .mock-body {
     display: grid;
+    flex: 1;
+    min-height: 0;
     grid-template-columns: 200px 36px 1fr 200px;
-    height: clamp(420px, 46vw, 560px);
   }
 
   .mock-left,
@@ -740,8 +749,13 @@ const tools = ['lucide:mouse-pointer-2', 'lucide:hand', 'lucide:hash', 'lucide:s
   }
 
   @media (max-width: 680px) {
+    .mock-window {
+      aspect-ratio: auto;
+      min-height: 0;
+    }
     .mock-body {
       grid-template-columns: 1fr;
+      flex: none;
       height: 470px;
     }
     .mock-rail,

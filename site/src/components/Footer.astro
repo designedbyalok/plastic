@@ -1,5 +1,4 @@
 ---
-import { Icon } from 'astro-icon/components';
 import { Image } from 'astro:assets';
 import logo from '../assets/logo.webp';
 import { SITE } from '../data/site';
@@ -45,15 +44,7 @@ const year = new Date().getFullYear();
     </div>
     <div class="footer-base">
       <span>© {year} Plastic. Made for ideas that become real interfaces.</span>
-      <span class="footer-made"><Icon name="simple-icons:cloudflare" width={14} height={14} aria-hidden="true" /> Served from the edge</span>
     </div>
   </div>
 </footer>
 
-<style>
-  .footer-made {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-</style>

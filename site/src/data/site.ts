@@ -119,7 +119,7 @@ export const FAQ = [
   },
   {
     q: 'Is there a desktop app?',
-    a: 'A desktop app for macOS, Windows and Linux is on the way, built for local files and offline work. Plastic runs in your browser today; join the waitlist from the download page to hear when the desktop app is ready.',
+    a: 'A desktop app for macOS and Windows is on the way, built for local files and offline work. Plastic runs in your browser today; join the waitlist from the download page to hear when the desktop app is ready.',
   },
   {
     q: 'What does Plastic cost?',
