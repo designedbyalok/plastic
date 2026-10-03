@@ -67,7 +67,8 @@ describe('approved email delivery', () => {
     });
     expect(email.html).toContain('&lt;img onerror=&quot;bad&quot;&gt;');
     expect(email.html).not.toContain('{{');
-    expect(email.html).toContain('/emails/arrow-up-right.png');
+    expect(email.html).toContain('/emails/arrow-up-right-light-v2.png');
+    expect(email.html).toContain('/emails/arrow-up-right-dark-v2.png');
     expect(email.html).not.toContain('<svg');
     expect(() =>
       renderEmail('magic-link', 'https://plastic.test', {

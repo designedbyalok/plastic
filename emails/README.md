@@ -15,8 +15,11 @@ After reviewing changes in Plastic, copy the workspace HTML, CSS, tokens and ass
 `emails/design`. `bun run emails:build` compiles the exact desktop frames in `manifest.json`
 into `worker/generated/email-templates.ts`. It inlines CSS, resolves design tokens, replaces
 example recipient values with delivery fields, adds a hidden preheader and generates plain
-text. Responsive rules match the mobile artboards. The Lucide SVG uses a 3x PNG fallback in
-outgoing emails for clients that do not display inline SVG. Assets are served from `/emails/`.
+text. Responsive rules match the mobile artboards. The Lucide SVG uses light/dark 4x PNG variants in
+outgoing emails for clients that do not display inline SVG. `delivery.css` switches the icon
+and CTA colors in dark mode, including Outlook selectors. Contrasting outlines keep the
+icon visible in clients that recolor buttons without supporting image swaps. Assets are
+served from `/emails/`.
 
 `node scripts/publish-email-templates.mjs` synchronizes and publishes the same designs in
 Resend through the authenticated official CLI. It updates known template IDs. Template

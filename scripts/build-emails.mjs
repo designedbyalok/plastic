@@ -7,6 +7,7 @@ const root = new URL('../emails/', import.meta.url);
 const manifest = JSON.parse(await readFile(new URL('manifest.json', root), 'utf8'));
 const css = await readFile(new URL('design/styles.css', root), 'utf8');
 const tokens = await readFile(new URL('design/tokens.css', root), 'utf8');
+const deliveryCSS = await readFile(new URL('delivery.css', root), 'utf8');
 const variables = Object.fromEntries([...tokens.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)].map((m) => [m[1], m[2].trim()]));
 const templates = {};
 for (const template of manifest.templates) {
@@ -50,12 +51,18 @@ for (const template of manifest.templates) {
   // Lucide's exact ArrowUpRight paths are rasterized at 3x for mail clients without SVG.
   for (const svg of document.querySelectorAll('.email-action-icon')) {
     const image = document.createElement('img');
-    image.setAttribute('src', '{{assetOrigin}}/emails/arrow-up-right.png');
+    image.setAttribute('src', '{{assetOrigin}}/emails/arrow-up-right-light-v2.png');
+    image.setAttribute('class', 'email-action-icon email-icon-light');
     image.setAttribute('alt', '');
     image.setAttribute('width', '14');
     image.setAttribute('height', '14');
     image.setAttribute('style', svg.getAttribute('style'));
-    svg.replaceWith(image);
+    const darkImage = image.cloneNode(true);
+    darkImage.setAttribute('src', '{{assetOrigin}}/emails/arrow-up-right-dark-v2.png');
+    darkImage.setAttribute('class', 'email-action-icon email-icon-dark');
+    darkImage.setAttribute('style', `${image.getAttribute('style')};display:none;mso-hide:all`);
+    // Hide the alternate icon from Outlook's Word renderer, which cannot apply the switch.
+    svg.replaceWith(image, document.createComment('[if !mso]><!--'), darkImage, document.createComment('<![endif]'));
   }
   for (const element of document.querySelectorAll('*')) {
     for (const attribute of [...element.attributes]) if (attribute.name.startsWith('data-')) element.removeAttribute(attribute.name);
@@ -73,7 +80,7 @@ for (const template of manifest.templates) {
     .replace(/ *\n */g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${template.subject}</title><style>@media(max-width:480px){.email-padding{padding:16px!important}.email-content{padding:28px 24px!important}.email-heading{font-size:32px!important;letter-spacing:-1.3px!important}}</style></head><body style="margin:0;padding:0;background:${variables['--color-canvas']}"><div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${template.preheader}</div>${frame.outerHTML}</body></html>`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>${template.subject}</title><style>@media(max-width:480px){.email-padding{padding:16px!important}.email-content{padding:28px 24px!important}.email-heading{font-size:32px!important;letter-spacing:-1.3px!important}}${deliveryCSS}</style></head><body style="margin:0;padding:0;background:${variables['--color-canvas']}"><div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${template.preheader}</div>${frame.outerHTML}</body></html>`;
   templates[template.id] = { subject: template.subject, html, text };
 }
 await mkdir(new URL('../worker/generated/', root), { recursive: true });

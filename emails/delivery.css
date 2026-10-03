@@ -1,0 +1,21 @@
+/* Delivery-only dark theme. Native Plastic artboards retain their reviewed light theme. */
+:root { color-scheme: light dark; supported-color-schemes: light dark; }
+@media (prefers-color-scheme: dark) {
+  body,.email-shell { background:#141516!important;color:#f0eeea!important; }
+  .email-card { background:#202124!important;border-color:#424448!important; }
+  .email-panel { background:#2c2d2f!important; }
+  .email-heading,.email-wordmark,.email-strong,.email-panel-title,.email-feature-title,.email-secondary-link { color:#f0eeea!important; }
+  .email-body,.email-detail,.email-signoff,.email-feature-body,.email-footer-brand { color:#c9c8c5!important; }
+  .email-edition,.email-kicker,.email-note,.email-footer-text,.email-footer-link,.email-feature-index,.email-inline-label { color:#a7a9ad!important; }
+  .email-feature { border-color:#424448!important; }
+  .email-divider { background:#424448!important; }
+  .email-action-cell { background:#f0eeea!important; }
+  .email-action { color:#202124!important; }
+  .email-icon-light { display:none!important; }
+  .email-icon-dark { display:inline-block!important; }
+}
+/* Outlook's email-specific dark-mode attributes. */
+[data-ogsc] .email-action-cell,[data-ogsb] .email-action-cell { background:#f0eeea!important; }
+[data-ogsc] .email-action,[data-ogsb] .email-action { color:#202124!important; }
+[data-ogsc] .email-icon-light,[data-ogsb] .email-icon-light { display:none!important; }
+[data-ogsc] .email-icon-dark,[data-ogsb] .email-icon-dark { display:inline-block!important; }
