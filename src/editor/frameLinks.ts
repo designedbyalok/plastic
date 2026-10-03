@@ -2,13 +2,15 @@ import { frameDesign } from '../serialization/frame.ts';
 import { domElement, getViewportElement, styleOf } from '../canvas/dom.ts';
 import { notify } from '../canvas/gestureStore.ts';
 import { pageOf, rootOf } from '../document/tree.ts';
-import { saveNow } from './persistence.ts';
+import { saveNow, updateShareLink } from './persistence.ts';
 import { useEditor } from './store.ts';
 import { fitRect } from '../canvas/coords.ts';
 
 export function frameLink(id?: string): string {
   const url = new URL(location.href);
+  const preview = url.searchParams.get('preview');
   url.search = '';
+  if (preview) url.searchParams.set('preview', preview);
   url.hash = '';
   if (id) url.searchParams.set('frame', id);
   return url.href;
@@ -18,6 +20,7 @@ export async function copyFrameLink(id?: string): Promise<void> {
   try {
     await saveNow();
     if (useEditor.getState().saveStatus === 'error') throw new Error('Save the file before copying its frame link.');
+    await updateShareLink();
     await navigator.clipboard.writeText(frameLink(id));
     notify(id ? 'Frame Link Copied' : 'File Link Copied');
   } catch (error) { notify(error instanceof Error ? error.message : 'Could not copy frame link.'); }

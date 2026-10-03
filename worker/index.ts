@@ -9,6 +9,7 @@
  *                             WebSocket for live sync (see live.ts)
  *   *    /api/folders/*, GET /api/activity → folders and profile activity (see library.ts)
  */
+import { serveFilePreview, servePreviewImage } from './previews.ts';
 import { getAuth, providers } from './auth.ts';
 import type { Env } from './env.ts';
 import { handleProjects } from './projects.ts';
@@ -21,6 +22,9 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
+    const previewImage = /^\/api\/previews\/([a-f0-9]{32})\/image$/.exec(url.pathname);
+    if (previewImage) return servePreviewImage(request, env, previewImage[1]!);
+    if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname.startsWith('/file/') && url.searchParams.has('preview')) return serveFilePreview(request, env);
     if (url.pathname === '/api/health') {
       // Asked once per page load; the answer only changes on deploy, so let browsers reuse it.
       return Response.json({ auth: true, providers: providers(env) }, { headers: { 'cache-control': 'public, max-age=600' } });

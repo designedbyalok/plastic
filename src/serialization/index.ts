@@ -48,6 +48,7 @@ export function serializeProject(
   if (options.syncComponents !== false) doc = synchronizeComponents(doc);
   const roots = doc.pages.flatMap((p) => p.roots);
   const project: ProjectJson = {
+    ...(doc.thumbnail && doc.nodes[doc.thumbnail.frame]?.kind === 'element' ? { thumbnail: doc.thumbnail } : {}),
     ...(doc.components ? { components: doc.components } : {}),
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
@@ -117,6 +118,7 @@ export function parseProject(
     }
   }
   const doc: DesignDocument = {
+    ...(project.thumbnail && nodes[project.thumbnail.frame]?.kind === 'element' ? { thumbnail: project.thumbnail } : {}),
     ...(project.components ? { components: project.components } : {}),
     title: title || 'Untitled',
     nodes,

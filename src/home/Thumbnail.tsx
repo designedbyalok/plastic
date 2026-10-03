@@ -11,8 +11,8 @@ const PADDING = 12;
 const LAYOUT_WIDTH = 1440;
 
 function thumbnailDocument(doc: DesignDocument, css: string, base: string | null): string {
-  const roots = doc.pages[0]?.roots ?? [];
-  const frames = roots.map((id) => doc.frames[id] ?? { x: 0, y: 0 });
+  const roots = doc.thumbnail && doc.nodes[doc.thumbnail.frame] ? [doc.thumbnail.frame] : doc.pages[0]?.roots ?? [];
+  const frames = roots.map((id) => doc.thumbnail ? { x: 0, y: 0 } : doc.frames[id] ?? { x: 0, y: 0 });
   const minX = Math.min(0, ...frames.map((f) => f.x));
   const minY = Math.min(0, ...frames.map((f) => f.y));
   const markup = roots
@@ -22,7 +22,7 @@ function thumbnailDocument(doc: DesignDocument, css: string, base: string | null
   return `<!doctype html><html><head><meta charset="utf-8">${base ? `<base href="${base.replace(/"/g, '&quot;')}">` : ''}<style>:where(html,body){margin:0;overflow:hidden;background:transparent}</style><style>${safeCss}</style></head><body>${markup}</body></html>`;
 }
 
-export function Thumbnail({ doc, css, base = null }: { doc: DesignDocument; css: string; base?: string | null }) {
+function LiveThumbnail({ doc, css, base = null }: { doc: DesignDocument; css: string; base?: string | null }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const srcDoc = useMemo(() => thumbnailDocument(doc, css, base), [doc, css, base]);
@@ -81,4 +81,10 @@ export function Thumbnail({ doc, css, base = null }: { doc: DesignDocument; css:
       <iframe ref={frameRef} className="home-thumb-frame" srcDoc={srcDoc} sandbox="allow-same-origin" tabIndex={-1} aria-hidden="true" title="" loading="lazy" />
     </div>
   );
+}
+
+export function Thumbnail(props: { doc: DesignDocument; css: string; base?: string | null }) {
+  const thumbnail = props.doc.thumbnail;
+  if (thumbnail && props.doc.nodes[thumbnail.frame]) return <div className="home-thumb"><img src={thumbnail.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>;
+  return <LiveThumbnail {...props} />;
 }

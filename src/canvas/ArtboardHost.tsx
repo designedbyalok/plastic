@@ -130,6 +130,8 @@ export function ArtboardHost({ id }: { id: NodeId }) {
         const previewWidth = preview && state.doc.nodes[preview.id] && rootOf(state.doc, preview.id) === id ? preview.maxWidth : null;
         iframe.style.width = px(previewWidth ?? r.right + Math.max(0, r.left));
         iframe.style.height = px(r.bottom + Math.max(0, r.top));
+        // Preserve the last measured box while the browser skips offscreen painting.
+        iframe.parentElement!.style.containIntrinsicSize = `${iframe.style.width} ${iframe.style.height}`;
       };
       const observe = () => {
         const root = domElement(id);
@@ -142,22 +144,33 @@ export function ArtboardHost({ id }: { id: NodeId }) {
 
       let lastDoc: unknown = null;
       let lastPreview: unknown = null;
+      let visibilityFrame = 0;
       const render = () => {
         const { doc: design, stylePreview } = useEditor.getState();
-        if ((design === lastDoc && stylePreview === lastPreview) || !design.nodes[id]) return;
+        if (!design.nodes[id]) return;
         const preview = stylePreview && design.nodes[stylePreview.id] && rootOf(design, stylePreview.id) === id ? stylePreview : null;
-        if (stylePreview !== lastPreview) iframe.style.width = px(preview?.maxWidth ?? DEFAULT_VIEWPORT_WIDTH);
+        if (design === lastDoc && preview === lastPreview) return;
+        let layoutChanged = preview !== lastPreview;
+        if (preview !== lastPreview) iframe.style.width = px(preview?.maxWidth ?? DEFAULT_VIEWPORT_WIDTH);
         lastDoc = design;
-        lastPreview = stylePreview;
+        lastPreview = preview;
         const tokenCss = cached(design.tokens, serializeTokenSheet);
-        if (tokens.textContent !== tokenCss) tokens.textContent = tokenCss;
+        if (tokens.textContent !== tokenCss) { tokens.textContent = tokenCss; layoutChanged = true; }
         const node = preview ? design.nodes[preview.id] : null;
         const cls = node?.kind === 'element' ? node.classes[0] : null;
         const css = preview && cls ? previewVariantCss(design.styles, cls, preview) : cached(design.styles, serializeStyleSheet);
-        if (style.textContent !== css) style.textContent = css;
-        renderer.render(design, id);
-        imageLoading.sync();
-        observe();
+        if (style.textContent !== css) { style.textContent = css; layoutChanged = true; }
+        const nodesChanged = renderer.render(design, id);
+        if (nodesChanged) imageLoading.sync();
+        if (layoutChanged || nodesChanged) {
+          // Initialize new/changed animation styles before skipping offscreen painting.
+          // This also covers agent edits to artboards that have never been on screen.
+          iframe.parentElement!.style.contentVisibility = 'visible';
+          observe();
+          doc.body.getAnimations?.({ subtree: true });
+          cancelAnimationFrame(visibilityFrame);
+          visibilityFrame = requestAnimationFrame(() => { iframe.parentElement!.style.contentVisibility = ''; });
+        }
       };
       render();
       const unsubscribe = useEditor.subscribe(render);
@@ -180,6 +193,7 @@ export function ArtboardHost({ id }: { id: NodeId }) {
       doc.addEventListener('paste', onPaste);
 
       teardown = () => {
+        cancelAnimationFrame(visibilityFrame);
         unsubscribe();
         offRerender();
         unregister();

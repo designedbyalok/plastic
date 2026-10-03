@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { useShortcuts } from '../src/editor/shortcuts';
 import { useEditor } from '../src/editor/store';
 import { docFrom, el } from './helpers';
-vi.mock('../src/editor/persistence', () => ({ saveNow: vi.fn(async (_value: string) => {}) }));
+vi.mock('../src/editor/persistence', () => ({ saveNow: vi.fn(async (_value: string) => {}), updateShareLink: vi.fn(async () => {}) }));
 const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
 afterEach(() => {
   if (original) Object.defineProperty(navigator, 'clipboard', original);
@@ -33,9 +33,11 @@ it('copies a nested selection link with Cmd+L and the file link with no selectio
   };
   try {
     await press();
+    await vi.waitFor(() => expect(clipboard).toHaveBeenCalledTimes(1));
     expect(new URL(clipboard.mock.calls[0]![0] as string).searchParams.get('frame')).toBe(child);
     useEditor.getState().select([]);
     await press();
+    await vi.waitFor(() => expect(clipboard).toHaveBeenCalledTimes(2));
     const link = new URL(clipboard.mock.calls[1]![0] as string);
     expect(link.pathname).toBe('/file/demo');
     expect(link.search).toBe('');

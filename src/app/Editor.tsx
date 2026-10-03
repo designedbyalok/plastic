@@ -41,7 +41,7 @@ export function Editor({ projectId }: { projectId: string }) {
   }, [status, projectId]);
 
   useEffect(() => {
-    document.title = status === 'open' ? `${title} — Plastic` : 'Plastic';
+    document.title = status === 'open' ? `${title} • Plastic` : 'Plastic • Indestructible Design';
   }, [status, title]);
 
   useEffect(() => {

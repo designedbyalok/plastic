@@ -909,6 +909,7 @@ html.is-resizing-panel * {
 }
 
 .artboard-host {
+  content-visibility: auto;
   position: absolute;
 }
 

@@ -5,6 +5,7 @@ import { SourceSection } from './SourceSection.tsx';
 import { ScrollArea } from '../ui/ScrollArea.tsx';
 import { VariantsSection } from './VariantsSection.tsx';
 import { pageOf } from '../../document/tree.ts';
+import { useAsThumbnail } from '../../editor/thumbnail.ts';
 import { copyFrameContext, copyFrameLink } from '../../editor/frameLinks.ts';
 import { resolvedTheme, useTheme } from '../../app/theme.ts';
 import { ChevronDown, Pipette } from 'lucide-react';
@@ -38,6 +39,7 @@ import {
 } from './StyleSections.tsx';
 
 export function Inspector() {
+  const [settingThumbnail, setSettingThumbnail] = useState(false);
   const selection = useEditor((s) => s.selection);
   const doc = useEditor((s) => s.doc);
   // Computed-value placeholders read the live DOM; re-read once after new artboards mount.
@@ -78,6 +80,8 @@ export function Inspector() {
           {single && pageOf(doc, single.id) && <div className="frame-share-actions">
             <button type="button" className="insp-chip" onClick={() => void copyFrameLink(single.id)}>Copy Frame Link</button>
             <button type="button" className="insp-chip" onClick={() => void copyFrameContext(single.id)}>Copy AI Context</button>
+            <button type="button" className="insp-chip" disabled={settingThumbnail} aria-pressed={doc.thumbnail?.frame === single.id} onClick={() => { setSettingThumbnail(true); void useAsThumbnail(single.id).finally(() => setSettingThumbnail(false)); }}>{settingThumbnail ? 'Rendering Thumbnail…' : doc.thumbnail?.frame === single.id ? 'Update Thumbnail' : 'Use as Thumbnail'}</button>
+            {doc.thumbnail?.frame === single.id && <button type="button" className="insp-chip" onClick={() => useEditor.getState().apply('Remove file thumbnail', (d) => { const { thumbnail, ...rest } = d; return rest; })}>Remove Thumbnail</button>}
           </div>}
           {single && <ComponentSection el={single} />}
           {single && <ContentSection el={single} />}

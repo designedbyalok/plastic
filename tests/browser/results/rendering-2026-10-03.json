@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-03",
+  "environment": "Codex in-app Chromium; development build; collapsed layer trees; animations enabled",
+  "before": {
+    "profile": {
+      "file": "browser-check-large-import-2",
+      "roots": 24,
+      "nodes": 20184,
+      "selectionToTwoAnimationFramesMs": {
+        "median": 59.30000001192093,
+        "p95": 95,
+        "max": 111.09999999403954
+      },
+      "longTasks": 4,
+      "longTaskMs": 226,
+      "usedJSHeapMiB": 81,
+      "iframeCount": 24
+    },
+    "idle": {
+      "seconds": 22.453482000011718,
+      "taskMs": 14206.674,
+      "scriptMs": 200.26499999999993,
+      "layoutMs": 0,
+      "styleMs": 7301.807,
+      "layouts": 0,
+      "styleRecalculations": 32328,
+      "heapMiB": 56.74807357788086,
+      "taskPercent": 63.271585226703756
+    }
+  },
+  "after": {
+    "profile": {
+      "file": "browser-check-large-import",
+      "roots": 24,
+      "nodes": 20184,
+      "selectionToTwoAnimationFramesMs": {
+        "median": 36.400000005960464,
+        "p95": 66.40000000596046,
+        "max": 97.80000001192093
+      },
+      "pointerDispatchToTwoAnimationFramesMs": {
+        "median": 39.099999994039536,
+        "p95": 60.900000005960464
+      },
+      "dirtyRootTextEditToTwoAnimationFramesMs": {
+        "median": 48.79999998211861,
+        "p95": 70.5
+      },
+      "longTasks": 1,
+      "longTaskMs": 63,
+      "usedJSHeapMiB": 82,
+      "iframeCount": 24
+    },
+    "idle": {
+      "seconds": 5.011672000022372,
+      "taskMs": 915.2070000000001,
+      "scriptMs": 50.074,
+      "layoutMs": 0,
+      "styleMs": 387.871,
+      "layouts": 0,
+      "styleRecalculations": 1204,
+      "heapMiB": 52.95199966430664,
+      "taskPercent": 18.261510330203464
+    },
+    "source": "Isolated main snapshot plus this task rendering/browser-check changes"
+  }
+}

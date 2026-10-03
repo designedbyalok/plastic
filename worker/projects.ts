@@ -73,6 +73,7 @@ interface Row {
   title: string;
   updated_at: number;
   files: string;
+  preview_id?: string | null;
   folder_id?: string | null;
   archived_at?: number | null;
 }
@@ -100,7 +101,7 @@ async function backfill(env: Env, owner: string, row: Row): Promise<Versions> {
 }
 
 async function getRow(env: Env, owner: string, id: string): Promise<Row | null> {
-  return env.DB.prepare('select id, title, updated_at, files from project where owner_id = ? and id = ?').bind(owner, id).first<Row>();
+  return env.DB.prepare('select id, title, updated_at, files, preview_id from project where owner_id = ? and id = ?').bind(owner, id).first<Row>();
 }
 
 async function uniqueId(env: Env, owner: string, title: string): Promise<string> {
@@ -172,7 +173,13 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
     if (method === 'DELETE') return deleteProject(env, owner, id);
     if (method !== 'GET') return error(405, 'Method not allowed.');
     const row = await getRow(env, owner, id);
-    return json({ location: LOCATION, owner, files: row ? await backfill(env, owner, row) : null });
+    let previewId = row?.preview_id;
+    if (row && !previewId) {
+      const token = crypto.randomUUID().replace(/-/g, '');
+      await env.DB.prepare('update project set preview_id = ? where owner_id = ? and id = ? and preview_id is null').bind(token, owner, id).run();
+      previewId = (await getRow(env, owner, id))?.preview_id ?? token;
+    }
+    return json({ location: LOCATION, owner, previewId, files: row ? await backfill(env, owner, row) : null });
   }
 
   if (path.length === 3 && path[1] === 'files') {

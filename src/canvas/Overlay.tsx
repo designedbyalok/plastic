@@ -9,7 +9,7 @@ import type { NodeId } from '../document/types.ts';
 import { layerName } from '../elements/registry.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
 import type { Rect } from './coords.ts';
-import { domElement, hostOf, screenRectOf, styleOf, toScreenRect } from './dom.ts';
+import { domElement, hostOf, screenRectOf, styleOf, getViewportElement } from './dom.ts';
 import { startFrameMove, startResize, type Handle } from './gestures.ts';
 import { useGesture } from './gestureStore.ts';
 import { VectorOverlay } from '../vector/VectorOverlay.tsx';
@@ -26,7 +26,8 @@ const EMPTY: Measured = { selection: [], hover: null, parent: null, titles: [] }
 const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 function measure(): Measured {
-  const { doc, selection, hoverId } = useEditor.getState();
+  const state = useEditor.getState();
+  const { doc, selection, hoverId, viewport } = state;
   const selected = selection.map((id) => ({ id, rect: screenRectOf(id) })).filter((s): s is { id: NodeId; rect: Rect } => !!s.rect);
   const hover = hoverId && !selection.includes(hoverId) ? screenRectOf(hoverId) : null;
   let parent: Rect | null = null;
@@ -37,10 +38,16 @@ function measure(): Measured {
     const display = styleOf(parentEl).display;
     if (display.includes('flex') || display.includes('grid')) parent = screenRectOf(parentId);
   }
-  const titles = activeRoots(useEditor.getState()).flatMap((id) => {
+  const canvas = getViewportElement();
+  const titles = activeRoots(state).flatMap((id) => {
     const host = hostOf(id);
     if (!host) return [];
-    return [{ id, name: layerName(doc, id), rect: toScreenRect(host.getBoundingClientRect()) }];
+    // Iframe CSS dimensions are maintained by ResizeObserver; avoid waking offscreen
+    // artboards with a layout read on every animation frame. World positions are metadata.
+    const point = doc.frames[id] ?? { x: 0, y: 0 };
+    const rect = { x: viewport.x + point.x * viewport.zoom, y: viewport.y + point.y * viewport.zoom, width: parseFloat(host.style.width) * viewport.zoom, height: parseFloat(host.style.height) * viewport.zoom };
+    if (canvas && (rect.x + rect.width < -40 || rect.x > canvas.clientWidth + 40 || rect.y + rect.height < -40 || rect.y > canvas.clientHeight + 40)) return [];
+    return [{ id, name: layerName(doc, id), rect }];
   });
   return { selection: selected, hover, parent, titles };
 }

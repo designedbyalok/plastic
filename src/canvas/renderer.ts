@@ -25,12 +25,12 @@ export class DomRenderer {
     this.document = mount.ownerDocument;
   }
 
-  render(doc: DesignDocument, rootId: NodeId): void {
+  render(doc: DesignDocument, rootId: NodeId): boolean {
     // CSS/token/metadata edits need browser layout, but never a DOM tree reconciliation.
     // Changes in other artboards likewise leave this subtree's immutable nodes untouched.
     if (rootId === this.lastRootId && this.lastNodes && (
       doc.nodes === this.lastNodes || this.subtreeUnchanged(doc)
-    )) { this.lastNodes = doc.nodes; return; }
+    )) { this.lastNodes = doc.nodes; return false; }
     this.lastNodes = doc.nodes;
     this.lastRootId = rootId;
     const seen = new Set<NodeId>();
@@ -47,6 +47,7 @@ export class DomRenderer {
       this.rendered.delete(id);
       this.spacers.delete(id);
     }
+    return true;
   }
 
   /** Forget cached state so the next render re-patches every node. */

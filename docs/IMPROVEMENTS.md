@@ -37,11 +37,14 @@ code editor, tokens, pages, undo/redo, local files, cloud accounts, and MCP tool
 - [x] Inspector provenance: show the selector, inline declaration, theme or breakpoint
   supplying a computed value and explain where an edit will be applied.
 - [x] Explicit reusable component structure/instances, preserving ordinary HTML output.
-- [ ] Browser interaction coverage: select, drag, resize, inline text, code edits, undo,
+- [x] Browser interaction coverage: select, drag, resize, inline text, code edits, undo,
   responsive rendering, safe embeds, persistence, and designer/agent concurrency.
-- [ ] Profile large imported designs before changing rendering. Measure input latency,
+- [x] Profile large imported designs before changing rendering. Measure input latency,
   layout work, memory and idle CPU; optimize dirty roots and offscreen artboards without
   dropping CSS animations or responsive behavior.
+  A repeatable dev-browser runner, 24-artboard baseline and measured first optimizations
+  are documented in [Browser Checks](BROWSER_CHECKS.md). Cross-browser/CI and broader
+  workload profiling remain follow-ups.
 
 ## Open-source choices
 

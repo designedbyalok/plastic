@@ -82,7 +82,18 @@ export interface Point {
   readonly y: number;
 }
 
+export interface FileThumbnail {
+  readonly page?: string;
+  readonly frame: NodeId;
+  readonly image: string;
+  readonly width: number;
+  readonly height: number;
+  /** Hash of the frame markup and CSS used for this snapshot. */
+  readonly source: string;
+}
+
 export interface DesignDocument {
+  readonly thumbnail?: FileThumbnail;
   /** Reusable structure links; ordinary HTML/CSS remains the rendered source. */
   readonly components?: ComponentLibrary;
   readonly title: string;

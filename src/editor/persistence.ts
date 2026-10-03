@@ -9,6 +9,7 @@ import { setTitle } from '../document/ops.ts';
 import { starterDocument } from '../elements/insertables.ts';
 import { ProjectSync } from './projectSync.ts';
 import { finishTextEditing } from '../canvas/textEditing.ts';
+import { captureThumbnail, thumbnailSource } from './thumbnail.ts';
 import { editorMeta, useEditor } from './store.ts';
 
 const AUTOSAVE_MS = 400;
@@ -37,10 +38,23 @@ function schedule(delay = storage?.saveDelayMs ?? AUTOSAVE_MS): void {
 
 export async function saveNow(): Promise<void> {
   const state = useEditor.getState();
+  const savingStorage = storage;
   if (!sync) return;
   if (state.tx || state.editingTextId) return schedule();
   try {
-    await sync.save();
+    if (state.doc.thumbnail && state.doc.nodes[state.doc.thumbnail.frame]) {
+      const { frame } = state.doc.thumbnail;
+      const hash = await thumbnailSource(state.doc, frame);
+      if (hash !== state.doc.thumbnail.source) {
+        try {
+          const thumbnail = await captureThumbnail(state.doc, frame, state.assetBase);
+          const current = useEditor.getState();
+          if (storage === savingStorage && await thumbnailSource(current.doc, frame) === hash && current.doc.thumbnail?.frame === frame)
+            current.apply('Refresh file thumbnail', (doc) => ({ ...doc, thumbnail }));
+        } catch (error) { console.error('Could not refresh the file thumbnail', error); }
+      }
+    }
+    await sync?.save();
   } catch (error) {
     console.error(error);
   }
@@ -102,6 +116,7 @@ export async function openProject(id: string): Promise<OpenedProject> {
     },
   });
   sync = coordinator;
+  void updateShareLink().catch(console.error);
   if (!sameFiles(normalized(files), serializeProject(doc, meta))) {
     useEditor.getState().setSaveState('saving', useEditor.getState().revision - 1);
     schedule(0);
@@ -168,4 +183,17 @@ export async function duplicateOpenProject(): Promise<string | null> {
   const files = serializeProject(setTitle(state.doc, title), editorMeta(state));
   const workspace = await connectWorkspace();
   return workspace.create(title, files, { assetsFrom: storage.id });
+}
+
+/** Add the account-independent preview identity to links copied or shared from the address bar. */
+export async function updateShareLink(): Promise<void> {
+  if (!storage?.shareLink) return;
+  const project = storage;
+  const link = new URL(await project.shareLink!());
+  if (storage !== project) return;
+  const current = new URL(location.href);
+  const preview = link.searchParams.get('preview');
+  if (preview) current.searchParams.set('preview', preview);
+  else current.searchParams.delete('preview');
+  history.replaceState(history.state, '', current.href);
 }

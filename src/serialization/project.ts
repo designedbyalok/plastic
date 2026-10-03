@@ -2,7 +2,7 @@
  * project.json: editor metadata only. Deleting it loses canvas placement, page names and order,
  * and layer names, never the design itself.
  */
-import type { ComponentLibrary, NodeId, Point, RulerGuide } from '../document/types.ts';
+import type { ComponentLibrary, FileThumbnail, NodeId, Point, RulerGuide } from '../document/types.ts';
 
 export const PROJECT_FORMAT = 'plastic';
 export const PROJECT_VERSION = 2;
@@ -21,6 +21,7 @@ export interface PageMeta {
 }
 
 export interface ProjectJson {
+  readonly thumbnail?: FileThumbnail;
   readonly components?: ComponentLibrary;
   readonly format: typeof PROJECT_FORMAT;
   readonly version: number;
@@ -99,6 +100,7 @@ export function readProjectJson(text: string): ProjectJson {
   const components = readComponents(raw.components);
   return {
     ...base,
+    ...(readThumbnail(raw.thumbnail) ? { thumbnail: readThumbnail(raw.thumbnail) } : {}),
     ...(components ? { components } : {}),
     pages,
     canvas: { viewport, activePage, frames },
@@ -147,4 +149,15 @@ function readGuides(raw: unknown[]): RulerGuide[] {
     ids.add(guide.id);
     return [{ id: guide.id, axis: guide.axis, value: guide.value, ...(typeof guide.frame === 'string' ? { frame: guide.frame } : {}) }];
   });
+}
+
+/** Only bounded raster snapshots can become public link images. */
+export function readThumbnail(raw: unknown): FileThumbnail | undefined {
+  if (!isRecord(raw) || typeof raw.frame !== 'string' || !/^[\w-]{1,64}$/.test(raw.frame) ||
+    typeof raw.image !== 'string' || raw.image.length > 2_000_000 ||
+    !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(raw.image) ||
+    typeof raw.width !== 'number' || !Number.isInteger(raw.width) || raw.width < 1 || raw.width > 1200 ||
+    typeof raw.height !== 'number' || !Number.isInteger(raw.height) || raw.height < 1 || raw.height > 1200 ||
+    typeof raw.source !== 'string' || !/^[a-f0-9]{64}$/.test(raw.source)) return undefined;
+  return { ...(typeof raw.page === 'string' && /^[a-z0-9][a-z0-9_.-]*\.html$/i.test(raw.page) ? { page: raw.page } : {}), frame: raw.frame, image: raw.image, width: raw.width, height: raw.height, source: raw.source };
 }

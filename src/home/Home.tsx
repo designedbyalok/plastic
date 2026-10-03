@@ -153,7 +153,7 @@ export function Home({ route }: { route: HomeRoute }) {
   const searching = !!query.trim();
 
   useEffect(() => {
-    document.title = route.name === 'profile' ? 'Profile — Plastic' : route.name === 'archive' ? 'Archive — Plastic' : folder ? `${folder.name} — Plastic` : 'Plastic';
+    document.title = route.name === 'profile' ? 'Profile • Plastic' : route.name === 'archive' ? 'Archive • Plastic' : folder ? `${folder.name} • Plastic` : 'Plastic • Indestructible Design';
   }, [route.name, folder]);
 
   const visible = useMemo(() => {

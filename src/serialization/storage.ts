@@ -4,6 +4,7 @@
  * anywhere else (a static build) the browser's localStorage is used. Tauri will add a native
  * implementation behind the same interfaces.
  */
+import { readProjectJson } from './project.ts';
 import { StorageConflictError } from './conflict.ts';
 import { authClient, detectBackend } from '../auth/client.ts';
 import { PROJECT_FILE_NAME, isPageFile, type ProjectFiles } from './index.ts';
@@ -51,6 +52,7 @@ export interface ProjectStorage {
   readonly assetBase: string | null;
   /** How long autosave waits after the last edit (cloud storage waits longer to save requests). */
   readonly saveDelayMs?: number;
+  shareLink?(): Promise<string>;
   load(): Promise<ProjectFiles | null>;
   save(files: ProjectFiles): Promise<void>;
   /** Called when the files change outside the editor (text editor, git, coding agent). */
@@ -484,7 +486,13 @@ class CloudWorkspace implements Workspace {
   }
 
   private async files(id: string, versions: Versions, only?: readonly string[]): Promise<ProjectFiles> {
-    const names = Object.keys(versions).filter((n) => !only || only.includes(n));
+    let selected = only;
+    if (only === THUMBNAIL_FILES && versions['project.json']) {
+      const metadata = await this.text(id, 'project.json', versions['project.json']);
+      const page = readProjectJson(metadata ?? '').thumbnail?.page;
+      if (page) selected = [...only, page];
+    }
+    const names = Object.keys(versions).filter((n) => !selected || selected.includes(n));
     const entries = await Promise.all(names.map(async (n) => [n, await this.text(id, n, versions[n]!)] as const));
     return Object.fromEntries(entries.filter((e): e is readonly [string, string] => e[1] !== null));
   }
@@ -659,6 +667,14 @@ class CloudWorkspace implements Workspace {
       id,
       location: this.location,
       assetBase: this.assetBase(id),
+      async shareLink() {
+        const response = await fetch(endpoint);
+        if (!response.ok) throw new Error('Could not load the file link.');
+        const data = await response.json() as { previewId?: string };
+        const url = new URL(`/file/${encodeURIComponent(id)}`, location.origin);
+        if (data.previewId) url.searchParams.set('preview', data.previewId);
+        return url.href;
+      },
       // Cloud saves wait for a pause in editing: fewer, larger saves use far fewer requests.
       saveDelayMs: 1500,
       async load() {
