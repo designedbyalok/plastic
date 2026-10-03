@@ -15,7 +15,9 @@ import {
   toggleHidden, toggleLocked, ungroupSelection,
 } from '../editor/layerActions.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
-import { getElement } from '../document/tree.ts';
+import { getElement, isRoot } from '../document/tree.ts';
+import { useAsThumbnail } from '../editor/thumbnail.ts';
+import { notify } from './gestureStore.ts';
 import { Menu, MenuContent } from '../panels/ui/Menu.tsx';
 
 /** Where the menu opened (client point) and on what: layers, or empty canvas. */
@@ -50,6 +52,9 @@ export function CanvasMenu({ at, onClose }: { at: CanvasMenuAt; onClose(): void 
   // Read when the menu opens (they live outside the store).
   const artboards = useEditor(activeRoots).length > 0;
   const readOnly = useEditor((s) => s.readOnly);
+  // A single outermost frame can become the file's thumbnail.
+  const frame = selection.length === 1 && primary && isRoot(doc, primary) ? primary : null;
+  const thumbnail = doc.thumbnail?.frame;
   const canPasteStyles = some && hasCopiedStyles() && !readOnly;
 
   return (
@@ -106,6 +111,21 @@ export function CanvasMenu({ at, onClose }: { at: CanvasMenuAt; onClose(): void 
           <Divider />
           <Item label={hidden ? 'Show' : 'Hide'} kbd="⇧⌘H" disabled={!some || readOnly} run={toggleHidden} />
           <Item label={locked ? 'Unlock' : 'Lock'} kbd="⇧⌘L" disabled={!some || readOnly} run={toggleLocked} />
+          {frame && !readOnly && (
+            <>
+              <Divider />
+              <Item
+                label={thumbnail === frame ? 'Update thumbnail' : 'Use as thumbnail'}
+                run={() => {
+                  notify('Rendering thumbnail…');
+                  void useAsThumbnail(frame);
+                }}
+              />
+              {thumbnail === frame && (
+                <Item label="Remove thumbnail" run={() => useEditor.getState().apply('Remove file thumbnail', (d) => { const { thumbnail: _, ...rest } = d; return rest; })} />
+              )}
+            </>
+          )}
         </MenuContent>
       )}
     </Menu.Root>

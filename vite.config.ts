@@ -19,6 +19,26 @@ function openPencilWorkerFix(): Plugin {
 }
 
 /**
+ * canvaskit-wasm (used by the Figma import) is one file for every runtime: it reaches for Node's
+ * "fs" and "path" only when it runs under Node. In the browser that branch never runs, so give
+ * those imports an empty module instead of Vite's externalized stub (and its build warnings).
+ */
+function canvaskitNodeStubs(): Plugin {
+  const stub = '\0plastic-node-stub';
+  return {
+    name: 'canvaskit-node-stubs',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if ((source === 'fs' || source === 'path') && importer && /[\\/]canvaskit-wasm[\\/]/.test(importer)) return stub;
+      return null;
+    },
+    load(id) {
+      return id === stub ? 'export default {};' : null;
+    },
+  };
+}
+
+/**
  * Every production build gets an id, compiled into the app (__PLASTIC_BUILD__) and written to
  * /version.json. Open tabs compare the two to offer "Update available" after a deploy; the file
  * is a static asset, so checking it never runs the Worker or costs a request.
@@ -35,7 +55,7 @@ function buildVersion(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [openPencilWorkerFix(), react(), buildVersion(), process.env.VITEST ? null : plasticWorkspace()],
+  plugins: [openPencilWorkerFix(), canvaskitNodeStubs(), react(), buildVersion(), process.env.VITEST ? null : plasticWorkspace()],
   worker: { format: 'es' },
   build: {
     rolldownOptions: {
