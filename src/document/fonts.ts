@@ -3,8 +3,20 @@ import postcss, { type Root } from 'postcss';
 import safeParse from 'postcss-safe-parser';
 import { parseStyleSheet, serializeStyleSheet } from './css.ts';
 import { setStyleOnNodes } from './ops.ts';
-import { INTER_VARIABLE_CSS } from './defaultFont.ts';
 import type { DesignDocument, NodeId } from './types.ts';
+
+/**
+ * Inter is embedded into a design's CSS (base64 woff2) so saved and exported files are
+ * self-contained. That data is ~290 kB, so it's a separate chunk, fetched in parallel as soon as
+ * the editor loads instead of inside the editor bundle. Until it arrives (or if it can't load),
+ * choosing Inter falls back to its Google Fonts import, which renders the same.
+ */
+let interCss: string | null = null;
+export const bundledFontsReady: Promise<void> = import('./defaultFont.ts')
+  .then((m) => {
+    interCss = m.INTER_VARIABLE_CSS;
+  })
+  .catch(() => {});
 
 export const UI_FONTS = [
   'Inter', 'Geist', 'Roboto', 'Open Sans', 'DM Sans', 'Manrope', 'Plus Jakarta Sans',
@@ -40,8 +52,8 @@ export function selectFont(doc: DesignDocument, ids: readonly NodeId[], value: s
     });
   });
   if (present) return next;
-  if (family === 'Inter') {
-    root.append(safeParse(INTER_VARIABLE_CSS).nodes);
+  if (family === 'Inter' && interCss) {
+    root.append(safeParse(interCss).nodes);
     return { ...next, styles: parseStyleSheet(root.toString()) };
   }
   const rule = postcss.atRule({ name: 'import', params: `url("${url}")` });

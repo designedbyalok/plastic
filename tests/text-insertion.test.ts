@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { setViewportElement } from '../src/canvas/dom';
 import { beginTextInsertion, finishTextEditing } from '../src/canvas/textEditing';
 import { readableTextColor } from '../src/canvas/textColor';
@@ -7,9 +7,12 @@ import { insertAt } from '../src/canvas/gestures';
 import { useEditor } from '../src/editor/store';
 import { emptyDocument } from '../src/document/factory';
 import { serializeStyleSheet } from '../src/document/css';
+import { bundledFontsReady } from '../src/document/fonts';
 import { getElement } from '../src/document/tree';
 import { parseProject, serializeProject } from '../src/serialization';
 import { el } from './helpers';
+// The editor starts loading the bundled Inter chunk on startup, well before any text is inserted.
+beforeAll(() => bundledFontsReady);
 vi.mock('../src/canvas/layout', async importOriginal => ({ ...await importOriginal<object>(), containerAt: () => null }));
 afterEach(() => { finishTextEditing(false); setViewportElement(null); document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function setup() {

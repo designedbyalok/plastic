@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { googleFontUrl, selectFont, WEB_FONT_OPTIONS } from '../src/document/fonts';
+import { bundledFontsReady, googleFontUrl, selectFont, WEB_FONT_OPTIONS } from '../src/document/fonts';
 import { parseStyleSheet, serializeStyleSheet } from '../src/document/css';
 import { parseProject, serializeProject } from '../src/serialization';
 import { docFrom, el } from './helpers';
@@ -28,6 +28,14 @@ describe('on-demand UI fonts', () => {
     expect(serializeStyleSheet(system.styles)).not.toContain('@import');
     const doc = { ...f.doc, styles: parseStyleSheet('@font-face { font-family: "Inter"; src: url(assets/inter.woff2); }') };
     expect(serializeStyleSheet(selectFont(doc, [f.root], 'Inter, sans-serif').styles)).not.toContain('fonts.googleapis.com');
+  });
+  it('embeds the bundled Inter once it has loaded, with no web request', async () => {
+    await bundledFontsReady;
+    const f = docFrom({ tag: 'p', children: ['Text'] });
+    const css = serializeStyleSheet(selectFont(f.doc, [f.root], 'Inter, sans-serif').styles);
+    expect(css).toContain('@font-face');
+    expect(css).toContain('data:font/woff2;base64,');
+    expect(css).not.toContain('fonts.googleapis.com');
   });
   it('resolves selected font tokens without rewriting the token reference', () => {
     const f = docFrom({ tag: 'p' });

@@ -21,6 +21,22 @@ function openPencilWorkerFix(): Plugin {
 export default defineConfig({
   plugins: [openPencilWorkerFix(), react(), process.env.VITEST ? null : plasticWorkspace()],
   worker: { format: 'es' },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            // UI primitives (menus, selects, popovers and what they're built on) change far less
+            // often than the app: one shared chunk that stays cached across deploys.
+            {
+              name: 'ui-vendor',
+              test: /node_modules[\\/](@radix-ui|@floating-ui|react-remove-scroll|react-remove-scroll-bar|react-style-singleton|use-callback-ref|use-sidecar|aria-hidden|get-nonce|tslib)[\\/]/,
+            },
+          ],
+        },
+      },
+    },
+  },
   // Path operations use Paper.js for geometry only; its core build leaves out PaperScript.
   resolve: { alias: [{ find: /^paper$/, replacement: 'paper/dist/paper-core.js' }] },
   server: {
