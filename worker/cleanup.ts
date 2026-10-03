@@ -20,7 +20,7 @@ import { parseVersions, projectPrefix, revisionKey } from './projects.ts';
 const HOUR = 60 * 60 * 1000;
 /** Superseded revisions stay readable this long; also the minimum age of anything deleted. */
 export const GRACE_MS = HOUR;
-export const WEEKLY_CRON = '0 4 * * 0';
+export const WEEKLY_CRON = '0 4 * * SUN';
 /** Projects swept per run (keeps one invocation small; the overlap catches the rest). */
 const PROJECT_LIMIT = 500;
 

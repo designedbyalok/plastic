@@ -45,6 +45,6 @@
   },
   // Hourly + weekly sweep of superseded file revisions (worker/cleanup.ts). Cron triggers are free.
   // The weekly expression must match WEEKLY_CRON in cleanup.ts.
-  "triggers": { "crons": ["17 * * * *", "0 4 * * 0"] },
+  "triggers": { "crons": ["17 * * * *", "0 4 * * SUN"] },
   "observability": { "enabled": true }
 }

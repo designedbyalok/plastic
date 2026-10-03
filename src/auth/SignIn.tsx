@@ -25,6 +25,17 @@ const INVITE_ONLY = 'Plastic is invite-only for now. Join the waitlist and we’
 /** What an OAuth sign-up refused by the invite check comes back with. */
 const INVITE_ERRORS = new Set(['unable_to_create_user', 'invite_only', 'INVITE_ONLY']);
 
+/** The message for an `?error=` code an auth redirect (Google, GitHub, an email link) came back with. */
+function errorMessage(code: string): string {
+  if (INVITE_ERRORS.has(code)) return INVITE_ONLY;
+  // An existing account whose email isn't verified yet can't be joined to a social login (so
+  // nobody can pre-register someone else's address). Verifying it once fixes that.
+  if (code === 'account_not_linked')
+    return 'This email already has a Plastic account that isn’t verified yet. Sign in with a magic link or your password once to verify it, then Continue with Google will work.';
+  if (code === 'email_not_verified') return 'Your Google email isn’t verified. Verify it with Google, or sign in with email instead.';
+  return 'This link has expired or is invalid. Request a new one below.';
+}
+
 export function SignIn({ providers }: { providers: readonly string[] }) {
   const query = new URLSearchParams(location.search);
   const initialMode = query.get('auth');
@@ -43,7 +54,7 @@ export function SignIn({ providers }: { providers: readonly string[] }) {
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [error, setError] = useState<string | null>(
-    query.has('error') ? (INVITE_ERRORS.has(query.get('error') ?? '') ? INVITE_ONLY : 'This link has expired or is invalid. Request a new one below.') : null,
+    query.has('error') ? errorMessage(query.get('error') ?? '') : null,
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [verify, setVerify] = useState(false);
