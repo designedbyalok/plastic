@@ -6,6 +6,8 @@ import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { addFlexOrWrap, cycleArtboard, duplicateSelection, toggleUi } from '../editor/commands.ts';
 import { toScreen } from './dom.ts';
+import { screenToWorld } from './coords.ts';
+import { openCursorChat } from '../editor/presence.ts';
 import { copySelectionToClipboard, pasteFromSystemClipboard } from '../editor/clipboard.ts';
 import { copyFrameContext, copyFrameLink } from '../editor/frameLinks.ts';
 import {
@@ -30,6 +32,13 @@ function Item({ label, kbd, run, disabled }: { label: ReactNode; kbd?: string; r
 
 const Divider = () => <Menu.Separator className="insp-menu-divider" />;
 
+/** Open cursor chat where the menu was opened, after the menu has closed and returned focus. */
+function chatAt(at: { x: number; y: number }) {
+  const { viewport, activePage } = useEditor.getState();
+  const point = { ...screenToWorld(toScreen(at.x, at.y), viewport), page: activePage };
+  setTimeout(() => openCursorChat(point));
+}
+
 export function CanvasMenu({ at, onClose }: { at: CanvasMenuAt; onClose(): void }) {
   const doc = useEditor((s) => s.doc);
   const selection = useEditor((s) => s.selection).filter((id) => getElement(doc, id));
@@ -40,7 +49,8 @@ export function CanvasMenu({ at, onClose }: { at: CanvasMenuAt; onClose(): void 
   const locked = primary ? isLocked(doc, primary) : false;
   // Read when the menu opens (they live outside the store).
   const artboards = useEditor(activeRoots).length > 0;
-  const canPasteStyles = some && hasCopiedStyles();
+  const readOnly = useEditor((s) => s.readOnly);
+  const canPasteStyles = some && hasCopiedStyles() && !readOnly;
 
   return (
     <Menu.Root open={!!at} onOpenChange={(open) => !open && onClose()} modal={false}>
@@ -49,10 +59,11 @@ export function CanvasMenu({ at, onClose }: { at: CanvasMenuAt; onClose(): void 
       </Menu.Trigger>
       {at?.target === 'canvas' && (
         <MenuContent align="start" side="bottom" sideOffset={2} aria-label="Canvas actions" className="canvas-menu" onCloseAutoFocus={(e) => e.preventDefault()}>
-          <Item label="Paste" kbd="⌘V" run={() => void pasteFromSystemClipboard('normal', toScreen(at.x, at.y))} />
+          <Item label="Paste" kbd="⌘V" disabled={readOnly} run={() => void pasteFromSystemClipboard('normal', toScreen(at.x, at.y))} />
           <Divider />
           <Item label="Next artboard" kbd="N" disabled={!artboards} run={() => cycleArtboard(1)} />
           <Item label="Previous artboard" kbd="⇧N" disabled={!artboards} run={() => cycleArtboard(-1)} />
+          <Item label="Cursor chat" kbd="/" run={() => chatAt(at)} />
           <Divider />
           <Item label="Hide UI" kbd="." run={toggleUi} />
         </MenuContent>
@@ -76,25 +87,25 @@ export function CanvasMenu({ at, onClose }: { at: CanvasMenuAt; onClose(): void 
               </Menu.SubContent>
             </Menu.Portal>
           </Menu.Sub>
-          <Item label="Paste" kbd="⌘V" run={() => void pasteFromSystemClipboard('normal')} />
-          <Item label="Paste on top" kbd="⇧⌘V" run={() => void pasteFromSystemClipboard('over')} />
-          <Item label="Paste to replace" kbd="⇧⌘R" disabled={!some} run={() => void pasteFromSystemClipboard('replace')} />
-          <Item label="Duplicate" kbd="⌘D" disabled={!some} run={duplicateSelection} />
+          <Item label="Paste" kbd="⌘V" disabled={readOnly} run={() => void pasteFromSystemClipboard('normal')} />
+          <Item label="Paste on top" kbd="⇧⌘V" disabled={readOnly} run={() => void pasteFromSystemClipboard('over')} />
+          <Item label="Paste to replace" kbd="⇧⌘R" disabled={!some || readOnly} run={() => void pasteFromSystemClipboard('replace')} />
+          <Item label="Duplicate" kbd="⌘D" disabled={!some || readOnly} run={duplicateSelection} />
           <Divider />
           <Item label="Copy styles" kbd="⌥⌘C" disabled={!some} run={copyStyles} />
           <Item label="Paste styles" kbd="⌥⌘V" disabled={!canPasteStyles} run={pasteStyles} />
           <Divider />
-          <Item label="Frame selection" kbd="⇧F" disabled={!some} run={frameSelection} />
-          <Item label="Add flex layout" kbd="⇧A" disabled={!some} run={addFlexOrWrap} />
-          <Item label="Ungroup" kbd="⇧⌘G" disabled={!hasChildren} run={ungroupSelection} />
+          <Item label="Frame selection" kbd="⇧F" disabled={!some || readOnly} run={frameSelection} />
+          <Item label="Add flex layout" kbd="⇧A" disabled={!some || readOnly} run={addFlexOrWrap} />
+          <Item label="Ungroup" kbd="⇧⌘G" disabled={!hasChildren || readOnly} run={ungroupSelection} />
           <Divider />
-          <Item label="Bring to front" kbd="]" disabled={!some} run={() => reorderSelection('front')} />
-          <Item label="Send to back" kbd="[" disabled={!some} run={() => reorderSelection('back')} />
-          <Item label="Move forward" kbd="⌘]" disabled={!some} run={() => reorderSelection('forward')} />
-          <Item label="Move backward" kbd="⌘[" disabled={!some} run={() => reorderSelection('backward')} />
+          <Item label="Bring to front" kbd="]" disabled={!some || readOnly} run={() => reorderSelection('front')} />
+          <Item label="Send to back" kbd="[" disabled={!some || readOnly} run={() => reorderSelection('back')} />
+          <Item label="Move forward" kbd="⌘]" disabled={!some || readOnly} run={() => reorderSelection('forward')} />
+          <Item label="Move backward" kbd="⌘[" disabled={!some || readOnly} run={() => reorderSelection('backward')} />
           <Divider />
-          <Item label={hidden ? 'Show' : 'Hide'} kbd="⇧⌘H" disabled={!some} run={toggleHidden} />
-          <Item label={locked ? 'Unlock' : 'Lock'} kbd="⇧⌘L" disabled={!some} run={toggleLocked} />
+          <Item label={hidden ? 'Show' : 'Hide'} kbd="⇧⌘H" disabled={!some || readOnly} run={toggleHidden} />
+          <Item label={locked ? 'Unlock' : 'Lock'} kbd="⇧⌘L" disabled={!some || readOnly} run={toggleLocked} />
         </MenuContent>
       )}
     </Menu.Root>

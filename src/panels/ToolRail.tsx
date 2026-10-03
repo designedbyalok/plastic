@@ -179,6 +179,25 @@ function ShapeMenu() {
 
 export function ToolRail() {
   const layersOpen = useEditor((s) => s.layersOpen);
+  const readOnly = useEditor((s) => s.readOnly);
+  if (readOnly) {
+    // Viewing someone else's file: look around, nothing to draw with.
+    return (
+      <nav className={`rail${layersOpen ? '' : ' is-floating'}`} aria-label="Tools">
+        <div className="rail-group">
+          <RailButton tool={{ kind: 'select' }} label="Select" shortcut="V">
+            <MousePointer2 size={18} strokeWidth={1.5} />
+          </RailButton>
+          <RailButton tool={{ kind: 'hand' }} label="Hand (or hold Space)">
+            <Hand size={18} strokeWidth={1.5} />
+          </RailButton>
+        </div>
+        <div className="rail-group">
+          <ShortcutsMenu />
+        </div>
+      </nav>
+    );
+  }
   return (
     // With the side panel hidden, the rail floats over the canvas.
     <nav className={`rail${layersOpen ? '' : ' is-floating'}`} aria-label="Tools">

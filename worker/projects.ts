@@ -20,13 +20,14 @@
  *   GET    /api/projects/<id>/live?client=<id>   WebSocket for live sync (see live.ts)
  */
 import type { Env } from './env.ts';
-import { CLIENT_ID, room } from './live.ts';
+import { CLIENT_ID, room, withPeer } from './live.ts';
+import { participantFor } from '../src/editor/presenceProtocol.ts';
 import { deleteProject, placeProject, recordEdit } from './library.ts';
 
 /** Same rules as the local workspace (server/projectStore.ts). */
 const PROJECT_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
-const FILE_NAME = /^[a-z0-9][a-z0-9_.-]*\.(html|css|json)$/i;
-const ASSET_NAME = /^[a-z0-9][a-z0-9_.-]*\.(png|jpe?g|gif|webp|avif|svg)$/i;
+export const FILE_NAME = /^[a-z0-9][a-z0-9_.-]*\.(html|css|json)$/i;
+export const ASSET_NAME = /^[a-z0-9][a-z0-9_.-]*\.(png|jpe?g|gif|webp|avif|svg)$/i;
 const ASSET_TYPES: Record<string, string> = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif', svg: 'image/svg+xml',
 };
@@ -34,7 +35,7 @@ const FILE_TYPES: Record<string, string> = { html: 'text/html; charset=utf-8', c
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 500;
 const LOCATION = 'Your account';
-const REVISION = /^[a-f0-9]{32,64}$/;
+export const REVISION = /^[a-f0-9]{32,64}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 /** Hex SHA-256 of the upload body, computed by the browser and verified by R2. */
 export const CHECKSUM_HEADER = 'x-plastic-sha256';
@@ -73,7 +74,7 @@ function isVersions(value: unknown): value is Versions {
   return entries.length <= MAX_FILES && entries.every(([n, v]) => FILE_NAME.test(n) && typeof v === 'string' && v.length <= 64);
 }
 
-interface Row {
+export interface Row {
   id: string;
   title: string;
   updated_at: number;
@@ -87,7 +88,7 @@ interface Row {
  * Projects saved before versions were recorded have files = '{}'. List their R2 folder once and
  * store the versions; after that they never need a list again.
  */
-async function backfill(env: Env, owner: string, row: Row): Promise<Versions> {
+export async function backfill(env: Env, owner: string, row: Row): Promise<Versions> {
   const known = parseVersions(row.files);
   if (Object.keys(known).length) return known;
   const prefix = projectPrefix(owner, row.id);
@@ -140,7 +141,51 @@ async function readBody<T>(request: Request, limit = 256 * 1024): Promise<T | nu
   return (await request.json().catch(() => null)) as T | null;
 }
 
-export async function handleProjects(request: Request, env: Env, owner: string, path: string[]): Promise<Response> {
+/** The signed-in person, as others in the file see them. */
+export interface Member {
+  readonly id: string;
+  readonly name?: string | null;
+  readonly image?: string | null;
+}
+
+/** One project file at a version (immutable when the version was asked for by URL). */
+export async function serveFile(env: Env, prefix: string, name: string, version: string | undefined, immutable: boolean): Promise<Response> {
+  let object = version ? await env.FILES.get(revisionKey(prefix, name, version)) : null;
+  // Existing projects used mutable keys. Only serve legacy bytes if their etag matches.
+  if (!object) {
+    const legacy = await env.FILES.get(prefix + name);
+    if (legacy && (!version || legacy.etag === version)) object = legacy;
+  }
+  if (!object) return error(404, 'No such revision.');
+  return new Response(object.body, {
+    headers: {
+      'content-type': FILE_TYPES[extension(name)]!,
+      'cache-control': immutable ? IMMUTABLE : 'no-store',
+      etag: object.httpEtag,
+      'x-content-type-options': 'nosniff',
+      // HTML may be inspected/downloaded on the app origin without executing design code.
+      ...(extension(name) === 'html' ? { 'content-security-policy': 'sandbox allow-same-origin' } : {}),
+    },
+  });
+}
+
+/** A project image (names are content hashes, so an image never changes under its URL). */
+export async function serveAsset(env: Env, prefix: string, name: string): Promise<Response> {
+  const object = await env.FILES.get(`${prefix}assets/${name}`);
+  if (!object) return error(404, 'Not found.');
+  return new Response(object.body, {
+    headers: {
+      'content-type': ASSET_TYPES[extension(name)] ?? 'application/octet-stream',
+      'cache-control': IMMUTABLE,
+      etag: object.httpEtag,
+      // SVGs are images here, never documents that run script.
+      'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'",
+      'x-content-type-options': 'nosniff',
+    },
+  });
+}
+
+export async function handleProjects(request: Request, env: Env, owner: string, path: string[], user?: Member): Promise<Response> {
   const method = request.method;
 
   if (path.length === 0) {
@@ -195,24 +240,7 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
       if (requested !== null && !REVISION.test(requested)) return error(400, 'Invalid revision.');
       const row = await getRow(env, owner, id);
       if (!row) return error(404, 'No such file.');
-      const version = requested ?? parseVersions(row.files)[name];
-      let object = version ? await env.FILES.get(revisionKey(prefix, name, version)) : null;
-      // Existing projects used mutable keys. Only serve legacy bytes if their etag matches.
-      if (!object) {
-        const legacy = await env.FILES.get(prefix + name);
-        if (legacy && (!version || legacy.etag === version)) object = legacy;
-      }
-      if (!object) return error(404, 'No such revision.');
-      return new Response(object.body, {
-        headers: {
-          'content-type': FILE_TYPES[extension(name)]!,
-          'cache-control': requested ? IMMUTABLE : 'no-store',
-          etag: object.httpEtag,
-          'x-content-type-options': 'nosniff',
-          // HTML may be inspected/downloaded on the app origin without executing design code.
-          ...(extension(name) === 'html' ? { 'content-security-policy': 'sandbox allow-same-origin' } : {}),
-        },
-      });
+      return serveFile(env, prefix, name, requested ?? parseVersions(row.files)[name], requested !== null);
     }
     if (method === 'PUT') {
       const size = Number(request.headers.get('content-length') ?? NaN);
@@ -280,28 +308,16 @@ export async function handleProjects(request: Request, env: Env, owner: string, 
   if (path.length === 2 && path[1] === 'live') {
     if (method !== 'GET' || request.headers.get('upgrade')?.toLowerCase() !== 'websocket') return error(426, 'Expected a WebSocket.');
     if (!(await getRow(env, owner, id))) return error(404, 'No such file.');
-    return room(env, owner, id).fetch(request);
+    const client = new URL(request.url).searchParams.get('client') ?? '';
+    if (!CLIENT_ID.test(client)) return error(400, 'Invalid client.');
+    return room(env, owner, id).fetch(withPeer(request, participantFor(client, { id: owner, name: user?.name, image: user?.image }, 'owner')));
   }
 
   if (path.length === 3 && path[1] === 'assets') {
     const name = path[2]!;
     if (!ASSET_NAME.test(name)) return error(404, 'Not found.');
     const key = `${prefix}assets/${name}`;
-    if (method === 'GET') {
-      const object = await env.FILES.get(key);
-      if (!object) return error(404, 'Not found.');
-      return new Response(object.body, {
-        headers: {
-          'content-type': ASSET_TYPES[extension(name)] ?? 'application/octet-stream',
-          // Asset names are content hashes, so an image never changes under its URL.
-          'cache-control': IMMUTABLE,
-          etag: object.httpEtag,
-          // SVGs are images here, never documents that run script.
-          'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'",
-          'x-content-type-options': 'nosniff',
-        },
-      });
-    }
+    if (method === 'GET') return serveAsset(env, prefix, name);
     if (method === 'PUT') {
       const size = Number(request.headers.get('content-length') ?? NaN);
       if (!Number.isFinite(size)) return error(411, 'Content-Length is required.');

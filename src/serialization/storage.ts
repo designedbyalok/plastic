@@ -8,6 +8,7 @@ import { readProjectJson } from './project.ts';
 import { StorageConflictError } from './conflict.ts';
 import { authClient, detectBackend } from '../auth/client.ts';
 import { PROJECT_FILE_NAME, isPageFile, type ProjectFiles } from './index.ts';
+import type { PresenceMessage } from '../editor/presenceProtocol.ts';
 
 async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
@@ -66,6 +67,20 @@ export interface ProjectStorage {
   save(files: ProjectFiles): Promise<void>;
   /** Called when the files change outside the editor (text editor, git, coding agent). */
   onExternalChange(listener: (files: ProjectFiles) => void): () => void;
+  /** Opened through its shared link by someone else: it is never edited or saved. */
+  readonly readOnly?: boolean;
+  /** Who the file belongs to, when it is someone else's. */
+  readonly ownerName?: string;
+  /** Presence and cursor chat with everyone else in the file (cloud files, while live). */
+  readonly presence?: PresenceLink;
+}
+
+/** The file's live room (see src/editor/presenceProtocol.ts). */
+export interface PresenceLink {
+  /** Sent only while connected; dropped otherwise. */
+  send(message: PresenceMessage): void;
+  /** Room messages, unvalidated, and { t: 'closed' } when the connection drops. */
+  subscribe(listener: (message: unknown) => void): () => void;
 }
 
 export interface Workspace {
@@ -91,6 +106,11 @@ export interface Workspace {
   /** Throws with a readable message (e.g. a username that's taken). */
   updateProfile(profile: { name: string; username: string | null }): Promise<void>;
   open(id: string): ProjectStorage;
+  /**
+   * A file opened through its shared link: the owner's own storage when it's yours, read-only
+   * storage otherwise, or null when the link doesn't open this file.
+   */
+  openShared?(id: string, previewId: string): Promise<ProjectStorage | null>;
   /** URL a project's folder is served from, for its assets/ (null when assets aren't served). */
   assetBase(id: string): string | null;
   /** Convert a Figma .fig file into a new project. Null when this workspace can't import. */
@@ -483,26 +503,27 @@ class CloudWorkspace implements Workspace {
   }
 
   /** One file at a version: from memory, then the browser cache, then the network. */
-  private async text(id: string, name: string, version: string): Promise<string | null> {
-    const key = `${id}/${name}@${version}`;
+  private async text(base: string, name: string, version: string): Promise<string | null> {
+    const key = `${base}/${name}@${version}`;
     const known = this.texts.get(key);
     if (known !== undefined) return known;
-    const response = await fetch(`${this.endpoint(id)}/files/${encodeURIComponent(name)}?v=${encodeURIComponent(version)}`);
+    const response = await fetch(`${base}/files/${encodeURIComponent(name)}?v=${encodeURIComponent(version)}`);
     if (!response.ok) throw new Error(`Could not load ${name}: ${response.status}`);
     const text = await response.text();
     this.texts.set(key, text);
     return text;
   }
 
-  private async files(id: string, versions: Versions, only?: readonly string[]): Promise<ProjectFiles> {
+  /** Files of the project served at `base` (its API endpoint). */
+  private async files(base: string, versions: Versions, only?: readonly string[]): Promise<ProjectFiles> {
     let selected = only;
     if (only === THUMBNAIL_FILES && versions['project.json']) {
-      const metadata = await this.text(id, 'project.json', versions['project.json']);
+      const metadata = await this.text(base, 'project.json', versions['project.json']);
       const page = readProjectJson(metadata ?? '').thumbnail?.page;
       if (page) selected = [...only, page];
     }
     const names = Object.keys(versions).filter((n) => !selected || selected.includes(n));
-    const entries = await Promise.all(names.map(async (n) => [n, await this.text(id, n, versions[n]!)] as const));
+    const entries = await Promise.all(names.map(async (n) => [n, await this.text(base, n, versions[n]!)] as const));
     return Object.fromEntries(entries.filter((e): e is readonly [string, string] => e[1] !== null));
   }
 
@@ -524,7 +545,7 @@ class CloudWorkspace implements Workspace {
           });
           if (!response.ok) throw new Error(`Save failed: ${response.status}`);
           versions[name] = ((await response.json()) as { version: string }).version;
-          this.texts.set(`${id}/${name}@${versions[name]}`, files[name]!);
+          this.texts.set(`${this.endpoint(id)}/${name}@${versions[name]}`, files[name]!);
         }),
       );
     }
@@ -546,7 +567,7 @@ class CloudWorkspace implements Workspace {
       (data.projects ?? []).map(async (p) => ({
         id: p.id,
         updatedAt: Number(p.updatedAt) || 0,
-        files: await this.files(p.id, p.files, THUMBNAIL_FILES),
+        files: await this.files(this.endpoint(p.id), p.files, THUMBNAIL_FILES),
         folderId: p.folderId ?? null,
         archivedAt: p.archivedAt ?? null,
       })),
@@ -660,23 +681,9 @@ class CloudWorkspace implements Workspace {
 
   open(id: string): ProjectStorage {
     const endpoint = this.endpoint(id);
-    /** What the server has (text and versions), so saves send only what changed. */
-    let saved: { files: ProjectFiles; versions: Versions } | null = null;
-    /** This editor, so live sync doesn't echo our own saves back to us. */
-    const client = randomClientId();
-    let socket: WebSocket | null = null;
-    const workspace = this;
-
-    const fetchVersions = async (): Promise<Versions | null> => {
-      const response = await fetch(endpoint);
-      if (!response.ok) return null;
-      const data = (await response.json()) as { files?: Versions | null; owner?: string };
-      return data.files ?? null;
-    };
-
-    return {
+    return this.storage({
       id,
-      location: this.location,
+      endpoint,
       assetBase: this.assetBase(id),
       async shareLink() {
         const response = await fetch(endpoint);
@@ -686,23 +693,80 @@ class CloudWorkspace implements Workspace {
         if (data.previewId) url.searchParams.set('preview', data.previewId);
         return url.href;
       },
+    });
+  }
+
+  async openShared(id: string, previewId: string): Promise<ProjectStorage | null> {
+    if (!/^[a-f0-9]{32}$/.test(previewId)) return null;
+    const endpoint = `/api/shared/${previewId}`;
+    const response = await fetch(endpoint);
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`Could not open the shared file: ${response.status}`);
+    const data = (await response.json()) as { id?: string; owned?: boolean; owner?: { name?: string } };
+    if (data.id !== id) return null;
+    if (data.owned) return this.open(id);
+    const link = new URL(`/file/${encodeURIComponent(id)}`, location.origin);
+    link.searchParams.set('preview', previewId);
+    return this.storage({ id, endpoint, assetBase: `${endpoint}/`, readOnly: true, ownerName: data.owner?.name || undefined, shareLink: async () => link.href });
+  }
+
+  /**
+   * A project served at `endpoint`: GET it for { files: versions }, …/files/<name>?v= for a file,
+   * …/live for its room. Read-only storage never writes; the room still delivers the owner's saves.
+   */
+  private storage(options: { id: string; endpoint: string; assetBase: string; readOnly?: boolean; ownerName?: string; shareLink(): Promise<string> }): ProjectStorage {
+    const { id, endpoint, readOnly = false } = options;
+    /** What the server has (text and versions), so saves send only what changed. */
+    let saved: { files: ProjectFiles; versions: Versions } | null = null;
+    /** This editor, so live sync doesn't echo our own saves back to us. */
+    const client = randomClientId();
+    let socket: WebSocket | null = null;
+    const workspace = this;
+    const presenceListeners = new Set<(message: unknown) => void>();
+    const presence: PresenceLink = {
+      send(message) {
+        if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+      },
+      subscribe(listener) {
+        presenceListeners.add(listener);
+        return () => presenceListeners.delete(listener);
+      },
+    };
+    const emit = (message: unknown) => presenceListeners.forEach((fn) => fn(message));
+
+    const fetchVersions = async (): Promise<Versions | null> => {
+      const response = await fetch(endpoint);
+      if (!response.ok) return null;
+      const data = (await response.json()) as { files?: Versions | null };
+      return data.files ?? null;
+    };
+
+    return {
+      id,
+      location: readOnly ? (options.ownerName ? `${options.ownerName}’s file` : 'Shared with you') : this.location,
+      assetBase: options.assetBase,
+      readOnly,
+      ownerName: options.ownerName,
+      presence,
+      shareLink: options.shareLink,
       // Cloud saves wait for a pause in editing: fewer, larger saves use far fewer requests.
       saveDelayMs: 1500,
       async load() {
         const versions = await fetchVersions();
         if (!versions) return null;
-        const files = await workspace.files(id, versions);
+        const files = await workspace.files(endpoint, versions);
         saved = { files, versions };
         return files;
       },
       async save(files) {
+        if (readOnly) throw new Error('This file is view-only.');
         let versions: Versions;
         try { versions = await workspace.write(id, files, saved, { client, notify: () => socket?.readyState !== WebSocket.OPEN }); }
         catch (error) {
           if (error instanceof Error && error.message === 'Save failed: 409') {
             const latest = await fetchVersions();
             if (latest) {
-              const incoming = await workspace.files(id, latest);
+              const incoming = await workspace.files(endpoint, latest);
               saved = { files: incoming, versions: latest };
               throw new StorageConflictError(incoming);
             }
@@ -729,7 +793,7 @@ class CloudWorkspace implements Workspace {
           const changed = Object.keys(versions).filter((n) => current[n] !== versions[n]);
           const removed = Object.keys(current).filter((n) => !(n in versions));
           if (!changed.length && !removed.length) return;
-          const fresh = await workspace.files(id, versions, changed);
+          const fresh = await workspace.files(endpoint, versions, changed);
           const files: Record<string, string> = {};
           for (const name of Object.keys(versions)) {
             const text = fresh[name] ?? saved?.files[name];
@@ -752,19 +816,22 @@ class CloudWorkspace implements Workspace {
           };
           ws.onmessage = (event) => {
             if (event.data === 'pong') return;
-            let message: { type?: string; files?: Versions };
+            let message: { type?: string; files?: Versions; t?: unknown };
             try {
               message = JSON.parse(String(event.data));
             } catch {
               return;
             }
-            if (message.type !== 'changed' || !message.files) return;
+            if (message && typeof message.t === 'string') return emit(message);
+            if (message?.type !== 'changed' || !message.files) return;
             const versions = Object.fromEntries(Object.entries(message.files).filter(([n, v]) => PROJECT_FILE_NAME.test(n) && typeof v === 'string'));
             queue = queue.then(() => apply(versions)).catch((error) => { caughtUp = false; console.error(error); });
           };
           ws.onclose = () => {
             clearInterval(heartbeat);
-            if (socket === ws) socket = null;
+            if (socket !== ws) return;
+            socket = null;
+            emit({ t: 'closed' });
             caughtUp = false;
             if (stopped || document.visibilityState === 'hidden') return;
             retry = setTimeout(connect, Math.min(30_000, 1000 * 2 ** attempts++));

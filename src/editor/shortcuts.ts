@@ -7,6 +7,7 @@ import {
 import { navigate } from '../app/router.ts';
 import { saveNow } from './persistence.ts';
 import { useEditor } from './store.ts';
+import { openCursorChat } from './presence.ts';
 import { exitVectorEdit, readPath, screenDeltaToUser, writePath } from '../vector/edit.ts';
 import { deleteAnchors, moveRefs } from '../vector/path.ts';
 import { runOutlineStroke, runPathOp } from '../vector/pathOps.ts';
@@ -241,6 +242,9 @@ export function useShortcuts(enabled = true): void {
           break;
         case '.':
           toggleUi();
+          break;
+        case '/':
+          openCursorChat();
           break;
         default: {
           if (e.shiftKey) return;

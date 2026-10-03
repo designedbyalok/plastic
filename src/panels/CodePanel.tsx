@@ -51,6 +51,7 @@ function applyFile(name: string, text: string): string | null {
 export function CodePanel() {
   const doc = useEditor((s) => s.doc);
   const activePage = useEditor((s) => s.activePage);
+  const readOnly = useEditor((s) => s.readOnly);
   const [tab, setTab] = useState<Tab>('page');
   const [clean, setClean] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,17 +122,17 @@ export function CodePanel() {
             <input type="checkbox" checked={clean} onChange={(e) => setClean(e.target.checked)} /> Hide editor ids
           </label>
         )}
-        <button type="button" className="code-copy" onClick={() => void format()} disabled={formatting} title="Format with Prettier">
+        {!readOnly && <button type="button" className="code-copy" onClick={() => void format()} disabled={formatting} title="Format with Prettier">
           <AlignLeft size={12} strokeWidth={1.75} />
           {formatting ? 'Formatting…' : 'Format'}
-        </button>
+        </button>}
         <button type="button" className="code-copy" onClick={copy} title={tab === 'page' && clean ? 'Copy Without Editor IDs' : 'Copy'}>
           <Copy size={12} strokeWidth={1.75} />
           Copy
         </button>
       </div>
       <div className="code-body">
-        <CodeEditor key={fileName} value={text} language={language} hideIds={tab === 'page' && clean} onEdit={onEdit} onBlur={() => flush.current()} handle={(h) => (editor.current = h)} />
+        <CodeEditor key={fileName} readOnly={readOnly} value={text} language={language} hideIds={tab === 'page' && clean} onEdit={onEdit} onBlur={() => flush.current()} handle={(h) => (editor.current = h)} />
       </div>
       {error && (
         <div className="code-error" role="alert">

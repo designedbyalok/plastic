@@ -82,7 +82,7 @@ export function Editor({ projectId }: { projectId: string }) {
   if (status === 'missing') {
     return (
       <div className="missing-file">
-        <p>There is no file called “{projectId}” in this workspace.</p>
+        <p>{new URL(location.href).searchParams.has('preview') ? 'This link doesn’t open a file you can see. Ask its owner for a new link.' : `There is no file called “${projectId}” in this workspace.`}</p>
         <a href="/" onClick={linkClick}>
           Back to Files
         </a>

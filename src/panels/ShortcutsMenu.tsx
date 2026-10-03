@@ -20,6 +20,7 @@ const GROUPS: readonly { title: string; items: readonly [string, readonly string
       ['Input', ['I']],
       ['Labeled Field', ['L']],
       ['Pan', ['Space']],
+      ['Cursor Chat', ['/']],
     ],
   },
   {

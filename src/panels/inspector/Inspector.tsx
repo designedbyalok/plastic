@@ -42,6 +42,7 @@ export function Inspector() {
   const [settingThumbnail, setSettingThumbnail] = useState(false);
   const selection = useEditor((s) => s.selection);
   const doc = useEditor((s) => s.doc);
+  const readOnly = useEditor((s) => s.readOnly);
   // Computed-value placeholders read the live DOM; re-read once after new artboards mount.
   const [, refresh] = useReducer((n: number) => n + 1, 0);
   const rootCount = useEditor((s) => activeRoots(s).length);
@@ -65,11 +66,11 @@ export function Inspector() {
       <ScrollArea className="inspector-scroll" viewportClassName="inspector-content">
       <InspectorHeader />
       {!elements.length ? (
-        <EmptyInspector />
+        <fieldset className="insp-readonly" disabled={readOnly}><EmptyInspector /></fieldset>
       ) : (
         <div key={ids.join(',')}>
           {single ? (
-            <ElementSection el={single} />
+            <fieldset className="insp-readonly" disabled={readOnly}><ElementSection el={single} /></fieldset>
           ) : (
             <section className="insp-section">
               <div className="insp-header">
@@ -80,9 +81,11 @@ export function Inspector() {
           {single && pageOf(doc, single.id) && <div className="frame-share-actions">
             <button type="button" className="insp-chip" onClick={() => void copyFrameLink(single.id)}>Copy Frame Link</button>
             <button type="button" className="insp-chip" onClick={() => void copyFrameContext(single.id)}>Copy AI Context</button>
-            <button type="button" className="insp-chip" disabled={settingThumbnail} aria-pressed={doc.thumbnail?.frame === single.id} onClick={() => { setSettingThumbnail(true); void useAsThumbnail(single.id).finally(() => setSettingThumbnail(false)); }}>{settingThumbnail ? 'Rendering Thumbnail…' : doc.thumbnail?.frame === single.id ? 'Update Thumbnail' : 'Use as Thumbnail'}</button>
-            {doc.thumbnail?.frame === single.id && <button type="button" className="insp-chip" onClick={() => useEditor.getState().apply('Remove file thumbnail', (d) => { const { thumbnail, ...rest } = d; return rest; })}>Remove Thumbnail</button>}
+            {!readOnly && <button type="button" className="insp-chip" disabled={settingThumbnail} aria-pressed={doc.thumbnail?.frame === single.id} onClick={() => { setSettingThumbnail(true); void useAsThumbnail(single.id).finally(() => setSettingThumbnail(false)); }}>{settingThumbnail ? 'Rendering Thumbnail…' : doc.thumbnail?.frame === single.id ? 'Update Thumbnail' : 'Use as Thumbnail'}</button>}
+            {!readOnly && doc.thumbnail?.frame === single.id && <button type="button" className="insp-chip" onClick={() => useEditor.getState().apply('Remove file thumbnail', (d) => { const { thumbnail, ...rest } = d; return rest; })}>Remove Thumbnail</button>}
           </div>}
+          {/* View-only: every value is shown, no control changes it. */}
+          <fieldset className="insp-readonly" disabled={readOnly}>
           {single && <ComponentSection el={single} />}
           {single && <ContentSection el={single} />}
           {single && <BehaviorSection el={single} />}
@@ -107,6 +110,7 @@ export function Inspector() {
           {single && <VariantsSection key={single.id} el={single} />}
           {single && <SourceSection el={single} />}
           {single && <AttributesSection el={single} />}
+          </fieldset>
         </div>
       )}
       </ScrollArea>
@@ -136,9 +140,13 @@ function InspectorHeader() {
   );
 }
 
-/** Links to this file or its frames. They unfurl with a preview card; only the owner can open the file. */
+/**
+ * Links to this file or its frames. They unfurl with a preview card; anyone signed in to Plastic
+ * can open them view-only and chat on the canvas. Only the owner can edit.
+ */
 function ShareMenu() {
   const [open, setOpen] = useState(false);
+  const readOnly = useEditor((s) => s.readOnly);
   const frame = useEditor((s) => {
     const id = s.selection.at(-1);
     return id && s.doc.nodes[id] ? rootOf(s.doc, id) : null;
@@ -167,7 +175,11 @@ function ShareMenu() {
             <span>Copy frame context for AI</span>
           </Menu.Item>
           <Menu.Separator className="insp-menu-divider" />
-          <p className="insp-share-note">Links show a preview card when shared. Only you can open and edit this file.</p>
+          <p className="insp-share-note">
+            {readOnly
+              ? 'You’re viewing this file. Anyone signed in to Plastic with the link can view it and chat with you on the canvas. Only its owner can edit it.'
+              : 'Anyone signed in to Plastic with a link can view this file, see who’s here and chat on the canvas. Only you can edit it.'}
+          </p>
         </MenuContent>
       )}
     </span></Menu.Root>

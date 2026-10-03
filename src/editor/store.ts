@@ -54,6 +54,8 @@ export interface ApplyOptions {
   readonly coalesce?: string;
   /** Selection after the change. */
   readonly select?: readonly NodeId[];
+  /** The file changed elsewhere (saved by its owner): applies even when read-only, without undo. */
+  readonly remote?: boolean;
 }
 
 export interface EditorState {
@@ -65,6 +67,8 @@ export interface EditorState {
   readonly savedRevision: number;
   readonly saveStatus: SaveStatus;
   readonly storageLocation: string;
+  /** Viewing someone else's file through its shared link: inspect only, nothing is edited or saved. */
+  readonly readOnly: boolean;
   /** Base URL that the project's relative asset paths (assets/…) resolve against, if served. */
   readonly assetBase: string | null;
   /** Canvas-only responsive/state simulation; never saved or exported. */
@@ -127,6 +131,7 @@ export interface EditorState {
   setShortcutsOpen(open: boolean): void;
   setSpacePressed(pressed: boolean): void;
   setSaveState(status: SaveStatus, savedRevision?: number, location?: string): void;
+  setReadOnly(readOnly: boolean): void;
 }
 
 function existing(doc: DesignDocument, ids: readonly NodeId[]): NodeId[] {
@@ -172,6 +177,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
   savedRevision: 0,
   saveStatus: 'idle',
   storageLocation: '',
+  readOnly: false,
   assetBase: null,
   stylePreview: null,
   styleSourceProperty: 'color',
@@ -193,8 +199,9 @@ export const useEditor = create<EditorState>()((set, get) => ({
   spacePressed: false,
 
   apply(label, recipe, options = {}) {
-    const { doc, selection, history, tx, revision } = get();
+    const { doc, selection, history, tx, revision, readOnly } = get();
     if (tx) return; // a gesture owns the document until it commits
+    if (readOnly && !options.remote) return;
     const next = synchronizeComponents(recipe(doc));
     const nextSelection = options.select ? existing(next, options.select) : existing(next, selection);
     if (next === doc) {
@@ -203,7 +210,8 @@ export const useEditor = create<EditorState>()((set, get) => ({
     }
     set({
       doc: next,
-      history: record(history, { doc, selection, label }, options.coalesce ?? null, Date.now()),
+      // A read-only file has no undo: everything in it came from its owner.
+      history: readOnly ? history : record(history, { doc, selection, label }, options.coalesce ?? null, Date.now()),
       selection: nextSelection,
       revision: revision + 1,
       activePage: validPage(next, get().activePage),
@@ -211,7 +219,8 @@ export const useEditor = create<EditorState>()((set, get) => ({
   },
 
   begin() {
-    const { doc, selection } = get();
+    const { doc, selection, readOnly } = get();
+    if (readOnly) return; // gestures without a transaction change nothing
     set({ tx: { base: doc, selection } });
   },
 
@@ -243,7 +252,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
 
   undo() {
     const { history, doc, selection, tx, revision } = get();
-    if (tx) return;
+    if (tx || get().readOnly) return;
     const result = undo(history, { doc, selection, label: '' });
     if (!result) return;
     set({
@@ -258,7 +267,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
 
   redo() {
     const { history, doc, selection, tx, revision } = get();
-    if (tx) return;
+    if (tx || get().readOnly) return;
     const result = redo(history, { doc, selection, label: '' });
     if (!result) return;
     set({
@@ -313,6 +322,7 @@ export const useEditor = create<EditorState>()((set, get) => ({
     if (get().hoverId !== id) set({ hoverId: id });
   },
   setTool(tool) {
+    if (get().readOnly && tool.kind !== 'select' && tool.kind !== 'hand') return;
     set({ tool });
   },
   setRulersVisible(visible) {
@@ -329,9 +339,11 @@ export const useEditor = create<EditorState>()((set, get) => ({
     set({ collapsed: next });
   },
   setEditingText(id) {
+    if (id && get().readOnly) return;
     set({ editingTextId: id });
   },
   setVectorEdit(edit) {
+    if (edit && get().readOnly) return;
     set({ vectorEdit: edit });
   },
   setCodeOpen(open) {
@@ -357,6 +369,9 @@ export const useEditor = create<EditorState>()((set, get) => ({
   },
   setSpacePressed(pressed) {
     if (get().spacePressed !== pressed) set({ spacePressed: pressed });
+  },
+  setReadOnly(readOnly) {
+    set(readOnly ? { readOnly, tool: { kind: 'select' }, editingTextId: null, vectorEdit: null, tx: null } : { readOnly });
   },
   setSaveState(status, savedRevision, location) {
     set((s) => ({

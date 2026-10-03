@@ -9,7 +9,9 @@ import { CanvasMenu, type CanvasMenuAt } from './CanvasMenu.tsx';
 import { canEditText } from '../editor/commands.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
 import { ArtboardHost } from './ArtboardHost.tsx';
-import { zoomAround } from './coords.ts';
+import { screenToWorld, zoomAround } from './coords.ts';
+import { PresenceOverlay } from './PresenceOverlay.tsx';
+import { moveCursor } from '../editor/presence.ts';
 import { nodeIdAt, setHitFilter, setViewportElement, toScreen } from './dom.ts';
 import { insertAt, startFrameDraw, startPan, startSelectGesture } from './gestures.ts';
 import { Rulers } from './Rulers.tsx';
@@ -28,6 +30,8 @@ export function Canvas() {
   const viewport = useEditor((s) => s.viewport);
   const tool = useEditor((s) => s.tool);
   const spacePressed = useEditor((s) => s.spacePressed);
+  const readOnly = useEditor((s) => s.readOnly);
+  const owner = useEditor((s) => s.storageLocation);
   const [menuAt, setMenuAt] = useState<CanvasMenuAt>(null);
   useTextEditing();
 
@@ -114,6 +118,7 @@ export function Canvas() {
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const store = useEditor.getState();
+    moveCursor({ ...screenToWorld(toScreen(e.clientX, e.clientY), store.viewport), page: store.activePage });
     if (store.tool.kind === 'pen' && !e.buttons) {
       // The preview follows the snapped position, with guides, like where a click would land.
       const at = penPoint(e.clientX, e.clientY, true);
@@ -169,6 +174,7 @@ export function Canvas() {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerLeave={() => {
+        moveCursor(null);
         useEditor.getState().setHover(null);
         useGesture.getState().set({ pen: null, guides: [] });
       }}
@@ -181,8 +187,15 @@ export function Canvas() {
       </div>
       <Overlay />
       <AiReadingOverlay />
+      <PresenceOverlay />
+      {readOnly && (
+        <div className="canvas-view-only" role="status">
+          <strong>View only</strong>
+          <span>{owner}. Press <kbd>/</kbd> to chat.</span>
+        </div>
+      )}
       <Rulers />
-      {pageEmpty && (
+      {pageEmpty && !readOnly && (
         <div className="canvas-empty">
           <p>
             Paste a design here, or press <kbd>F</kbd> and drag to draw a frame.

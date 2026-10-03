@@ -3166,3 +3166,35 @@ textarea.insp-input {
 .lp-row-state { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--ui-muted); cursor: pointer; }
 .lp-row-state:hover { color: var(--ui-text); background: rgb(var(--ink) / 0.08); }
 .layer-is-hidden .layer-name, .layer-is-hidden .layer-icon { opacity: 0.45; }
+
+/* Presence: other people's cursors and cursor chat ("/"), over the canvas in screen space. */
+.presence-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 3; }
+.presence-cursor { position: absolute; left: 0; top: 0; will-change: transform; transition: transform 100ms linear; }
+.presence-cursor.is-own { transition: none; }
+.presence-arrow { position: absolute; left: -1px; top: -1px; filter: drop-shadow(0 1px 1px #0000004d); }
+.presence-name, .presence-bubble { position: absolute; left: 14px; top: 16px; width: max-content; color: #fff; background: var(--peer); box-shadow: 0 1px 3px #00000040; }
+.presence-name { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 500; line-height: 16px; white-space: nowrap; }
+.presence-bubble { display: flex; flex-direction: column; gap: 1px; max-width: 260px; padding: 6px 10px; border-radius: 4px 14px 14px 14px; font-size: 13px; line-height: 18px; overflow-wrap: anywhere; }
+.presence-cursor.is-own .presence-bubble { left: 12px; top: 18px; pointer-events: auto; }
+.presence-cursor.is-flipped .presence-name, .presence-cursor.is-flipped .presence-bubble { left: auto; right: 4px; border-radius: 14px 4px 14px 14px; }
+.presence-cursor.is-flipped .presence-name { border-radius: 4px; }
+.presence-bubble-name { font-size: 10px; font-weight: 600; line-height: 13px; opacity: 0.8; }
+.presence-bubble-text { white-space: pre-wrap; }
+.presence-input { min-width: 0; padding: 0; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; }
+.presence-input::placeholder { color: #ffffffb3; }
+.presence-bubble.is-fading { animation: presence-fade 4s ease-in forwards; }
+@keyframes presence-fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .presence-cursor { transition: none; } }
+
+/* Who's in the file, next to your own avatar. */
+.editor-avatar.is-peer { border: 2px solid var(--peer); box-shadow: 0 0 0 2px var(--ui-panel); }
+.editor-avatar.is-peer, .editor-avatar-more { margin-left: -8px; }
+.editor-avatar-more { font-size: 10px; color: var(--ui-muted); box-shadow: 0 0 0 2px var(--ui-panel); }
+
+/* Viewing someone else's file. */
+.canvas-view-only { position: absolute; top: 12px; left: 50%; z-index: 4; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; max-width: calc(100% - 32px); padding: 5px 10px; border-radius: 999px; background: var(--ui-panel); box-shadow: var(--ui-popover-shadow); color: var(--ui-secondary); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.canvas-view-only strong { color: var(--ui-text); font-weight: 600; }
+.canvas-view-only kbd { padding: 0 4px; border-radius: 3px; background: var(--ui-raised); font: inherit; }
+
+/* Read-only files: the inspector shows values; its controls don't change anything. */
+.insp-readonly { margin: 0; padding: 0; border: 0; min-width: 0; }

@@ -63,7 +63,7 @@ export async function serveFilePreview(request: Request, env: Env): Promise<Resp
   return new Response(request.method === 'HEAD' ? null : html, { status: response.status, headers });
 }
 
-/** Public raster only. Project HTML, CSS and assets still require the owner's session. */
+/** Public raster only. Opening the file itself needs a session (see shared.ts). */
 export async function servePreviewImage(request: Request, env: Env, previewId: string): Promise<Response> {
   const notFound = () => new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
   if (request.method !== 'GET' && request.method !== 'HEAD') return new Response(null, { status: 405 });

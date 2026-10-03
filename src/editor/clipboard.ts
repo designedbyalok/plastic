@@ -180,7 +180,7 @@ export function handleCanvasPaste(e: ClipboardEvent, artboardHint?: NodeId): voi
   const mode = nextPasteMode;
   nextPasteMode = 'normal';
   nextPastePoint = null; // a keyboard paste lands in view, not where a menu last opened
-  if (e.defaultPrevented || ownsTextPaste(e) || store.editingTextId || store.agentsOpen || store.tx) return;
+  if (e.defaultPrevented || ownsTextPaste(e) || store.editingTextId || store.agentsOpen || store.tx || store.readOnly) return;
   const html = e.clipboardData?.getData('text/html') ?? '';
   const text = e.clipboardData?.getData('text/plain') ?? '';
   const token = e.clipboardData?.getData(PLASTIC_CLIPBOARD) || tokenIn(html);
@@ -202,6 +202,8 @@ function pastePosition(): Point {
 
 /** Paste from the system clipboard without a paste event (the canvas menu, ⇧⌘R). */
 export async function pasteFromSystemClipboard(mode: PasteMode, at?: Point): Promise<void> {
+  // A read-only file can be copied from, never pasted into.
+  if (useEditor.getState().readOnly) return;
   nextPastePoint = at ?? null;
   let html = '';
   let text = '';

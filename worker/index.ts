@@ -6,7 +6,9 @@
  *   GET  /api/health       → { auth: true, providers: ["email", "github", …] }
  *   *    /api/auth/*       → Better Auth (sign up/in/out, sessions, OAuth callbacks)
  *   *    /api/projects/*   → the signed-in user's files (see projects.ts); …/live is the
- *                             WebSocket for live sync (see live.ts)
+ *                             WebSocket for live sync and presence (see live.ts)
+ *   GET  /api/shared/*     → a file opened read-only through its shared link, by any signed-in
+ *                             person, and its live room (see shared.ts)
  *   *    /api/folders/*, GET /api/activity → folders and profile activity (see library.ts)
  *   POST /api/waitlist     → join the waitlist (public); /api/admin/* → waitlist and invites
  *                             for ADMIN_EMAILS (see waitlist.ts)
@@ -22,6 +24,7 @@ import { scheduledSweep } from './cleanup.ts';
 import { friendlyAuthError, startDueSuspensions } from './suspensions.ts';
 import type { Env } from './env.ts';
 import { handleProjects } from './projects.ts';
+import { handleShared } from './shared.ts';
 import { activity, handleFolders } from './library.ts';
 import { serveSite } from './site.ts';
 import { handleAdmin, joinWaitlist } from './waitlist.ts';
@@ -59,7 +62,7 @@ export default {
       const response = await emailContext.run(context, () => getAuth(env).handler(request));
       return friendlyAuthError(request, response, env);
     }
-    const scoped = ['/api/projects', '/api/folders', '/api/activity', '/api/admin', '/api/profile'].find((p) => url.pathname === p || url.pathname.startsWith(`${p}/`));
+    const scoped = ['/api/projects', '/api/shared', '/api/folders', '/api/activity', '/api/admin', '/api/profile'].find((p) => url.pathname === p || url.pathname.startsWith(`${p}/`));
     if (scoped) {
       if (!env.BETTER_AUTH_SECRET) return json({ error: 'BETTER_AUTH_SECRET is not set.' }, 500);
       const session = await getAuth(env).api.getSession({
@@ -74,13 +77,14 @@ export default {
           return json({ error: 'Cross-origin request.' }, 403);
       }
       const path = url.pathname.split('/').slice(3).filter(Boolean).map(decodeURIComponent);
+      if (scoped === '/api/shared') return handleShared(request, env, session.user, path);
       if (scoped === '/api/folders') return handleFolders(request, env, session.user.id, path);
       if (scoped === '/api/profile')
         return path.join('/') === 'avatar' ? handleAvatarUpload(request, env, session.user.id) : json({ error: 'Not found' }, 404);
       if (scoped === '/api/admin') return emailContext.run(context, () => handleAdmin(request, env, session.user, path));
       if (scoped === '/api/activity')
         return request.method === 'GET' ? activity(env, session.user.id) : json({ error: 'Method not allowed.' }, 405);
-      return handleProjects(request, env, session.user.id, path);
+      return handleProjects(request, env, session.user.id, path, session.user);
     }
     if (url.pathname.startsWith('/api/')) return json({ error: 'Not found' }, 404);
     return env.ASSETS.fetch(request);

@@ -12,6 +12,7 @@ import { ProjectSync } from './projectSync.ts';
 import { finishTextEditing } from '../canvas/textEditing.ts';
 import { captureThumbnail, thumbnailSource } from './thumbnail.ts';
 import { editorMeta, useEditor } from './store.ts';
+import { connectPresence } from './presence.ts';
 
 const AUTOSAVE_MS = 400;
 /** However long the storage waits, a long editing session still saves at least this often. */
@@ -24,6 +25,7 @@ let firstPending = 0;
 let opening = 0;
 
 function schedule(delay = storage?.saveDelayMs ?? AUTOSAVE_MS): void {
+  if (storage?.readOnly) return;
   clearTimeout(timer);
   const now = Date.now();
   if (!firstPending) firstPending = now;
@@ -39,7 +41,7 @@ function schedule(delay = storage?.saveDelayMs ?? AUTOSAVE_MS): void {
 
 /** Before reloading the page (e.g. to update): finish text editing and any gesture, then save. */
 export async function flushForReload(): Promise<void> {
-  if (!sync) return;
+  if (!sync || storage?.readOnly) return;
   finishTextEditing(true);
   if (useEditor.getState().tx) useEditor.getState().commit('Finish edit');
   await saveNow({ requirePersisted: true });
@@ -49,7 +51,7 @@ export async function saveNow({ requirePersisted = false }: { requirePersisted?:
   const state = useEditor.getState();
   const savingStorage = storage;
   const savingSync = sync;
-  if (!sync) return;
+  if (!sync || storage?.readOnly) return;
   if (state.tx || state.editingTextId) {
     if (requirePersisted) throw new Error('Finish editing before reloading.');
     return schedule();
@@ -85,6 +87,8 @@ export interface OpenedProject {
   readonly found: boolean;
   /** Whether a saved viewport was restored (otherwise the caller should frame the artboards). */
   readonly restoredViewport: boolean;
+  /** Opened through its shared link by someone else: view-only. */
+  readonly readOnly: boolean;
   /** Stop syncing. Pending edits are flushed first. */
   stop(): void;
 }
@@ -93,10 +97,14 @@ export interface OpenedProject {
 export async function openProject(id: string): Promise<OpenedProject> {
   const ticket = ++opening;
   const workspace = await connectWorkspace();
-  const project = workspace.open(id);
+  // A shared link (?preview=) opens someone else's file read-only, or your own as usual.
+  const previewId = new URL(location.href).searchParams.get('preview');
+  const project = (previewId && workspace.openShared ? await workspace.openShared(id, previewId) : null) ?? workspace.open(id);
   const files = await project.load();
   await bundledFontsReady;
-  if (!files || ticket !== opening) return { found: false, restoredViewport: false, stop: () => {} };
+  if (!files || ticket !== opening) return { found: false, restoredViewport: false, readOnly: false, stop: () => {} };
+  const readOnly = project.readOnly === true;
+  useEditor.getState().setReadOnly(readOnly);
   const parsedFile = parseProject(files);
   const { meta } = parsedFile;
   const doc = loadInterFont(parsedFile.doc);
@@ -129,7 +137,7 @@ export async function openProject(id: string): Promise<OpenedProject> {
       applying = true;
       try {
         const parsed = parseProject(incoming);
-        useEditor.getState().apply('External change', () => loadInterFont(parsed.doc));
+        useEditor.getState().apply('External change', () => loadInterFont(parsed.doc), { remote: true });
       } finally {
         applying = false;
       }
@@ -141,7 +149,7 @@ export async function openProject(id: string): Promise<OpenedProject> {
   });
   sync = coordinator;
   void updateShareLink().catch(console.error);
-  if (!sameFiles(normalized(files), serializeProject(doc, meta))) {
+  if (!readOnly && !sameFiles(normalized(files), serializeProject(doc, meta))) {
     useEditor.getState().setSaveState('saving', useEditor.getState().revision - 1);
     schedule(0);
   }
@@ -155,6 +163,8 @@ export async function openProject(id: string): Promise<OpenedProject> {
     )
       schedule();
   });
+  // Before the live connection opens, so the room's greeting isn't missed.
+  const offPresence = project.presence ? connectPresence(project.presence) : () => {};
   const offExternal = project.onExternalChange((incoming) => {
     try {
       coordinator.receive(normalized(incoming));
@@ -173,18 +183,20 @@ export async function openProject(id: string): Promise<OpenedProject> {
   const stop = () => {
     unsubscribe();
     offExternal();
+    offPresence();
     document.removeEventListener('visibilitychange', onHide);
     if (sync !== coordinator) return;
     clearTimeout(timer);
     firstPending = 0;
     finishTextEditing(true);
     if (useEditor.getState().tx) useEditor.getState().commit('Finish edit');
-    void coordinator.save().catch(console.error);
+    if (!readOnly) void coordinator.save().catch(console.error);
     coordinator.close();
     sync = null;
     storage = null;
+    useEditor.getState().setReadOnly(false);
   };
-  return { found: true, restoredViewport: !!meta.viewport, stop };
+  return { found: true, restoredViewport: !!meta.viewport, readOnly, stop };
 }
 
 /** Create a project with one empty artboard; resolves with its id. */
@@ -200,7 +212,7 @@ export async function createProject(title = 'Untitled', folderId: string | null 
 
 /** Save the open project as a new file (with its assets); returns the new id. */
 export async function duplicateOpenProject(): Promise<string | null> {
-  if (!storage) return null;
+  if (!storage || storage.readOnly) return null;
   await saveNow();
   const state = useEditor.getState();
   const title = `${state.doc.title || 'Untitled'} copy`;

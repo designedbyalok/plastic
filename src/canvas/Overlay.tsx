@@ -60,8 +60,9 @@ export function Overlay() {
   const editing = useEditor((s) => s.editingTextId);
   const zoom = useEditor((s) => s.viewport.zoom);
   const selection = useEditor((s) => s.selection);
-  const toolIsSelect = useEditor((s) => s.tool.kind === 'select');
+  const toolIsSelect = useEditor((s) => s.tool.kind === 'select' && !s.readOnly);
   const editingVector = useEditor((s) => !!s.vectorEdit);
+  const readOnly = useEditor((s) => s.readOnly);
   const { marquee, draft, ghost, dropLine, dropTarget, notice, guides } = useGesture();
 
   useEffect(() => {
@@ -101,8 +102,8 @@ export function Overlay() {
           className={`artboard-title${selection.includes(t.id) ? ' is-selected' : ''}`}
           style={{ left: t.rect.x, top: t.rect.y - 20, maxWidth: Math.max(40, t.rect.width) }}
           onPointerDown={(e) => onTitleDown(e, t.id)}
-          onDoubleClick={(e) => { e.stopPropagation(); useEditor.getState().select([t.id]); setRenaming(t.id); }}
-          title={`${t.name} — drag to move, double-click to rename`}
+          onDoubleClick={(e) => { e.stopPropagation(); useEditor.getState().select([t.id]); if (!useEditor.getState().readOnly) setRenaming(t.id); }}
+          title={readOnly ? t.name : `${t.name} — drag to move, double-click to rename`}
         >
           {renaming === t.id ? <FrameNameInput id={t.id} name={t.name} done={() => setRenaming(null)} /> : t.name}
         </div>
