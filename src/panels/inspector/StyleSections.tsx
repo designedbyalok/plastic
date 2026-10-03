@@ -22,8 +22,6 @@ import { addFlexOrWrap, setFreePositioning } from '../../editor/commands.ts';
 import { useEditor } from '../../editor/store.ts';
 import { WEB_FONT_OPTIONS, selectFont } from '../../document/fonts.ts';
 import { missingFamily } from '../../app/fonts.ts';
-import { colorWithAlpha, cssGradient, gradientFrom, parseColor, parseCssGradient } from '../../paint/gradient.ts';
-import { GradientEditor } from './GradientEditor.tsx';
 import {
   Checkbox, ColorInput, CssInput, CssSelect, CssSlider, MIXED, Row, Section, Segmented, Select, TextInput, TokenSlot, type Choice,
   clearStyles, computedValue, declaredValue, setStyle, useAnyDeclared, useDeclared,
@@ -400,57 +398,7 @@ function OptionalSection({ ids, title, props, onAdd, aside, children }: Ids & { 
   );
 }
 
-export function FillSection({ ids, textual = false }: Ids & { textual?: boolean }) {
-  return textual ? <TextFillSection ids={ids} /> : <BackgroundFillSection ids={ids} />;
-}
-function TextFillSection({ ids }: Ids) {
-  const background = useAnyDeclared(ids, ['background', 'background-color', 'background-image']);
-  return <>
-    <Section title="Fill"><Row><ColorInput ids={ids} prop="color" /></Row></Section>
-    {background && <BackgroundFillSection ids={ids} title="Background" />}
-  </>;
-}
-function BackgroundFillSection({ ids, title = 'Fill' }: Ids & { title?: string }) {
-  const declared = useDeclared(ids, 'background');
-  const gradient = declared && declared !== MIXED ? parseCssGradient(declared) : null;
-  const image = declared && declared !== MIXED && /url\(/i.test(declared);
-  const computed = computedValue(ids[0], 'background-color');
-  const setType = (type: string) => {
-    if (type === 'solid') {
-      const first = gradient?.stops[0];
-      setStyle(ids, 'background', first ? colorWithAlpha(first.color, first.alpha) : '#ffffff');
-      return;
-    }
-    const base = gradient?.stops[0] ?? parseColor(declared && declared !== MIXED ? declared : computed) ?? { color: '#d9d9d9', alpha: 1 };
-    const next = gradient ? { ...gradient, type: type as 'linear' | 'radial' } : gradientFrom(base.color, base.alpha || 1, type as 'linear' | 'radial');
-    setStyle(ids, 'background', cssGradient(next));
-  };
-  return (
-    <OptionalSection ids={ids} title={title} props={['background', 'background-color', 'background-image']} onAdd={() => setStyle(ids, 'background', '#ffffff')}>
-      {!image && declared !== MIXED && (
-        <Row>
-          <Segmented
-            ariaLabel="Fill type"
-            value={gradient ? gradient.type : 'solid'}
-            choices={[
-              { value: 'solid', label: 'Solid' },
-              { value: 'linear', label: 'Linear' },
-              { value: 'radial', label: 'Radial' },
-            ]}
-            onChange={setType}
-          />
-        </Row>
-      )}
-      {gradient ? (
-        <GradientEditor gradient={gradient} onChange={(g) => setStyle(ids, 'background', cssGradient(g))} />
-      ) : (
-        <Row>
-          <ColorInput ids={ids} prop="background" computedProp="background-color" />
-        </Row>
-      )}
-    </OptionalSection>
-  );
-}
+export { FillSection } from './FillSection.tsx';
 
 const FONT_FAMILIES: readonly { value: string; label: string }[] = [
   { value: 'system-ui, sans-serif', label: 'System Sans-Serif' },

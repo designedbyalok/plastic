@@ -68,6 +68,33 @@ function mount() {
 }
 
 describe('canvas selection in the layers panel', () => {
+  it('nests a dragged frame into a collapsed frame, expands it, and restores the tree on undo', () => {
+    const fixture = docFrom({ tag: 'main', children: [
+      { tag: 'div', className: 'source', children: [{ tag: 'span', children: ['Content'] }] },
+      { tag: 'div', className: 'target', children: [{ tag: 'span', children: ['Existing'] }] },
+    ] });
+    const [source, target] = el(fixture.doc, fixture.root).children;
+    useEditor.getState().load(fixture.doc);
+    useEditor.setState({ layersOpen: true, leftTab: 'design', collapsed: { [target!]: true } });
+    act(() => root.render(createElement(LayersPanel)));
+    const transfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' };
+    const dispatch = (row: Element, type: string, y = 50) => {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientY: y });
+      Object.defineProperty(event, 'dataTransfer', { value: transfer });
+      act(() => row.dispatchEvent(event));
+      return event;
+    };
+    dispatch(container.querySelector(`[data-layer-id="${source}"]`)!, 'dragstart');
+    const targetRow = container.querySelector(`[data-layer-id="${target}"]`)!;
+    expect(dispatch(targetRow, 'dragover').defaultPrevented).toBe(true);
+    expect(targetRow.classList.contains('drop-inside')).toBe(true);
+    dispatch(targetRow, 'drop');
+    expect(el(useEditor.getState().doc, target).children).toContain(source);
+    expect(useEditor.getState().selection).toEqual([source]);
+    expect(useEditor.getState().collapsed[target!]).toBeUndefined();
+    act(() => useEditor.getState().undo());
+    expect(useEditor.getState().doc).toEqual(fixture.doc);
+  });
   it('expands ancestors, marks the selected row and smoothly reveals it without moving keyboard focus', () => {
     const fixture = mount();
     const input = container.querySelector<HTMLInputElement>('.file-title')!;
@@ -151,7 +178,7 @@ it('creates a white rectangle with its drawn height and no carried-over border o
   const made = instantiate(old, spec);
   act(() => useEditor.getState().apply('Add Rectangle', () => setFrame(insertRoot(made.doc, 'index.html', 1, made.id), made.id, { x: 200, y: 0 }), { select: [made.id] }));
   flushFrames();
-  expect(container.querySelector<HTMLInputElement>('[aria-label="background"]')?.value).toBe('#ffffff');
+  expect(container.querySelector<HTMLInputElement>('[aria-label="Fill Color"]')?.value).toBe('FFFFFF');
   expect(container.querySelector<HTMLInputElement>('[aria-label="height"]')?.value).toBe('160');
   expect(container.querySelector('[aria-label="border"]')).toBeNull();
   expect(container.querySelector('[aria-label="box-shadow"]')).toBeNull();

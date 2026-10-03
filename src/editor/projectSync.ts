@@ -57,6 +57,18 @@ export class ProjectSync {
     this.closed = true;
   }
 
+  /** A reload barrier: conflicts must be merged and written, not just scheduled for later. */
+  async flush(): Promise<void> {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (this.closed || this.callbacks.read().busy) throw new Error('Finish editing before reloading.');
+      await this.save();
+      // save() returns the write job; its queue also finishes draining incoming changes.
+      await this.queue;
+      if (!this.closed && !this.incoming && !this.callbacks.read().busy && sameFiles(this.callbacks.read().files, this.baseline)) return;
+    }
+    throw new Error('The file is still changing. Try updating again in a moment.');
+  }
+
   /** Capture before queuing: navigation must flush this project's snapshot, never the next one. */
   save(): Promise<void> {
     if (this.closed) return this.queue;

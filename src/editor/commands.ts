@@ -5,9 +5,11 @@
 import { enterVectorEdit, vectorTargetFor } from '../vector/edit.ts';
 import { fitRect, screenToWorld, unionRects, zoomAround, type Rect, type Viewport } from '../canvas/coords.ts';
 import { domElement, getViewportElement, hostOf, isOutOfFlow, screenRectOf, styleOf } from '../canvas/dom.ts';
+import { containerAt, flowInsertion, insertsInFlow } from '../canvas/layout.ts';
+import { canMoveLayers, moveLayers, type LayerPlacement } from '../document/layerMove.ts';
 import { instantiate } from '../document/factory.ts';
-import { duplicateNodes, insertRoot, removeNodes, setFrame, setStyleOnNodes, stripPosition, wrapInStack } from '../document/ops.ts';
-import { getElement, getParentId, hasOnlyTextChildren, isRoot, topmostIds } from '../document/tree.ts';
+import { detachClass, duplicateNodes, insertChild, insertRoot, removeNodes, setFrame, setStyleOnNodes, stripPosition, wrapInStack } from '../document/ops.ts';
+import { getElement, getParentId, hasOnlyTextChildren, isRoot, nodesWithClass, topmostIds } from '../document/tree.ts';
 import type { DesignDocument, NodeId } from '../document/types.ts';
 import { frameSpec } from '../elements/insertables.ts';
 import { elementSpec } from '../elements/registry.ts';
@@ -201,13 +203,85 @@ export function enterSelection(): void {
 }
 
 export function createFrame(rect: Rect): void {
+  const { doc, selection, viewport } = state();
+  const origin = getViewportElement()?.getBoundingClientRect();
+  const clientX = rect.x * viewport.zoom + viewport.x + (origin?.left ?? 0);
+  const clientY = rect.y * viewport.zoom + viewport.y + (origin?.top ?? 0);
+  const selected = selection.length === 1 ? getElement(doc, selection[0]) : undefined;
+  const parent = selected && elementSpec(selected.tag).acceptsChildren
+    ? selected : containerAt(doc, clientX, clientY);
+  const parentEl = domElement(parent?.id);
+  const bounds = parent ? screenRectOf(parent.id) : null;
+  const flow = parent ? insertsInFlow(doc, parent) : false;
+  const index = parent && flow ? flowInsertion(doc, parent, new Set(), clientX, clientY)?.index : undefined;
+  // World coordinates are converted to the parent's padding box, including its scroll offset.
+  const parentWorld = bounds ? screenToWorld(bounds, viewport) : doc.frames[parent?.id ?? ''];
+  const left = rect.x - (parentWorld?.x ?? rect.x) - (parentEl?.clientLeft ?? 0) + (parentEl?.scrollLeft ?? 0);
+  const top = rect.y - (parentWorld?.y ?? rect.y) - (parentEl?.clientTop ?? 0) + (parentEl?.scrollTop ?? 0);
   let id: NodeId = '';
-  state().apply('Add frame', (d) => {
-    const made = instantiate(d, frameSpec(rect.width, rect.height));
+  state().apply('Add Frame', (d) => {
+    const spec = frameSpec(rect.width, rect.height);
+    const made = instantiate(d, { ...spec, style: { ...spec.style, height: px(rect.height),
+      ...(parent && !flow ? { position: 'absolute', left: px(left), top: px(top) } : {}),
+      ...(flow ? { 'flex-shrink': '0' } : {}),
+    } });
     id = made.id;
+    if (parent) {
+      let next = insertChild(made.doc, parent.id, index ?? parent.children.length, made.id);
+      if (!flow && parentEl && styleOf(parentEl).position === 'static') next = setStyleOnNodes(next, [parent.id], 'position', 'relative');
+      return next;
+    }
     return setFrame(insertRoot(made.doc, state().activePage, Number.MAX_SAFE_INTEGER, made.id), made.id, { x: rect.x, y: rect.y });
   });
   state().select([id]);
+}
+
+/** Layer-panel moves use the browser's layout, then commit structure and positioning together. */
+export function moveLayersTo(ids: readonly NodeId[], target: NodeId, placement: LayerPlacement): void {
+  const { doc, viewport } = state();
+  if (!canMoveLayers(doc, ids, target, placement)) return;
+  const moving = topmostIds(doc, ids);
+  const parentId = placement === 'inside' ? target : getParentId(doc, target);
+  const parent = getElement(doc, parentId);
+  const parentEl = domElement(parentId);
+  const bounds = parentId ? screenRectOf(parentId) : null;
+  const flow = parent ? insertsInFlow(doc, parent) : false;
+  const rects = new Map(moving.map(id => [id, screenRectOf(id)]));
+  state().apply('Move Layers', d => {
+    let next = moveLayers(d, moving, target, placement);
+    for (const id of moving) {
+      if (getParentId(d, id) === parentId) continue; // Reordering preserves intentional absolute positioning.
+      const rect = rects.get(id);
+      if (!parentId) {
+        if (rect) next = setFrame(next, id, screenToWorld(rect, viewport));
+        next = setLayerPosition(next, id, { position: 'relative' });
+      } else if (flow) {
+        next = setLayerPosition(next, id, { position: 'relative' });
+      } else if (rect && bounds) {
+        next = setLayerPosition(next, id, { position: 'absolute',
+          left: px((rect.x - bounds.x) / viewport.zoom - (parentEl?.clientLeft ?? 0) + (parentEl?.scrollLeft ?? 0)),
+          top: px((rect.y - bounds.y) / viewport.zoom - (parentEl?.clientTop ?? 0) + (parentEl?.scrollTop ?? 0)),
+        });
+      }
+    }
+    if (parentId && !flow && parentEl && styleOf(parentEl).position === 'static') next = setStyleOnNodes(next, [parentId], 'position', 'relative');
+    return next;
+  }, { select: moving });
+  if (parentId) state().setCollapsed(parentId, false);
+}
+
+function setLayerPosition(doc: DesignDocument, id: NodeId, values: Record<string, string>): DesignDocument {
+  const primary = getElement(doc, id)?.classes[0];
+  let next = primary && nodesWithClass(doc, primary).length > 1 ? detachClass(doc, id) : doc;
+  // Remove shorthands rather than adding them after left/top (which would override those offsets).
+  for (const prop of ['inset', 'inset-inline', 'inset-block', 'inset-inline-start', 'inset-inline-end', 'inset-block-start', 'inset-block-end']) {
+    next = setStyleOnNodes(next, [id], prop, null);
+  }
+  for (const prop of ['left', 'right', 'top', 'bottom']) {
+    next = setStyleOnNodes(next, [id], prop, 'auto');
+  }
+  for (const [prop, value] of Object.entries(values)) next = setStyleOnNodes(next, [id], prop, value);
+  return next;
 }
 
 // --- viewport -------------------------------------------------------------------------------

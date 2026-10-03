@@ -32,6 +32,7 @@ function dismissed(): string | null {
 export function UpdatePrompt() {
   const [available, setAvailable] = useState<string | null>(null);
   const [reloading, setReloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (__PLASTIC_BUILD__ === 'dev') return;
@@ -56,12 +57,16 @@ export function UpdatePrompt() {
 
   const update = async () => {
     setReloading(true);
+    setError(null);
     // Save the open file first, so updating never loses an edit.
     try {
       const { flushForReload } = await import('../editor/persistence.ts');
       await flushForReload();
     } catch (error) {
       console.error(error);
+      setError('Couldn’t save your changes. Please check your connection and try again.');
+      setReloading(false);
+      return;
     }
     location.reload();
   };
@@ -84,6 +89,7 @@ export function UpdatePrompt() {
         Update available
       </p>
       <p className="update-body">A new version of Plastic is ready. Reload to apply the update.</p>
+      {error && <p className="update-body" role="alert">{error}</p>}
       <div className="update-actions">
         <button type="button" className="update-primary" onClick={() => void update()} disabled={reloading}>
           {reloading ? 'Saving and reloading…' : 'Refresh to update'}

@@ -6,12 +6,13 @@ import { ancestorIds, elementChildren, getElement } from '../document/tree.ts';
 import type { NodeId, Page } from '../document/types.ts';
 import { kindLabel, layerName } from '../elements/registry.ts';
 import { activeRoots, useEditor } from '../editor/store.ts';
-import { zoomToLayer } from '../editor/commands.ts';
+import { moveLayersTo, zoomToLayer } from '../editor/commands.ts';
 import { iconFor } from './icons.tsx';
 import { ThemePanel } from './ThemePanel.tsx';
 import { PanelResizer } from './PanelResizer.tsx';
 import { FileMenu } from './FileMenu.tsx';
-import { canMoveLayers, moveLayers, type LayerPlacement } from '../document/layerMove.ts';
+import { canMoveLayers, type LayerPlacement } from '../document/layerMove.ts';
+import { elementSpec } from '../elements/registry.ts';
 import { ScrollArea } from './ui/ScrollArea.tsx';
 
 export function LayersPanel() {
@@ -256,6 +257,10 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
   const Icon = iconFor(el, isFlex ? (rule?.['flex-direction'] ?? 'row') : undefined);
   const name = layerName(doc, id);
   const kind = kindLabel(el);
+  const placementAt = (fraction: number): LayerPlacement => {
+    if (!elementSpec(el.tag).acceptsChildren) return fraction < .5 ? 'before' : 'after';
+    return fraction < .2 ? 'before' : fraction > .8 ? 'after' : 'inside';
+  };
 
   return (
     <>
@@ -273,7 +278,7 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
           if (!draggedLayers.length) return;
           const bounds = e.currentTarget.getBoundingClientRect();
           const fraction = (e.clientY - bounds.top) / bounds.height;
-          const placement = fraction < .25 ? 'before' : fraction > .75 ? 'after' : 'inside';
+          const placement = placementAt(fraction);
           if (!canMoveLayers(store().doc, draggedLayers, id, placement)) {
             setDrop(null);
             clearTimeout(expandTimer.current);
@@ -302,10 +307,10 @@ function LayerRow({ id, depth }: { id: NodeId; depth: number }) {
           clearTimeout(expandTimer.current);
           const bounds = e.currentTarget.getBoundingClientRect();
           const fraction = (e.clientY - bounds.top) / bounds.height;
-          const placement = fraction < .25 ? 'before' : fraction > .75 ? 'after' : 'inside';
+          const placement = placementAt(fraction);
           if (draggedLayers.length && canMoveLayers(store().doc, draggedLayers, id, placement)) {
             const ids = draggedLayers;
-            store().apply('Move Layers', (doc) => moveLayers(doc, ids, id, placement), { select: ids });
+            moveLayersTo(ids, id, placement);
             if (placement === 'inside') store().setCollapsed(id, false);
           }
           draggedLayers = []; setDrop(null);

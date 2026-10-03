@@ -109,6 +109,9 @@ export async function acceptsMail(domain: string): Promise<boolean | null> {
     });
     if (!response.ok) return null;
     const answer = (await response.json()) as { Status: number; Answer?: { type: number; data: string }[] };
+    // SERVFAIL, REFUSED and malformed answers are inconclusive, not proof of a dead domain.
+    // Do not cache them: the next attempt must be able to recover immediately.
+    if (answer.Status !== 0 && answer.Status !== 3) return null;
     // NXDOMAIN, or no MX records, or a "null MX" (RFC 7505: this domain takes no mail).
     const exchanges = (answer.Answer ?? []).filter((record) => record.type === 15).map((record) => record.data.trim());
     ok = answer.Status === 0 && exchanges.some((data) => !/^0\s+\.?$/.test(data));

@@ -37,6 +37,25 @@ function harness(save = vi.fn(async () => {})) {
 }
 
 describe('project synchronization', () => {
+  it('flushes the merged changes before resolving after a save conflict', async () => {
+    const save = vi.fn()
+      .mockRejectedValueOnce(new StorageConflictError({ 'index.html': 'base', 'styles.css': 'agent-css' }))
+      .mockResolvedValue(undefined);
+    const h = harness(save);
+    h.set({ files: { 'index.html': 'local', 'styles.css': 'base-css' }, revision: 1 });
+    await h.sync.flush();
+    expect(save).toHaveBeenLastCalledWith({ 'index.html': 'local', 'styles.css': 'agent-css' });
+    expect(h.state().files).toEqual(save.mock.calls.at(-1)![0]);
+  });
+
+  it('rejects a reload flush when saving fails or conflicts keep occurring', async () => {
+    const offline = harness(vi.fn().mockRejectedValue(new Error('offline')));
+    offline.set({ files: { 'index.html': 'local' } });
+    await expect(offline.sync.flush()).rejects.toThrow('offline');
+    const conflict = harness(vi.fn().mockRejectedValue(new StorageConflictError({ 'index.html': 'incoming' })));
+    conflict.set({ files: { 'index.html': 'local' } });
+    await expect(conflict.sync.flush()).rejects.toThrow('still changing');
+  });
   it('merges independent files including additions and deletions', () => {
     expect(mergeProjectFiles({ a: '1', b: '1' }, { a: '2', b: '1', c: '3' }, { a: '1' })).toEqual({
       files: { a: '2', c: '3' },

@@ -3094,3 +3094,58 @@ textarea.insp-input {
   opacity: 0.6;
   cursor: default;
 }
+
+/* Compact paint controls share the inspector's surfaces and spacing. */
+.paint-type-row { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.paint-types { display: inline-flex; padding: 2px; gap: 1px; border-radius: 6px; background: var(--ui-control); box-shadow: var(--ui-control-shadow); }
+.paint-types button { display: grid; place-items: center; width: 27px; height: 21px; border: 0; border-radius: 4px; color: var(--ui-muted); background: transparent; cursor: pointer; }
+.paint-types button:hover { color: var(--ui-text); background: var(--ui-hover); }
+.paint-types button[aria-checked="true"] { color: var(--ui-text); background: var(--ui-hover); box-shadow: inset 0 0 0 1px var(--ui-line); }
+.paint-types button:focus-visible, .paint-swatch:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.paint-color-row { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.paint-color-field { display: flex; align-items: center; flex: 1; min-width: 0; height: 24px; padding: 0 4px; border-radius: 6px; background: var(--ui-control); box-shadow: var(--ui-control-shadow); }
+.paint-color-field > .insp-field { flex: 1; min-width: 0; }
+.paint-color-field > .insp-field:last-child { flex: 0 0 54px; }
+.paint-color-field .insp-input { padding: 0 5px; background: transparent; box-shadow: none; font-size: 11px; }
+.paint-color-field .insp-input.has-suffix { padding-right: 15px; text-align: right; }
+.paint-swatch { flex: 0 0 14px; width: 14px; height: 14px; padding: 0; border: 1px solid rgb(var(--ink) / 0.2); border-radius: 3px; overflow: hidden; cursor: pointer; }
+.paint-swatch span { display: block; width: 100%; height: 100%; }
+.checkerboard { background-color: #ddd; background-image: repeating-conic-gradient(#bbb 0% 25%, transparent 0% 50%); background-size: 8px 8px; }
+.paint-picker { z-index: 1000; width: min(442px, calc(100vw - 24px)); padding: 12px; border: 1px solid var(--ui-line); border-radius: 10px; background: var(--ui-panel); color: var(--ui-text); box-shadow: 0 12px 40px rgb(0 0 0 / 0.28); font-size: 11px; }
+.paint-picker-head { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.paint-picker-head > span { flex: 1; }
+.paint-picker-body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.paint-picker .react-colorful { width: 100%; height: 226px; gap: 10px; }
+.paint-picker .react-colorful__saturation { border: 0; border-radius: 4px; }
+.paint-picker .react-colorful__hue, .paint-picker .react-colorful__alpha { height: 12px; border-radius: 3px; flex: 0 0 12px; }
+.paint-picker .react-colorful__pointer { width: 12px; height: 12px; border-width: 2px; box-shadow: 0 0 0 1px #0004; }
+.paint-picker .react-colorful__hue-pointer, .paint-picker .react-colorful__alpha-pointer { width: 6px; height: 16px; border-radius: 2px; }
+.paint-picker-values { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.paint-compare { display: flex; height: 44px; overflow: hidden; border-radius: 4px; }
+.paint-compare > * { flex: 1; border: 0; padding: 0; }
+.paint-compare button { cursor: pointer; }
+.paint-compare-labels { display: flex; color: var(--ui-muted); font-size: 10px; margin-top: -3px; }
+.paint-compare-labels span { flex: 1; text-align: center; }
+.paint-channel-row { display: flex; gap: 3px; }
+.paint-channel-row label { min-width: 0; flex: 1; text-align: center; }
+.paint-channel-row .insp-input { text-align: center; }
+.paint-channel-row label > span { display: block; margin-top: 2px; color: var(--ui-muted); font-size: 9px; }
+.paint-picker-hex { display: flex; gap: 4px; margin-top: auto; }
+.paint-picker-hex > :first-child { flex: 1; min-width: 0; }
+.paint-picker-hex > :last-child { width: 56px; }
+.grad-color-row { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.grad-color-row.is-selected .paint-swatch { box-shadow: 0 0 0 1px var(--ui-accent); }
+.grad .grad-bar { height: 18px; margin: 5px 8px 10px; }
+.grad .grad-stop { top: 100%; margin-top: -3px; width: 12px; height: 14px; margin-left: -6px; border-radius: 3px 3px 2px 2px; }
+.paint-image { display: flex; flex-direction: column; gap: 8px; }
+.paint-image-preview { position: relative; width: 100%; height: 112px; display: grid; place-items: center; overflow: hidden; padding: 0; border: 1px solid var(--ui-line); border-radius: 6px; color: var(--ui-muted); cursor: pointer; }
+.paint-image-preview > span:first-child:not(.paint-image-caption) { position: absolute; inset: 0; }
+.paint-image-caption { position: absolute; bottom: 6px; padding: 4px 7px; border-radius: 4px; color: var(--ui-text); background: var(--ui-panel); box-shadow: 0 1px 5px #0003; font-size: 10px; }
+@media (max-width: 480px) { .paint-picker-body { grid-template-columns: 1fr; } .paint-picker .react-colorful { height: 180px; } }
+.insp-body > .paint-type-row, .insp-body > .grad, .insp-body > .paint-image { margin-inline: 12px; }
+.insp-body > .insp-token-slot:has(.paint-color-row) { margin-inline: 12px; width: calc(100% - 24px); }
+.grad .insp-row, .paint-image .insp-row { padding: 0; min-height: 24px; }
+.insp-body > .paint-type-row { margin-bottom: 8px; }
+.insp-token-slot:has(> .paint-color-row) { gap: 6px; }
+.insp-token-slot > .paint-color-row { flex: 1; width: 0; }
+.insp-token-slot:has(> .paint-color-row) > .insp-token-button { position: static; flex: none; width: 20px; height: 24px; background: transparent; opacity: 1; }

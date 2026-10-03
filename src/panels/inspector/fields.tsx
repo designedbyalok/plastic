@@ -276,7 +276,7 @@ function roundPx(value: string): string {
   return value.replace(/(-?\d+\.\d+)px/g, (_, n: string) => `${Math.round(parseFloat(n) * 10) / 10}px`);
 }
 
-export function CssSelect({ ids, prop, label, options }: { ids: readonly NodeId[]; prop: string; label: string; options: readonly string[] }) {
+export function CssSelect({ ids, prop, label, options }: { ids: readonly NodeId[]; prop: string; label: string; options: readonly (string | { value: string; label: string })[] }) {
   const declared = useDeclared(ids, prop);
   return (
     <Select

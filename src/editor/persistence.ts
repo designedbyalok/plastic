@@ -41,15 +41,18 @@ export async function flushForReload(): Promise<void> {
   if (!sync) return;
   finishTextEditing(true);
   if (useEditor.getState().tx) useEditor.getState().commit('Finish edit');
-  await saveNow();
+  await saveNow({ requirePersisted: true });
 }
 
-export async function saveNow(): Promise<void> {
+export async function saveNow({ requirePersisted = false }: { requirePersisted?: boolean } = {}): Promise<void> {
   const state = useEditor.getState();
   const savingStorage = storage;
   const savingSync = sync;
   if (!sync) return;
-  if (state.tx || state.editingTextId) return schedule();
+  if (state.tx || state.editingTextId) {
+    if (requirePersisted) throw new Error('Finish editing before reloading.');
+    return schedule();
+  }
   try {
     if (state.doc.thumbnail && state.doc.nodes[state.doc.thumbnail.frame]) {
       const { frame } = state.doc.thumbnail;
@@ -67,8 +70,12 @@ export async function saveNow(): Promise<void> {
         } catch (error) { console.error('Could not refresh the file thumbnail', error); }
       }
     }
-    if (sync === savingSync) await savingSync?.save();
+    if (sync === savingSync) {
+      if (requirePersisted) await savingSync!.flush();
+      else await savingSync?.save();
+    } else if (requirePersisted) throw new Error('The open file changed. Try updating again.');
   } catch (error) {
+    if (requirePersisted) throw error;
     console.error(error);
   }
 }

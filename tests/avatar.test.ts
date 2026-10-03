@@ -11,13 +11,22 @@ const WEBP = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x4
 function harness() {
   const objects = new Map<string, Uint8Array>();
   const updates: unknown[][] = [];
+  let image: string | null = null;
   const env = {
-    DB: { prepare: () => ({ bind: (...args: unknown[]) => ({ run: async () => (updates.push(args), { meta: { changes: 1 } }) }) }) },
+    DB: { prepare: () => ({ bind: (...args: unknown[]) => ({
+      first: async () => ({ image }),
+      run: async () => {
+        if (args[3] !== image) return { meta: { changes: 0 } };
+        image = args[0] as string | null;
+        updates.push(args);
+        return { meta: { changes: 1 } };
+      },
+    }) }) },
     FILES: {
       put: vi.fn(async (key: string, bytes: Uint8Array) => void objects.set(key, bytes)),
       get: async (key: string) => (objects.has(key) ? { body: objects.get(key) } : null),
       list: async ({ prefix }: { prefix: string }) => ({ objects: [...objects.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })) }),
-      delete: async (keys: string[]) => keys.forEach((k) => objects.delete(k)),
+      delete: vi.fn(async (keys: string | string[]) => (Array.isArray(keys) ? keys : [keys]).forEach((k) => objects.delete(k))),
     },
   };
   const upload = (bytes: Uint8Array | string, method = 'PUT') =>
@@ -36,11 +45,70 @@ describe('profile photos', () => {
   it('stores a real image by its hash, points the account at it, and keeps only the latest', async () => {
     const h = harness();
     const first = await (await h.upload(PNG)).json();
-    expect(first.image).toMatch(/^\/api\/avatars\/user1\/[a-f0-9]{64}\.png$/);
+    expect(first.image).toMatch(/^\/api\/avatars\/user1\/[a-f0-9]{64}-[a-f0-9]{32}\.png$/);
     const second = await (await h.upload(WEBP)).json();
     expect(second.image).toMatch(/\.webp$/);
     expect([...h.objects.keys()]).toEqual([`users/user1/avatar/${second.image.split('/').pop()}`]);
     expect(h.updates.at(-1)![0]).toBe(second.image);
+  });
+
+  it('keeps the winning image through overlapping uploads of the same photo', async () => {
+    const h = harness();
+    await h.upload(PNG);
+    let release!: () => void;
+    let started!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    const deleting = new Promise<void>((resolve) => { started = resolve; });
+    h.env.FILES.delete.mockImplementationOnce(async (keys) => {
+      started();
+      await paused;
+      (Array.isArray(keys) ? keys : [keys]).forEach((k) => h.objects.delete(k));
+    });
+    const first = h.upload(WEBP);
+    await deleting;
+    const winner = await (await h.upload(PNG)).json();
+    release();
+    await first;
+    expect(h.updates.at(-1)![0]).toBe(winner.image);
+    expect([...h.objects.keys()]).toEqual([`users/user1/avatar/${winner.image.split('/').pop()}`]);
+  });
+
+  it('retries atomic updates when two uploads read the same previous photo', async () => {
+    const h = harness();
+    await Promise.all([h.upload(PNG), h.upload(WEBP)]);
+    const image = h.updates.at(-1)![0] as string;
+    expect(h.updates).toHaveLength(2);
+    expect([...h.objects.keys()]).toEqual([`users/user1/avatar/${image.split('/').pop()}`]);
+  });
+
+  it('continues serving photos stored under existing hash-only URLs', async () => {
+    const h = harness();
+    const file = `${'a'.repeat(64)}.png`;
+    h.objects.set(`users/user1/avatar/${file}`, PNG);
+    const response = await serveAvatar(new Request(`https://plastic.test/api/avatars/user1/${file}`), h.env, 'user1', file);
+    expect(response.status).toBe(200);
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(PNG);
+  });
+
+  it('does not delete a new upload while a removal is finishing', async () => {
+    const h = harness();
+    await h.upload(PNG);
+    let release!: () => void;
+    let started!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    const deleting = new Promise<void>((resolve) => { started = resolve; });
+    h.env.FILES.delete.mockImplementationOnce(async (keys) => {
+      started();
+      await paused;
+      (Array.isArray(keys) ? keys : [keys]).forEach((k) => h.objects.delete(k));
+    });
+    const removal = h.upload('', 'DELETE');
+    await deleting;
+    const winner = await (await h.upload(PNG)).json();
+    release();
+    await removal;
+    expect(h.updates.at(-1)![0]).toBe(winner.image);
+    expect(h.objects.has(`users/user1/avatar/${winner.image.split('/').pop()}`)).toBe(true);
   });
 
   it('refuses anything that is not a raster image, whatever it claims to be', async () => {

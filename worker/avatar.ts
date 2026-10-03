@@ -4,10 +4,10 @@
  *
  *   PUT    /api/profile/avatar               signed in   raw image (WebP, PNG or JPEG, ≤ 300 KB) → { image }
  *   DELETE /api/profile/avatar               signed in   remove the photo → { image: null }
- *   GET    /api/avatars/<user>/<hash>.<ext>  public      the image (content-addressed: cached forever)
+ *   GET    /api/avatars/<user>/<hash>-<upload>.<ext>  public  immutable image (cached forever)
  *
- * Only real raster images are accepted (checked by their first bytes, never SVG), and replacing
- * a photo deletes the old one, so each person keeps at most one in R2.
+ * Only real raster images are accepted (checked by their first bytes, never SVG). Each upload
+ * has a unique immutable key; an atomic account update retires only the photo it replaced.
  */
 import type { Env } from './env.ts';
 
@@ -15,7 +15,8 @@ const MAX_BYTES = 300 * 1024;
 const TYPES = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg' } as const;
 type Extension = keyof typeof TYPES;
 const prefixOf = (user: string) => `users/${user}/avatar/`;
-const FILE = /^[a-f0-9]{64}\.(webp|png|jpg)$/;
+// Existing hash-only URLs remain readable.
+const FILE = /^[a-f0-9]{64}(?:-[a-f0-9]{32})?\.(webp|png|jpg)$/;
 const USER = /^[A-Za-z0-9_-]{1,64}$/;
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -29,16 +30,30 @@ function sniff(bytes: Uint8Array): Extension | null {
   return null;
 }
 
-async function removeOthers(env: Env, user: string, keep: string | null): Promise<void> {
-  const listed = await env.FILES.list({ prefix: prefixOf(user) });
-  const stale = listed.objects.map((o) => o.key).filter((key) => key !== keep);
-  if (stale.length) await env.FILES.delete(stale);
+/** Compare-and-swap protects uploads/removals made from different tabs or Worker isolates. */
+async function replacePhoto(env: Env, user: string, image: string | null): Promise<boolean> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const previous = await env.DB.prepare('select image from "user" where id = ?').bind(user).first<{ image: string | null }>();
+    if (!previous) return false;
+    const updated = await env.DB.prepare('update "user" set image = ?, updatedAt = ? where id = ? and image is ?')
+      .bind(image, new Date().toISOString(), user, previous.image).run();
+    if (updated.meta.changes !== 1) continue;
+    const prefix = `/api/avatars/${user}/`;
+    const oldFile = previous.image?.startsWith(prefix) ? previous.image.slice(prefix.length) : null;
+    // Never enumerate/delete other uploads. Unique keys cannot become active again after
+    // replacement, even if the same photo is uploaded while this deletion is in flight.
+    if (oldFile && FILE.test(oldFile)) {
+      try { await env.FILES.delete(`${prefixOf(user)}${oldFile}`); }
+      catch { console.error('Could not remove a retired profile photo.'); }
+    }
+    return true;
+  }
+  return false;
 }
 
 export async function handleAvatarUpload(request: Request, env: Env, user: string): Promise<Response> {
   if (request.method === 'DELETE') {
-    await env.DB.prepare('update "user" set image = null, updatedAt = ? where id = ?').bind(new Date().toISOString(), user).run();
-    await removeOthers(env, user, null);
+    if (!await replacePhoto(env, user, null)) return json({ error: 'Your photo changed elsewhere. Try again.' }, 409);
     return json({ image: null });
   }
   if (request.method !== 'PUT') return json({ error: 'Method not allowed.' }, 405);
@@ -51,11 +66,15 @@ export async function handleAvatarUpload(request: Request, env: Env, user: strin
   if (!extension) return json({ error: 'Use a JPEG, PNG or WebP image.' }, 415);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   const hash = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
-  const key = `${prefixOf(user)}${hash}.${extension}`;
+  const file = `${hash}-${crypto.randomUUID().replace(/-/g, '')}.${extension}`;
+  const key = `${prefixOf(user)}${file}`;
   await env.FILES.put(key, bytes, { httpMetadata: { contentType: TYPES[extension] } });
-  const image = `/api/avatars/${user}/${hash}.${extension}`;
-  await env.DB.prepare('update "user" set image = ?, updatedAt = ? where id = ?').bind(image, new Date().toISOString(), user).run();
-  await removeOthers(env, user, key);
+  const image = `/api/avatars/${user}/${file}`;
+  const published = await replacePhoto(env, user, image);
+  if (!published) {
+    await env.FILES.delete(key);
+    return json({ error: 'Your photo changed elsewhere. Try again.' }, 409);
+  }
   return json({ image });
 }
 

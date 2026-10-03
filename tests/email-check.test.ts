@@ -38,6 +38,18 @@ describe('disposable inboxes', () => {
 });
 
 describe('mail domains', () => {
+  it('allows inconclusive DNS responses and retries without caching a refusal', async () => {
+    for (const status of [2, 5, undefined]) {
+      const domain = `dns-failure-${String(status)}.test`;
+      const lookup = vi.fn()
+        .mockResolvedValueOnce(Response.json({ Status: status }))
+        .mockResolvedValueOnce(Response.json({ Status: 0, Answer: [{ type: 15, data: '10 mx.example.test.' }] }));
+      vi.stubGlobal('fetch', lookup);
+      expect(await checkEmail(`ada@${domain}`)).toBeNull();
+      expect(await acceptsMail(domain)).toBe(true);
+      expect(lookup).toHaveBeenCalledTimes(2);
+    }
+  });
   it('needs a real MX record and allows the address when DNS is unreachable', async () => {
     vi.stubGlobal('fetch', dns({ Status: 0, Answer: [{ type: 15, data: '10 mx.acme-one.test.' }] }));
     expect(await acceptsMail('acme-one.test')).toBe(true);
