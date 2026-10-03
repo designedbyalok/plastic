@@ -7,15 +7,41 @@ import type { Env } from '../worker/env.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
-function harness() {
+/**
+ * node:sqlite for Better Auth, plus D1's prepare().bind() API for Plastic's own queries (the
+ * waitlist and invite checks), so one in-memory database serves both like D1 does in production.
+ */
+function d1(database: DatabaseSync) {
+  return new Proxy(database, {
+    get(target, key) {
+      if (key !== 'prepare') return Reflect.get(target, key).bind?.(target) ?? Reflect.get(target, key);
+      return (sql: string) => {
+        const statement = target.prepare(sql);
+        return Object.assign(statement, {
+          bind: (...args: never[]) => ({
+            first: async () => statement.get(...args) ?? null,
+            all: async () => ({ results: statement.all(...args) }),
+            run: async () => ({ meta: { changes: Number(statement.run(...args).changes) } }),
+          }),
+        });
+      };
+    },
+  });
+}
+
+function harness(invited: readonly string[] = ['user@example.com', 'magic@example.com']) {
   const database = new DatabaseSync(':memory:');
   database.exec(readFileSync('migrations/0001_better_auth.sql', 'utf8'));
   database.exec(readFileSync('migrations/0004_username.sql', 'utf8'));
+  database.exec(readFileSync('migrations/0007_waitlist.sql', 'utf8'));
+  // Plastic is invite-only: the accounts these tests create were invited first.
+  for (const email of invited) database.prepare('insert into waitlist (email, created_at, invited_at) values (?, 0, 1)').run(email);
   const env = {
-    DB: database,
+    DB: d1(database),
     BETTER_AUTH_URL: 'https://plastic.test',
     BETTER_AUTH_SECRET: 'test-only-secret-with-at-least-32-characters',
     RESEND_API_KEY: 'test-key',
+    ADMIN_EMAILS: 'admin@example.com',
   } as unknown as Env;
   const outbox: {
     to: string[];
@@ -176,6 +202,27 @@ describe('approved email delivery', () => {
     expect(again.headers.get('location')).toContain('INVALID_TOKEN');
     expect(databaseCount(h.database, 'session')).toBe(1);
     h.database.close();
+  });
+
+  it('refuses accounts without an invite, for every sign-up method, without sending email', async () => {
+    const h = harness([]);
+    const signup = await h.request('/sign-up/email', { email: 'stranger@example.com', password: 'correct-horse-battery', name: 'Stranger' });
+    // The answer doesn't reveal invite status, but no account exists and no email was sent.
+    expect([200, 403]).toContain(signup.status);
+    const magic = await h.request('/sign-in/magic-link', { email: 'stranger@example.com', callbackURL: '/' });
+    expect(magic.status).toBe(200);
+    expect(h.database.prepare('select count(*) as n from "user"').get()).toEqual({ n: 0 });
+    expect(h.outbox).toHaveLength(0);
+  });
+
+  it('lets admins and invited emails create accounts', async () => {
+    const h = harness(['invited@example.com']);
+    for (const email of ['admin@example.com', 'invited@example.com']) {
+      const response = await h.request('/sign-up/email', { email, password: 'correct-horse-battery', name: 'Someone' });
+      expect(response.status).toBe(200);
+    }
+    expect(h.database.prepare('select email from "user" order by email').all()).toEqual([{ email: 'admin@example.com' }, { email: 'invited@example.com' }]);
+    expect(h.outbox.map((m) => m.to[0])).toEqual(['admin@example.com', 'invited@example.com']);
   });
 
   it('advertises mail features only when configured and does not retry permanent Resend failures', async () => {

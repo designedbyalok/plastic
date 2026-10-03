@@ -25,6 +25,16 @@
       "canvas": "#dedcd7"
     },
     {
+      "file": "waitlist.html",
+      "name": "Waitlist",
+      "canvas": "#dedcd7"
+    },
+    {
+      "file": "invite.html",
+      "name": "Invite",
+      "canvas": "#dedcd7"
+    },
+    {
       "file": "sign-in.html",
       "name": "Sign-in Notification",
       "canvas": "#dedcd7"
@@ -113,6 +123,22 @@
       "release-notes-99": {
         "x": 720,
         "y": 0
+      },
+      "invite-1": {
+        "x": 0,
+        "y": 0
+      },
+      "invite-51": {
+        "x": 720,
+        "y": 0
+      },
+      "waitlist-1": {
+        "x": 0,
+        "y": 0
+      },
+      "waitlist-51": {
+        "x": 720,
+        "y": 0
       }
     }
   },
@@ -131,7 +157,11 @@
       "magic-link-1": "Magic Link • Desktop",
       "magic-link-42": "Magic Link • Mobile",
       "release-notes-1": "Release Notes • Desktop",
-      "release-notes-99": "Release Notes • Mobile"
+      "release-notes-99": "Release Notes • Mobile",
+      "invite-1": "Invite • Desktop",
+      "invite-51": "Invite • Mobile",
+      "waitlist-1": "Waitlist • Desktop",
+      "waitlist-51": "Waitlist • Mobile"
     },
     "collapsed": []
   }

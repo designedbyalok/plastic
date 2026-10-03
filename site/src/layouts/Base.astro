@@ -1,0 +1,143 @@
+---
+/**
+ * Every public page: complete SEO head (canonical, Open Graph, Twitter, JSON-LD), the shared
+ * nav and footer, and a tiny script for scroll reveals and waitlist forms. No framework runtime.
+ */
+import '../styles/site.css';
+import latin from '../assets/fonts/latin.woff2?url';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { SITE } from '../data/site';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Path of the canonical URL, e.g. "/changelog". */
+  path: string;
+  /** Extra JSON-LD objects for this page. */
+  schema?: Record<string, unknown>[];
+}
+
+const { title, description, path, schema = [] } = Astro.props;
+const canonical = new URL(path, SITE.url).href;
+const fullTitle = path === '/' ? title : `${title} • Plastic`;
+const graph = [
+  {
+    '@type': 'Organization',
+    '@id': `${SITE.url}/#organization`,
+    name: 'Plastic',
+    url: SITE.url,
+    logo: `${SITE.url}/apple-touch-icon.png`,
+    slogan: SITE.tagline,
+  },
+  {
+    '@type': 'WebSite',
+    '@id': `${SITE.url}/#website`,
+    name: 'Plastic',
+    url: SITE.url,
+    publisher: { '@id': `${SITE.url}/#organization` },
+  },
+  ...schema,
+];
+---
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#161616" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="application-name" content="Plastic" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Plastic" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={SITE.ogImage} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1672" />
+    <meta property="og:image:height" content="941" />
+    <meta property="og:image:alt" content="A floating chrome Plastic emblem above flowing silver ribbons." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={SITE.ogImage} />
+    <meta name="twitter:image:alt" content="A floating chrome Plastic emblem above flowing silver ribbons." />
+
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+    <link rel="preload" href={latin} as="font" type="font/woff2" crossorigin />
+
+    <script is:inline>document.documentElement.classList.remove('no-js');</script>
+    <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', '@graph': graph })} />
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <Nav path={path} />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+
+    <script>
+      // Scroll reveals (content is visible without JS and with reduced motion; see site.css).
+      const revealed = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            entry.target.classList.add('is-visible');
+            revealed.unobserve(entry.target);
+          }
+        },
+        { rootMargin: '0px 0px -8% 0px' },
+      );
+      document.querySelectorAll('.reveal').forEach((el) => revealed.observe(el));
+
+      const nav = document.querySelector('.nav');
+      const onScroll = () => nav?.classList.toggle('is-scrolled', window.scrollY > 8);
+      addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+
+      // Waitlist forms post JSON in place; without JS they submit normally (the server redirects
+      // back to #joined).
+      for (const form of document.querySelectorAll<HTMLFormElement>('form[data-waitlist]')) {
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const status = form.querySelector<HTMLElement>('.form-status');
+          const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+          const { redirect: _, ...data } = Object.fromEntries(new FormData(form));
+          status?.classList.remove('is-error');
+          if (status) status.textContent = 'Adding you to the list…';
+          if (button) button.disabled = true;
+          try {
+            const response = await fetch('/api/waitlist', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(data),
+            });
+            const body = (await response.json().catch(() => ({}))) as { error?: string };
+            if (!response.ok) throw new Error(body.error ?? 'Something went wrong. Please try again.');
+            form.classList.add('is-joined');
+            if (status) status.textContent = '';
+            form.querySelector<HTMLElement>('.joined-note')?.focus();
+          } catch (error) {
+            status?.classList.add('is-error');
+            if (status) status.textContent = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+          } finally {
+            if (button) button.disabled = false;
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

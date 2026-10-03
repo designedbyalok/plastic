@@ -1,0 +1,764 @@
+---
+/**
+ * The Plastic editor, drawn with real HTML and CSS — fitting for a tool whose designs are HTML
+ * and CSS. Decorative: hidden from assistive tech, described by the surrounding copy.
+ */
+import { Icon } from 'astro-icon/components';
+
+const layers = [
+  { depth: 0, icon: 'lucide:frame', name: 'Sign in', open: true },
+  { depth: 1, icon: 'lucide:rows-3', name: 'Login form', open: true, tag: 'form' },
+  { depth: 2, icon: 'lucide:heading', name: 'Heading', tag: 'h2' },
+  { depth: 2, icon: 'lucide:text-cursor-input', name: 'Email', tag: 'input' },
+  { depth: 2, icon: 'lucide:text-cursor-input', name: 'Password', tag: 'input' },
+  { depth: 2, icon: 'lucide:rectangle-horizontal', name: 'Continue', tag: 'button', selected: true },
+  { depth: 2, icon: 'lucide:type', name: 'Hint', tag: 'p' },
+  { depth: 0, icon: 'lucide:frame', name: 'Pricing' },
+  { depth: 0, icon: 'lucide:frame', name: 'Settings' },
+];
+const tools = ['lucide:mouse-pointer-2', 'lucide:hand', 'lucide:hash', 'lucide:square', 'lucide:pen-tool', 'lucide:type', 'lucide:image', 'lucide:circle-plus'];
+---
+
+<div class="mock" aria-hidden="true">
+  <div class="mock-window">
+    <div class="mock-titlebar">
+      <span class="lights"><i></i><i></i><i></i></span>
+      <span class="mock-file">Acme / Sign in flow</span>
+      <span class="mock-presence">
+        <span class="avatar a1">A</span>
+        <span class="avatar a2">M</span>
+        <span class="avatar agent"><Icon name="simple-icons:claude" /></span>
+        <span class="mock-share">Share</span>
+      </span>
+    </div>
+    <div class="mock-body">
+      <aside class="mock-left">
+        <div class="mock-tabs"><span class="is-on">Design</span><span>Theme</span></div>
+        <div class="mock-label">Pages</div>
+        <div class="mock-row is-page"><Icon name="lucide:file" /> Onboarding <em>index.html</em></div>
+        <div class="mock-row"><Icon name="lucide:file" /> Marketing <em>site.html</em></div>
+        <div class="mock-label">Layers</div>
+        {
+          layers.map((layer) => (
+            <div class:list={['mock-row', { 'is-selected': layer.selected }]} style={`padding-left:${10 + layer.depth * 14}px`}>
+              <Icon name={layer.open ? 'lucide:chevron-down' : 'lucide:chevron-right'} class="chev" />
+              <Icon name={layer.icon} />
+              <span>{layer.name}</span>
+              {layer.tag && <em>{`<${layer.tag}>`}</em>}
+            </div>
+          ))
+        }
+      </aside>
+      <div class="mock-rail">
+        {tools.map((tool, i) => <span class:list={{ 'is-on': i === 0 }}><Icon name={tool} /></span>)}
+      </div>
+      <div class="mock-canvas">
+        <div class="mock-ruler" />
+        <div class="mock-frame-label">Sign in <span>390 × 560</span></div>
+        <div class="mock-frame">
+          <form class="demo-form">
+            <div class="demo-logo" />
+            <h3>Welcome back</h3>
+            <p>Sign in to continue to Acme.</p>
+            <label>Email<span class="demo-input">ada@acme.com</span></label>
+            <label>Password<span class="demo-input">••••••••••</span></label>
+            <span class="demo-button">
+              Continue
+              <span class="sel"><i class="h tl"></i><i class="h tr"></i><i class="h bl"></i><i class="h br"></i><b>Fill × 44</b></span>
+            </span>
+            <span class="demo-hint">We’ll never share your email.</span>
+          </form>
+          <span class="guide v" />
+        </div>
+        <div class="agent-cursor">
+          <Icon name="lucide:mouse-pointer-2" />
+          <span><Icon name="simple-icons:claude" /> Claude is editing <b>Hint</b></span>
+        </div>
+        <div class="mock-code">
+          <div class="mock-code-tabs"><span class="is-on">index.html</span><span>styles.css</span><span>tokens.css</span></div>
+          <pre><code><span class="ln">14</span><span class="p">&lt;</span><span class="t">form</span> <span class="a">class</span><span class="p">=</span><span class="s">"login-form"</span><span class="p">&gt;</span>
+<span class="ln">15</span>  <span class="p">&lt;</span><span class="t">h3</span> <span class="a">class</span><span class="p">=</span><span class="s">"heading"</span><span class="p">&gt;</span>Welcome back<span class="p">&lt;/</span><span class="t">h3</span><span class="p">&gt;</span>
+<span class="ln">16</span>  <span class="p">&lt;</span><span class="t">input</span> <span class="a">class</span><span class="p">=</span><span class="s">"input"</span> <span class="a">type</span><span class="p">=</span><span class="s">"email"</span> <span class="a">required</span><span class="p">&gt;</span>
+<span class="ln">17</span>  <span class="p">&lt;</span><span class="t">button</span> <span class="a">class</span><span class="p">=</span><span class="s">"button"</span><span class="p">&gt;</span>Continue<span class="p">&lt;/</span><span class="t">button</span><span class="p">&gt;</span><span class="caret"></span></code></pre>
+        </div>
+      </div>
+      <aside class="mock-right">
+        <div class="mock-insp-head"><span>Continue</span><em>&lt;button&gt;</em></div>
+        <div class="mock-sec">
+          <div class="mock-sec-title">Layout <Icon name="lucide:chevron-down" /></div>
+          <div class="mock-grid">
+            <span><b>W</b> Fill</span><span><b>H</b> 44</span>
+            <span><b>X</b> 32</span><span><b>Y</b> 412</span>
+          </div>
+          <div class="mock-seg"><span>Fit</span><span>Fixed</span><span class="is-on">Fill</span></div>
+        </div>
+        <div class="mock-sec">
+          <div class="mock-sec-title">Fill <Icon name="lucide:plus" /></div>
+          <div class="mock-seg"><span>Solid</span><span class="is-on">Linear</span><span>Radial</span></div>
+          <div class="mock-gradient"><i style="left:0"></i><i style="left:62%"></i><i style="left:100%"></i></div>
+        </div>
+        <div class="mock-sec">
+          <div class="mock-sec-title">States <Icon name="lucide:plus" /></div>
+          <div class="mock-chips"><span class="is-on">Default</span><span>:hover</span><span>:focus</span><span>≤ 640</span></div>
+        </div>
+        <div class="mock-sec">
+          <div class="mock-sec-title">Radius</div>
+          <div class="mock-slider"><i style="width:38%"></i></div>
+        </div>
+        <div class="mock-sec">
+          <div class="mock-sec-title">Component</div>
+          <div class="mock-component"><Icon name="lucide:component" /> Button / Primary</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<style>
+  .mock {
+    --m-panel: #2a2a2a;
+    --m-canvas: #232323;
+    --m-line: #373737;
+    font-family: Inter, system-ui, sans-serif;
+    font-size: 11px;
+    line-height: 1.3;
+    color: rgb(255 255 255 / 0.86);
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .mock svg {
+    width: 12px;
+    height: 12px;
+    flex: none;
+  }
+
+  .mock-window {
+    overflow: hidden;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    border-radius: 16px;
+    corner-shape: superellipse(1.3);
+    background: var(--m-panel);
+    box-shadow:
+      0 0 0 1px #000000,
+      0 40px 120px -30px #000000,
+      0 0 120px -40px color-mix(in srgb, var(--ice) 40%, transparent);
+  }
+
+  .mock-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 38px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--m-line);
+  }
+
+  .lights {
+    display: flex;
+    gap: 6px;
+  }
+
+  .lights i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ffffff1f;
+  }
+
+  .mock-file {
+    color: rgb(255 255 255 / 0.62);
+  }
+
+  .mock-presence {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .avatar {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    color: #1e1e1e;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .a1 {
+    background: var(--peach);
+  }
+
+  .a2 {
+    background: var(--ice);
+  }
+
+  .avatar.agent {
+    background: #d97757;
+    color: #fff;
+  }
+
+  .avatar.agent svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .mock-share {
+    margin-left: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: #f2f2f2;
+    color: #1e1e1e;
+    font-weight: 500;
+  }
+
+  .mock-body {
+    display: grid;
+    grid-template-columns: 200px 36px 1fr 200px;
+    height: clamp(420px, 46vw, 560px);
+  }
+
+  .mock-left,
+  .mock-right {
+    overflow: hidden;
+    padding: 8px 0;
+    background: var(--m-panel);
+  }
+
+  .mock-left {
+    border-right: 1px solid var(--m-line);
+  }
+
+  .mock-right {
+    border-left: 1px solid var(--m-line);
+  }
+
+  .mock-tabs {
+    display: flex;
+    gap: 2px;
+    margin: 0 8px 8px;
+    padding: 2px;
+    border-radius: 7px;
+    background: #ffffff0d;
+  }
+
+  .mock-tabs span {
+    flex: 1;
+    padding: 4px;
+    border-radius: 5px;
+    color: rgb(255 255 255 / 0.55);
+    text-align: center;
+  }
+
+  .mock-tabs .is-on {
+    background: #404040;
+    color: #fff;
+  }
+
+  .mock-label {
+    margin: 10px 12px 4px;
+    color: rgb(255 255 255 / 0.5);
+    font-weight: 500;
+  }
+
+  .mock-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+
+  .mock-row span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mock-row em {
+    margin-left: auto;
+    color: rgb(255 255 255 / 0.35);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-style: normal;
+  }
+
+  .mock-row .chev {
+    width: 10px;
+    height: 10px;
+    opacity: 0.5;
+  }
+
+  .mock-row.is-page {
+    padding-left: 22px;
+  }
+
+  .mock-row.is-selected {
+    background: #3c3c3c;
+  }
+
+  .mock-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding-top: 8px;
+    border-right: 1px solid var(--m-line);
+    background: var(--m-panel);
+  }
+
+  .mock-rail span {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    color: rgb(255 255 255 / 0.7);
+  }
+
+  .mock-rail svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .mock-rail .is-on {
+    background: #4d8ae4;
+    color: #fff;
+  }
+
+  .mock-canvas {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 1px 1px, #ffffff0d 1px, transparent 0) 0 0 / 16px 16px,
+      var(--m-canvas);
+  }
+
+  .mock-ruler {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 14px;
+    border-bottom: 1px solid var(--m-line);
+    background: repeating-linear-gradient(90deg, #ffffff1c 0 1px, transparent 1px 40px), #262626;
+  }
+
+  .mock-frame-label {
+    position: absolute;
+    top: 34px;
+    left: calc(50% - 150px);
+    color: rgb(255 255 255 / 0.55);
+  }
+
+  .mock-frame-label span {
+    margin-left: 6px;
+    color: rgb(255 255 255 / 0.32);
+  }
+
+  .mock-frame {
+    position: absolute;
+    top: 52px;
+    left: calc(50% - 150px);
+    width: 300px;
+    height: 420px;
+    border-radius: 4px;
+    background: #ffffff;
+    box-shadow: 0 10px 40px -10px #00000099;
+  }
+
+  .demo-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 34px 28px;
+    color: #111827;
+    font-size: 11px;
+  }
+
+  .demo-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #dfe3ea, #ffd9c2 50%, #b9cdf2);
+  }
+
+  .demo-form h3 {
+    margin: 4px 0 0;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+  }
+
+  .demo-form p {
+    margin: -6px 0 6px;
+    color: #6b7280;
+  }
+
+  .demo-form label {
+    display: grid;
+    gap: 4px;
+    color: #374151;
+    font-weight: 500;
+  }
+
+  .demo-input {
+    padding: 8px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 7px;
+    color: #111827;
+    font-weight: 400;
+  }
+
+  .demo-button {
+    position: relative;
+    margin-top: 6px;
+    padding: 10px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #2f6fd0, #4d8ae4);
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .sel {
+    position: absolute;
+    inset: -3px;
+    border: 1.5px solid #4d8ae4;
+    border-radius: 2px;
+  }
+
+  .sel .h {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border: 1.5px solid #4d8ae4;
+    background: #fff;
+  }
+
+  .tl {
+    left: -4px;
+    top: -4px;
+  }
+
+  .tr {
+    right: -4px;
+    top: -4px;
+  }
+
+  .bl {
+    left: -4px;
+    bottom: -4px;
+  }
+
+  .br {
+    right: -4px;
+    bottom: -4px;
+  }
+
+  .sel b {
+    position: absolute;
+    left: 50%;
+    bottom: -22px;
+    translate: -50% 0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #4d8ae4;
+    color: #fff;
+    font-size: 9.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .demo-hint {
+    margin-top: 14px;
+    padding: 2px;
+    outline: 1.5px dashed #d97757;
+    outline-offset: 2px;
+    color: #6b7280;
+    text-align: center;
+  }
+
+  .guide.v {
+    position: absolute;
+    top: -40px;
+    bottom: -60px;
+    left: 50%;
+    width: 1px;
+    background: #f24822;
+  }
+
+  .agent-cursor {
+    position: absolute;
+    top: calc(52px + 380px);
+    left: calc(50% + 70px);
+    display: flex;
+    align-items: flex-start;
+    gap: 2px;
+    color: #d97757;
+    animation: agent 6s ease-in-out infinite;
+  }
+
+  .agent-cursor > svg {
+    width: 16px;
+    height: 16px;
+    fill: #d97757;
+  }
+
+  .agent-cursor > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: #d97757;
+    color: #fff;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .agent-cursor > span svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  @keyframes agent {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    50% {
+      translate: -18px -8px;
+    }
+  }
+
+  .mock-code {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    border: 1px solid var(--m-line);
+    border-radius: 10px;
+    background: #1f1f1f;
+    box-shadow: 0 -10px 40px -20px #000;
+  }
+
+  .mock-code-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px 8px 0;
+  }
+
+  .mock-code-tabs span {
+    padding: 4px 8px;
+    border-radius: 5px 5px 0 0;
+    color: rgb(255 255 255 / 0.45);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  .mock-code-tabs .is-on {
+    background: #ffffff0f;
+    color: #fff;
+  }
+
+  .mock-code pre {
+    margin: 0;
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--m-line);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1.65;
+    white-space: pre;
+    overflow: hidden;
+  }
+
+  .ln {
+    display: inline-block;
+    width: 22px;
+    color: rgb(255 255 255 / 0.25);
+  }
+
+  .t {
+    color: var(--code-tag);
+  }
+
+  .a {
+    color: var(--code-attribute);
+  }
+
+  .s {
+    color: var(--code-string);
+  }
+
+  .p {
+    color: var(--code-punctuation);
+  }
+
+  .caret {
+    display: inline-block;
+    width: 1.5px;
+    height: 12px;
+    margin-left: 1px;
+    vertical-align: -2px;
+    background: #fff;
+    animation: blink 1.1s steps(1) infinite;
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  .mock-insp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 12px 10px;
+    border-bottom: 1px solid var(--m-line);
+    font-weight: 600;
+  }
+
+  .mock-insp-head em {
+    color: #8db4f0;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 400;
+  }
+
+  .mock-sec {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--m-line);
+  }
+
+  .mock-sec-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .mock-sec-title svg {
+    opacity: 0.5;
+  }
+
+  .mock-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .mock-grid span,
+  .mock-component {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 7px;
+    border-radius: 5px;
+    background: #373737;
+  }
+
+  .mock-grid b {
+    color: rgb(255 255 255 / 0.4);
+    font-weight: 500;
+  }
+
+  .mock-seg,
+  .mock-chips {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 6px;
+    background: #ffffff0d;
+  }
+
+  .mock-seg span,
+  .mock-chips span {
+    flex: 1;
+    padding: 3px 0;
+    border-radius: 4px;
+    color: rgb(255 255 255 / 0.55);
+    text-align: center;
+    font-size: 10px;
+  }
+
+  .mock-seg .is-on,
+  .mock-chips .is-on {
+    background: #4a4a4a;
+    color: #fff;
+  }
+
+  .mock-gradient {
+    position: relative;
+    height: 14px;
+    margin: 10px 6px 2px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #2f6fd0, #ffcfae 62%, #b9cdf2);
+  }
+
+  .mock-gradient i {
+    position: absolute;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    translate: -50% -50%;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px #0006;
+  }
+
+  .mock-slider {
+    height: 4px;
+    border-radius: 2px;
+    background: #ffffff1a;
+  }
+
+  .mock-slider i {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: #f2f2f2;
+  }
+
+  .mock-component {
+    color: #c9a5f7;
+  }
+
+  @media (max-width: 1000px) {
+    .mock-body {
+      grid-template-columns: 36px 1fr 190px;
+    }
+    .mock-left {
+      display: none;
+    }
+  }
+
+  @media (max-width: 680px) {
+    .mock-body {
+      grid-template-columns: 1fr;
+      height: 470px;
+    }
+    .mock-rail,
+    .mock-right {
+      display: none;
+    }
+    .mock-file,
+    .mock-share,
+    .agent-cursor {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .agent-cursor,
+    .caret {
+      animation: none;
+    }
+  }
+</style>

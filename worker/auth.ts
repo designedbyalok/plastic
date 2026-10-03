@@ -3,9 +3,14 @@
  * ORM). One instance per isolate; the bindings are the same for every request it serves.
  */
 import { betterAuth } from 'better-auth';
-import { magicLink, username } from 'better-auth/plugins';
+import { APIError } from 'better-auth/api';
+import { customSession, magicLink, username } from 'better-auth/plugins';
 import type { Env } from './env.ts';
 import { deliverInBackground, emailContext, sendEmail, signInDevice } from './emails.ts';
+import { canCreateAccount, isAdmin } from './waitlist.ts';
+
+/** Shown when someone without an invite tries to create an account (any sign-up method). */
+export const INVITE_ONLY_MESSAGE = 'Plastic is invite-only for now. Join the waitlist at useplastic.app and we’ll email you an invite.';
 
 export type Auth = ReturnType<typeof createAuth>;
 
@@ -21,6 +26,11 @@ export function providers(env: Env): string[] {
 export function createAuth(env: Env) {
   const mailEnabled = Boolean(env.RESEND_API_KEY);
   const appURL = (path = '/') => new URL(path, env.BETTER_AUTH_URL).href;
+  // Invite-only: every way of creating an account (email, magic link, Google, GitHub) creates a
+  // user row, so the gate sits there. Existing accounts are never affected.
+  const inviteOnly = async (user: { email: string }) => {
+    if (!(await canCreateAccount(env, user.email))) throw new APIError('FORBIDDEN', { message: INVITE_ONLY_MESSAGE, code: 'INVITE_ONLY' });
+  };
   return betterAuth({
     appName: 'Plastic',
     baseURL: env.BETTER_AUTH_URL,
@@ -73,6 +83,7 @@ export function createAuth(env: Env) {
           databaseHooks: {
             user: {
               create: {
+                before: inviteOnly,
                 after: async (user) => {
                   // Social providers and magic links can create an already-verified account.
                   if (user.emailVerified)
@@ -122,7 +133,7 @@ export function createAuth(env: Env) {
             },
           },
         }
-      : {}),
+      : { databaseHooks: { user: { create: { before: inviteOnly } } } }),
     plugins: [
       // @handles for profiles: 3–30 characters, letters, numbers, dots and underscores.
       username({ minUsernameLength: 3, maxUsernameLength: 30 }),
@@ -132,11 +143,18 @@ export function createAuth(env: Env) {
               expiresIn: 15 * 60,
               storeToken: 'hashed',
               sendMagicLink: async ({ email, url, token }) => {
+                // A link for someone who can't have an account would be refused on arrival; don't
+                // spend an email on it (the response stays the same, so nothing is revealed).
+                const known = await env.DB.prepare('select 1 from "user" where email = ?').bind(email.toLowerCase()).first();
+                if (!known && !(await canCreateAccount(env, email))) return;
                 await deliverInBackground(sendEmail(env, 'magic-link', email, { actionUrl: url }, token));
               },
             }),
           ]
         : []),
+      // Last, so the user already has the other plugins' fields. `admin` is computed from
+      // ADMIN_EMAILS (no database read) and tells the app whether to show the waitlist.
+      customSession(async ({ user, session }) => ({ user: { ...user, admin: isAdmin(env, user.email) }, session })),
     ],
     socialProviders: {
       ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET

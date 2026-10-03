@@ -1,0 +1,12 @@
+{
+  "name": "plastic-site",
+  "private": true,
+  "type": "module",
+  "description": "Plastic's public site (landing, changelog, download). Built from the repo root with `bun run site:build`; dependencies are installed at the root. Listed here because astro-icon discovers icon sets from this file.",
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.139",
+    "@iconify-json/simple-icons": "^1.2.98",
+    "astro": "^7.3.5",
+    "astro-icon": "^1.2.0"
+  }
+}

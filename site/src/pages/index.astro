@@ -1,0 +1,1278 @@
+---
+import { Icon } from 'astro-icon/components';
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import EditorMock from '../components/EditorMock.astro';
+import WaitlistForm from '../components/WaitlistForm.astro';
+import chrome from '../assets/chrome.png';
+import { FAQ, FEATURES, SITE } from '../data/site';
+import { RELEASES } from '../data/changelog';
+
+const title = 'Plastic — Design real interfaces in HTML and CSS';
+const description = SITE.description;
+
+const integrations = [
+  { icon: 'simple-icons:figma', label: 'Figma' },
+  { icon: 'simple-icons:claude', label: 'Claude' },
+  { icon: 'simple-icons:openai', label: 'Codex' },
+  { icon: 'simple-icons:cursor', label: 'Cursor' },
+  { icon: 'simple-icons:githubcopilot', label: 'GitHub Copilot' },
+  { icon: 'simple-icons:git', label: 'Git' },
+  { icon: 'simple-icons:html5', label: 'HTML' },
+  { icon: 'simple-icons:css', label: 'CSS' },
+];
+
+const agents = [
+  { icon: 'simple-icons:claude', name: 'Claude' },
+  { icon: 'simple-icons:openai', name: 'Codex' },
+  { icon: 'simple-icons:cursor', name: 'Cursor' },
+  { icon: 'simple-icons:githubcopilot', name: 'Copilot' },
+];
+
+const audiences = [
+  { icon: 'lucide:pen-tool', title: 'Designers', body: 'Work the way you already do — frames, layers, a pen tool, an inspector — and know that what you draw is exactly what ships.' },
+  { icon: 'lucide:code-xml', title: 'Design engineers', body: 'Move between canvas and code without a translation layer. Every tweak on one side is reflected on the other, live.' },
+  { icon: 'lucide:terminal', title: 'Engineers', body: 'Start from semantic HTML, a real stylesheet and tokens — not a screenshot to reverse-engineer. Diff it, review it, commit it.' },
+  { icon: 'lucide:bot', title: 'Teams with agents', body: 'Give coding agents the actual design source through MCP, and watch their edits land on the canvas in real time.' },
+];
+
+const comparison = [
+  ['What you save', 'A proprietary file of vector layers', 'Semantic HTML, CSS and tokens'],
+  ['Layout', 'Approximations of flexbox', 'Real flex and grid, rendered by the browser'],
+  ['Hand-off', 'Specs, redlines and inspect mode', 'The source itself, plus frame links'],
+  ['Responsive and states', 'Duplicated frames per breakpoint', 'Media queries and :hover/:focus on one element'],
+  ['AI agents', 'Read screenshots, guess the code', 'Read and edit the design directly over MCP'],
+  ['Ownership', 'Locked in an app', 'Plain files in folders, ready for Git'],
+];
+
+const steps = [
+  { n: '01', title: 'Draw', body: 'Drop a frame, add text, inputs and buttons, or bring a Figma file. Wrap a selection in a stack and Plastic infers direction and gap.', icon: 'lucide:square-dashed-mouse-pointer' },
+  { n: '02', title: 'Refine', body: 'Tune layout, type, fills and gradients in the inspector. Add hover and focus states, breakpoints, components and variants.', icon: 'lucide:sliders-horizontal' },
+  { n: '03', title: 'Ship', body: 'Open the code panel: it is already HTML and CSS. Hand engineers a frame link, let an agent build on it, or commit the folder.', icon: 'lucide:rocket' },
+];
+
+const latest = RELEASES.slice(0, 3);
+const date = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+
+const schema = [
+  {
+    '@type': 'SoftwareApplication',
+    name: 'Plastic',
+    url: SITE.url,
+    applicationCategory: 'DesignApplication',
+    operatingSystem: 'Web browser; macOS, Windows and Linux (coming soon)',
+    description,
+    image: SITE.ogImage,
+    publisher: { '@id': `${SITE.url}/#organization` },
+    featureList: FEATURES.map((f) => f.title),
+  },
+  {
+    '@type': 'FAQPage',
+    mainEntity: FAQ.map((item) => ({ '@type': 'Question', name: item.q, acceptedAnswer: { '@type': 'Answer', text: item.a } })),
+  },
+];
+---
+
+<Base title={title} description={description} path="/" schema={schema}>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="wrap hero-inner">
+      <p class="kicker reveal"><span class="dot"></span>Invite-only preview • Inviting in waves</p>
+      <h1 class="display reveal">
+        Design with<br /><span class="chrome-text">the real thing.</span>
+      </h1>
+      <p class="lede reveal">
+        Plastic is a visual design tool where <strong>HTML and CSS are the design</strong>. Draw, lay out and style on a canvas — and what you save is the interface itself, ready to ship. No hand-off. No translation. Nothing lost.
+      </p>
+      <div class="hero-form reveal">
+        <WaitlistForm id="hero" source="home" page="/" cta="Request an invite" />
+        <p class="hero-note">
+          <Icon name="lucide:lock" aria-hidden="true" />
+          Invite-only while we grow carefully. Already invited? <a href={SITE.signIn}>Sign in</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="wrap hero-visual reveal">
+      <div class="hero-mock">
+        <EditorMock />
+      </div>
+    </div>
+  </section>
+
+  <!-- Integrations -->
+  <section class="logos hairline" aria-label="Works with">
+    <div class="wrap">
+      <p class="logos-title">Built for the tools your team already uses</p>
+      <ul class="logos-list">
+        {integrations.map((item) => <li><Icon name={item.icon} aria-hidden="true" /><span>{item.label}</span></li>)}
+      </ul>
+    </div>
+  </section>
+
+  <!-- The idea -->
+  <section class="idea">
+    <div class="wrap idea-grid">
+      <div class="section-head reveal">
+        <p class="kicker">The idea</p>
+        <h2 class="title">Stop drawing pictures of interfaces.</h2>
+        <p class="lede">
+          Most design tools save a picture of your interface. Then someone rebuilds it in code — and every spacing, state and breakpoint gets re-interpreted along the way. Plastic removes that step. The canvas renders real HTML and CSS in a real browser engine, so what you design is what the browser draws.
+        </p>
+        <ul class="checks">
+          <li><Icon name="lucide:check" aria-hidden="true" />Semantic elements: forms, inputs, buttons, tables, headings</li>
+          <li><Icon name="lucide:check" aria-hidden="true" />Your stylesheet and tokens, with the cascade intact</li>
+          <li><Icon name="lucide:check" aria-hidden="true" />One folder per file — open it in any editor or commit it</li>
+        </ul>
+      </div>
+      <div class="code-card card reveal" aria-label="What Plastic saves">
+        <div class="code-card-head">
+          <span><Icon name="lucide:file-code-2" aria-hidden="true" /> workspace/sign-in/index.html</span>
+          <span class="saved"><span class="saved-dot"></span>Saved</span>
+        </div>
+<pre><code><span class="p">&lt;</span><span class="t">form</span> <span class="a">class</span><span class="p">=</span><span class="s">"login-form"</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="t">h2</span> <span class="a">class</span><span class="p">=</span><span class="s">"heading"</span><span class="p">&gt;</span>Sign in<span class="p">&lt;/</span><span class="t">h2</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="t">label</span> <span class="a">class</span><span class="p">=</span><span class="s">"field"</span><span class="p">&gt;</span>Email
+    <span class="p">&lt;</span><span class="t">input</span> <span class="a">class</span><span class="p">=</span><span class="s">"input"</span> <span class="a">type</span><span class="p">=</span><span class="s">"email"</span>
+           <span class="a">placeholder</span><span class="p">=</span><span class="s">"you@example.com"</span> <span class="a">required</span><span class="p">&gt;</span>
+  <span class="p">&lt;/</span><span class="t">label</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="t">button</span> <span class="a">class</span><span class="p">=</span><span class="s">"button"</span> <span class="a">type</span><span class="p">=</span><span class="s">"submit"</span><span class="p">&gt;</span>Continue<span class="p">&lt;/</span><span class="t">button</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="t">form</span><span class="p">&gt;</span>
+
+<span class="c">/* styles.css */</span>
+<span class="k">.login-form</span> <span class="p">&#123;</span> <span class="pr">display</span><span class="p">:</span> <span class="n">flex</span><span class="p">;</span> <span class="pr">gap</span><span class="p">:</span> <span class="n">var</span>(<span class="v">--space-4</span>)<span class="p">;</span> <span class="p">&#125;</span>
+<span class="k">.button:hover</span> <span class="p">&#123;</span> <span class="pr">background</span><span class="p">:</span> <span class="n">var</span>(<span class="v">--accent-strong</span>)<span class="p">;</span> <span class="p">&#125;</span></code></pre>
+        <p class="code-card-foot">That’s the file. Not an export — the design itself.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison -->
+  <section class="compare hairline">
+    <div class="wrap">
+      <div class="section-head center reveal">
+        <p class="kicker">Why it matters</p>
+        <h2 class="title">Same craft. No translation.</h2>
+        <p class="lede">Everything you expect from a modern design tool, built on the platform your work ends up on.</p>
+      </div>
+      <div class="compare-table card reveal" role="table" aria-label="Plastic compared with picture-based design tools">
+        <div class="compare-row compare-headrow" role="row">
+          <span role="columnheader"></span>
+          <span role="columnheader">Picture-based tools</span>
+          <span role="columnheader" class="is-plastic">Plastic</span>
+        </div>
+        {
+          comparison.map(([label, before, after]) => (
+            <div class="compare-row" role="row">
+              <span role="rowheader">{label}</span>
+              <span role="cell" class="before"><Icon name="lucide:minus" aria-hidden="true" />{before}</span>
+              <span role="cell" class="after"><Icon name="lucide:check" aria-hidden="true" />{after}</span>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="features hairline">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="kicker">Features</p>
+        <h2 class="title">A complete canvas,<br />down to the last anchor point.</h2>
+        <p class="lede">Layout, vectors, type, color, components and states — every tool writes standard HTML, CSS and SVG you can read.</p>
+      </div>
+      <ul class="feature-grid">
+        {
+          FEATURES.map((feature, i) => (
+            <li class="feature card reveal" style={`transition-delay:${(i % 3) * 60}ms`}>
+              <span class="feature-n">{String(i + 1).padStart(2, '0')}</span>
+              <span class="icon-chip"><Icon name={feature.icon} aria-hidden="true" /></span>
+              <h3>{feature.title}</h3>
+              <p>{feature.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <!-- Agents -->
+  <section id="agents" class="agents hairline">
+    <div class="wrap agents-grid">
+      <div class="section-head reveal">
+        <p class="kicker">AI agents</p>
+        <h2 class="title">Your coding agent,<br /><span class="chrome-text">on the canvas.</span></h2>
+        <p class="lede">
+          Plastic speaks the Model Context Protocol. Connect Claude, Codex, Cursor, GitHub Copilot or any MCP-capable agent, and it can read a selected frame with its full styling context, change designs and tokens, and build from the real source.
+        </p>
+        <ul class="checks">
+          <li><Icon name="lucide:check" aria-hidden="true" />Edits appear live, and every one is undoable</li>
+          <li><Icon name="lucide:check" aria-hidden="true" />See which layers an agent is reading or editing</li>
+          <li><Icon name="lucide:check" aria-hidden="true" />Frame links hand an exact frame to any agent or engineer</li>
+        </ul>
+        <ul class="agent-logos">
+          {agents.map((agent) => <li><Icon name={agent.icon} aria-hidden="true" />{agent.name}</li>)}
+        </ul>
+      </div>
+      <div class="agent-card card reveal" aria-hidden="true">
+        <div class="agent-head">
+          <span class="agent-badge"><Icon name="simple-icons:claude" /></span>
+          <div>
+            <strong>Claude</strong>
+            <span>Connected over MCP</span>
+          </div>
+          <span class="live"><span></span>Live</span>
+        </div>
+        <ol class="agent-log">
+          <li><Icon name="lucide:scan-eye" /><span>Read frame <b>Sign in</b> with styles and tokens</span><em>2s</em></li>
+          <li><Icon name="lucide:palette" /><span>Set <b>--accent</b> to <code>#4d8ae4</code> in tokens.css</span><em>1s</em></li>
+          <li><Icon name="lucide:mouse-pointer-click" /><span>Added <b>:focus-visible</b> ring to <b>.input</b></span><em>now</em></li>
+          <li class="is-active"><Icon name="lucide:pencil" /><span>Editing <b>Hint</b> text…</span><em></em></li>
+        </ol>
+        <div class="agent-prompt">
+          <Icon name="lucide:sparkles" />
+          <span>“Make the sign-in form accessible and match our tokens.”</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how" class="how hairline">
+    <div class="wrap">
+      <div class="section-head center reveal">
+        <p class="kicker">How it works</p>
+        <h2 class="title">Draw. Refine. Ship.</h2>
+        <p class="lede">Three steps, one source of truth. Nothing to export at the end, because the end is where you started.</p>
+      </div>
+      <ol class="steps">
+        {
+          steps.map((step) => (
+            <li class="step card reveal">
+              <div class="step-top">
+                <span class="step-n">{step.n}</span>
+                <span class="icon-chip"><Icon name={step.icon} aria-hidden="true" /></span>
+              </div>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <!-- Audiences -->
+  <section class="audiences hairline">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="kicker">Who it’s for</p>
+        <h2 class="title">One file for everyone<br />who touches the interface.</h2>
+      </div>
+      <ul class="audience-grid">
+        {
+          audiences.map((a) => (
+            <li class="audience reveal">
+              <span class="icon-chip"><Icon name={a.icon} aria-hidden="true" /></span>
+              <h3>{a.title}</h3>
+              <p>{a.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <!-- Specs -->
+  <section class="specs hairline" aria-label="At a glance">
+    <div class="wrap spec-grid">
+      <div class="spec reveal"><strong>0</strong><span>export steps between design and code</span></div>
+      <div class="spec reveal"><strong>100%</strong><span>standard HTML, CSS and SVG — no runtime</span></div>
+      <div class="spec reveal"><strong>.fig</strong><span>files import with layout, text and vectors</span></div>
+      <div class="spec reveal"><strong>MCP</strong><span>for Claude, Codex, Cursor and Copilot</span></div>
+    </div>
+  </section>
+
+  <!-- Changelog teaser -->
+  <section class="latest hairline">
+    <div class="wrap">
+      <div class="latest-head reveal">
+        <div>
+          <p class="kicker">Changelog</p>
+          <h2 class="title">Shipping in the open.</h2>
+        </div>
+        <a class="button" href="/changelog">All updates <Icon name="lucide:arrow-right" aria-hidden="true" /></a>
+      </div>
+      <ul class="latest-list">
+        {
+          latest.map((release) => (
+            <li class="reveal">
+              <a class="latest-item card" href={`/changelog#${release.id}`}>
+                <time datetime={release.date}>{date.format(new Date(release.date))}</time>
+                <h3>{release.title}</h3>
+                <p>{release.summary}</p>
+                <span class="latest-more">Read more <Icon name="lucide:arrow-up-right" aria-hidden="true" /></span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <!-- Brand -->
+  <section class="brand-band hairline" aria-labelledby="brand-title">
+    <div class="wrap">
+      <figure class="brand-card reveal">
+        <Image src={chrome} alt="The Plastic emblem in liquid chrome, floating above flowing silver ribbons." widths={[640, 1100, 1672]} sizes="(max-width: 1240px) 100vw, 1200px" />
+        <figcaption>
+          <p class="kicker">Plastic</p>
+          <h2 id="brand-title" class="title">Indestructible Design.</h2>
+          <p>Designs that survive the trip to production — because they never have to make it.</p>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- Invite-only -->
+  <section id="invite-only" class="invite hairline">
+    <div class="wrap invite-grid">
+      <div class="reveal">
+        <p class="kicker">Invite-only</p>
+        <h2 class="title">Small waves.<br />Real attention.</h2>
+      </div>
+      <div class="invite-points">
+        <div class="reveal">
+          <span class="icon-chip"><Icon name="lucide:gauge" aria-hidden="true" /></span>
+          <h3>Fast for everyone</h3>
+          <p>Every workspace gets cloud storage, live sync and email. Inviting in waves keeps it quick and reliable for everyone already inside.</p>
+        </div>
+        <div class="reveal">
+          <span class="icon-chip"><Icon name="lucide:messages-square" aria-hidden="true" /></span>
+          <h3>Shaped by early users</h3>
+          <p>Tell us what you want to make. It decides who we invite next and what we build next — the changelog shows the results.</p>
+        </div>
+        <div class="reveal">
+          <span class="icon-chip"><Icon name="lucide:mail-check" aria-hidden="true" /></span>
+          <h3>One email, when it’s your turn</h3>
+          <p>Your invite arrives with a sign-up link for the address you gave us. No newsletters, no drip campaigns.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="faq hairline">
+    <div class="wrap faq-grid">
+      <div class="section-head reveal">
+        <p class="kicker">FAQ</p>
+        <h2 class="title">Questions,<br />answered.</h2>
+        <p class="lede">Something else? Ask in your waitlist note — we read every one.</p>
+      </div>
+      <div class="faq-list">
+        {
+          FAQ.map((item, i) => (
+            <details class="faq-item" open={i === 0}>
+              <summary>
+                {item.q}
+                <Icon name="lucide:plus" aria-hidden="true" />
+              </summary>
+              <p>{item.a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Waitlist -->
+  <section id="waitlist" class="join hairline">
+    <div class="join-glow" aria-hidden="true"></div>
+    <div class="wrap join-inner">
+      <div class="join-copy reveal">
+        <p class="kicker"><span class="dot"></span>Now inviting</p>
+        <h2 class="display join-title">Make something<br /><span class="chrome-text">that lasts.</span></h2>
+        <p class="lede">Join the waitlist for the invite-only preview. Tell us a little about you and what you’d make first — it helps us invite the right people sooner.</p>
+      </div>
+      <div class="join-card card reveal">
+        <WaitlistForm id="waitlist-form" source="home" page="/" variant="full" />
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  /* Hero */
+  .hero {
+    padding: clamp(56px, 9vw, 112px) 0 0;
+    overflow: hidden;
+  }
+
+  .hero-glow {
+    position: absolute;
+    inset: -20% -10% auto;
+    height: 900px;
+    background:
+      radial-gradient(40% 50% at 30% 30%, color-mix(in srgb, var(--peach) 16%, transparent), transparent 70%),
+      radial-gradient(40% 50% at 70% 20%, color-mix(in srgb, var(--ice) 18%, transparent), transparent 70%);
+    filter: blur(20px);
+    pointer-events: none;
+  }
+
+  .hero-inner {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero .lede {
+    max-width: 700px;
+    margin-inline: auto;
+  }
+
+  .hero .lede strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .hero-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    max-width: 520px;
+    margin-top: 36px;
+  }
+
+  .hero-form :global(.inline-row) {
+    margin-inline: auto;
+  }
+
+  .hero-note {
+    margin: 0;
+    color: var(--text-3);
+    font-size: 13.5px;
+    text-wrap: balance;
+  }
+
+  .hero-note svg {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    vertical-align: -2px;
+  }
+
+  .hero-note a {
+    white-space: nowrap;
+  }
+
+  .hero-note a {
+    color: var(--accent-text);
+    text-decoration: none;
+  }
+
+  .hero-note a:hover {
+    text-decoration: underline;
+  }
+
+  .hero-visual {
+    position: relative;
+    margin-top: clamp(48px, 7vw, 88px);
+  }
+
+  .hero-mock {
+    position: relative;
+    padding-bottom: clamp(56px, 8vw, 96px);
+    perspective: 1800px;
+  }
+
+  .hero-mock > :global(.mock) {
+    transform: rotateX(8deg);
+    transform-origin: 50% 0;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-mock > :global(.mock) {
+      animation: settle 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.2s both;
+    }
+    @keyframes settle {
+      from {
+        transform: rotateX(18deg) translateY(40px);
+        opacity: 0;
+      }
+    }
+  }
+
+  /* Logos */
+  .logos {
+    padding: 40px 0;
+  }
+
+  .logos-title {
+    margin: 0 0 20px;
+    color: var(--text-3);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .logos-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px 36px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .logos-list li {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-2);
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .logos-list svg {
+    width: 20px;
+    height: 20px;
+    opacity: 0.85;
+  }
+
+  /* Idea */
+  .idea-grid,
+  .agents-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.05fr;
+    align-items: center;
+    gap: clamp(40px, 6vw, 80px);
+  }
+
+  .idea-grid .section-head,
+  .agents-grid .section-head {
+    margin-bottom: 0;
+  }
+
+  @media (max-width: 960px) {
+    .idea-grid,
+    .agents-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .checks {
+    display: grid;
+    gap: 12px;
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .checks li {
+    display: flex;
+    gap: 12px;
+    color: var(--text-2);
+  }
+
+  .checks svg {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-top: 3px;
+    color: var(--success);
+  }
+
+  .code-card {
+    overflow: hidden;
+  }
+
+  .code-card-head {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    color: var(--text-2);
+    font-size: 13px;
+  }
+
+  .code-card-head span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .code-card-head svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .saved {
+    color: var(--text-3);
+  }
+
+  .saved-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+
+  .code-card pre {
+    margin: 0;
+    padding: 20px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.75;
+  }
+
+  .t {
+    color: var(--code-tag);
+  }
+  .a {
+    color: var(--code-attribute);
+  }
+  .s {
+    color: var(--code-string);
+  }
+  .p {
+    color: var(--code-punctuation);
+  }
+  .c {
+    color: var(--text-3);
+    font-style: italic;
+  }
+  .k {
+    color: var(--code-class);
+  }
+  .pr {
+    color: var(--code-property);
+  }
+  .n {
+    color: var(--code-number);
+  }
+  .v {
+    color: var(--code-attribute);
+  }
+
+  .code-card-foot {
+    margin: 0;
+    padding: 14px 18px;
+    border-top: 1px solid var(--line);
+    color: var(--text-2);
+    font-size: 14px;
+  }
+
+  /* Comparison */
+  .compare-table {
+    overflow: hidden;
+    max-width: 980px;
+    margin: 0 auto;
+  }
+
+  .compare-row {
+    display: grid;
+    grid-template-columns: 0.9fr 1.2fr 1.2fr;
+    gap: 16px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--line);
+    font-size: 15px;
+  }
+
+  .compare-headrow {
+    border-top: 0;
+    color: var(--text-3);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .compare-headrow .is-plastic {
+    color: var(--text);
+  }
+
+  .compare-row [role='rowheader'] {
+    color: var(--text-2);
+    font-weight: 500;
+  }
+
+  .compare-row .before,
+  .compare-row .after {
+    display: flex;
+    gap: 10px;
+  }
+
+  .compare-row svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-top: 4px;
+  }
+
+  .before {
+    color: var(--text-3);
+  }
+
+  .after {
+    color: var(--text);
+  }
+
+  .after svg {
+    color: var(--success);
+  }
+
+  @media (max-width: 720px) {
+    .compare-row {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .compare-headrow {
+      display: none;
+    }
+  }
+
+  /* Features */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 960px) {
+    .feature-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .feature-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .feature {
+    padding: 28px;
+    transition:
+      opacity 0.7s ease,
+      transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+      border-color 0.2s ease;
+  }
+
+  .feature:hover {
+    border-color: var(--line-strong);
+  }
+
+  .feature-n {
+    position: absolute;
+    top: 24px;
+    right: 26px;
+    color: var(--text-3);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .feature h3,
+  .step h3,
+  .audience h3,
+  .invite-points h3 {
+    margin: 20px 0 8px;
+    font-size: 18px;
+    letter-spacing: -0.015em;
+  }
+
+  .feature p,
+  .step p,
+  .audience p,
+  .invite-points p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* Agents */
+  .agent-logos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agent-logos li {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--text-2);
+    font-size: 14px;
+  }
+
+  .agent-logos svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .agent-card {
+    padding: 8px;
+  }
+
+  .agent-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .agent-head div {
+    display: grid;
+  }
+
+  .agent-head span {
+    color: var(--text-3);
+    font-size: 13px;
+  }
+
+  .agent-badge {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #d97757;
+    color: #fff;
+  }
+
+  .agent-badge svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    color: var(--success) !important;
+  }
+
+  .live span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  .agent-log {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agent-log li {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    color: var(--text-2);
+    font-size: 14px;
+  }
+
+  .agent-log li.is-active {
+    background: color-mix(in srgb, #d97757 12%, transparent);
+    color: var(--text);
+  }
+
+  .agent-log svg {
+    width: 16px;
+    height: 16px;
+    color: var(--text-3);
+  }
+
+  .agent-log b {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .agent-log code {
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: var(--fill-strong);
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+
+  .agent-log em {
+    color: var(--text-3);
+    font-size: 12px;
+    font-style: normal;
+  }
+
+  .agent-prompt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: var(--fill);
+    color: var(--text-2);
+    font-size: 14px;
+  }
+
+  .agent-prompt svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    color: var(--peach);
+  }
+
+  /* Steps */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 860px) {
+    .steps {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .step {
+    padding: 28px;
+  }
+
+  .step-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .step-n {
+    background: var(--chrome);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: 40px;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+  }
+
+  /* Audiences */
+  .audience-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 960px) {
+    .audience-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 560px) {
+    .audience-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Specs */
+  .specs {
+    padding: clamp(48px, 7vw, 80px) 0;
+  }
+
+  .spec-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+
+  @media (max-width: 860px) {
+    .spec-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .spec {
+    display: grid;
+    gap: 6px;
+  }
+
+  .spec strong {
+    background: var(--chrome);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: clamp(36px, 4.6vw, 56px);
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  .spec span {
+    color: var(--text-2);
+    font-size: 14.5px;
+  }
+
+  /* Latest */
+  .latest-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 40px;
+  }
+
+  .latest-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 860px) {
+    .latest-list {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .latest-item {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 24px;
+    text-decoration: none;
+    transition: border-color 0.2s ease;
+  }
+
+  .latest-item:hover {
+    border-color: var(--line-strong);
+  }
+
+  .latest-item time {
+    color: var(--text-3);
+    font-size: 13px;
+  }
+
+  .latest-item h3 {
+    margin: 10px 0 8px;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+  }
+
+  .latest-item p {
+    flex: 1;
+    margin: 0;
+    color: var(--text-2);
+    font-size: 14.5px;
+  }
+
+  .latest-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 18px;
+    color: var(--accent-text);
+    font-size: 14px;
+  }
+
+  .latest-more svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Brand */
+  .brand-card {
+    position: relative;
+    overflow: hidden;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    corner-shape: superellipse(1.3);
+    background: #e9eaee;
+  }
+
+  .brand-card img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1672 / 941;
+    object-fit: cover;
+  }
+
+  .brand-card figcaption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: clamp(24px, 5vw, 56px);
+    background: linear-gradient(0deg, #161616f2, #16161699 55%, transparent);
+  }
+
+  .brand-card .kicker {
+    color: rgb(255 255 255 / 0.6);
+  }
+
+  .brand-card figcaption > p:last-child {
+    max-width: 520px;
+    margin: 12px 0 0;
+    color: rgb(255 255 255 / 0.78);
+    font-size: clamp(15px, 1.5vw, 18px);
+  }
+
+  @media (max-width: 640px) {
+    .brand-card img {
+      aspect-ratio: 4 / 5;
+    }
+  }
+
+  /* Invite-only */
+  .invite-grid {
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: clamp(32px, 6vw, 80px);
+  }
+
+  .invite-points {
+    display: grid;
+    gap: 36px;
+  }
+
+  .invite-points h3 {
+    margin-top: 16px;
+  }
+
+  @media (max-width: 860px) {
+    .invite-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* FAQ */
+  .faq-grid {
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: clamp(32px, 6vw, 80px);
+  }
+
+  @media (max-width: 860px) {
+    .faq-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .faq-list {
+    border-top: 1px solid var(--line);
+  }
+
+  .faq-item {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .faq-item summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 0;
+    font-size: 17px;
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .faq-item summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .faq-item summary svg {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--text-3);
+    transition: rotate 0.2s ease;
+  }
+
+  .faq-item[open] summary svg {
+    rotate: 45deg;
+  }
+
+  .faq-item p {
+    margin: -6px 0 24px;
+    max-width: 640px;
+    color: var(--text-2);
+  }
+
+  /* Join */
+  .join {
+    overflow: hidden;
+  }
+
+  .join-glow {
+    position: absolute;
+    inset: 10% -10% -30%;
+    background:
+      radial-gradient(35% 45% at 25% 60%, color-mix(in srgb, var(--peach) 14%, transparent), transparent 70%),
+      radial-gradient(35% 45% at 75% 40%, color-mix(in srgb, var(--ice) 16%, transparent), transparent 70%);
+    filter: blur(20px);
+    pointer-events: none;
+  }
+
+  .join-inner {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: clamp(32px, 6vw, 80px);
+  }
+
+  .join-title {
+    font-size: clamp(40px, 6vw, 76px);
+  }
+
+  .join-card {
+    padding: clamp(20px, 3vw, 32px);
+    background: color-mix(in srgb, var(--bg-raised) 85%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  @media (max-width: 960px) {
+    .join-inner {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

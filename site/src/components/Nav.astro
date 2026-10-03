@@ -1,0 +1,33 @@
+---
+import { Icon } from 'astro-icon/components';
+import { Image } from 'astro:assets';
+import logo from '../assets/logo.webp';
+import { NAV, SITE } from '../data/site';
+
+const { path } = Astro.props as { path: string };
+---
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/" aria-label="Plastic home">
+      <Image src={logo} alt="" width={56} height={56} loading="eager" />
+      Plastic
+    </a>
+    <nav aria-label="Main">
+      <ul class="nav-links">
+        {NAV.map((item) => <li><a href={item.href} aria-current={item.href === path ? 'page' : undefined}>{item.label}</a></li>)}
+      </ul>
+    </nav>
+    <div class="nav-actions">
+      <a class="button ghost signin" href={SITE.signIn}>Sign in</a>
+      <a class="button primary" href="/#waitlist">Join the waitlist</a>
+      <details class="nav-menu">
+        <summary aria-label="Menu"><Icon name="lucide:menu" width={20} height={20} /></summary>
+        <nav class="nav-drawer" aria-label="Mobile">
+          {NAV.map((item) => <a href={item.href}>{item.label}</a>)}
+          <a href={SITE.signIn}>Sign in</a>
+        </nav>
+      </details>
+    </div>
+  </div>
+</header>

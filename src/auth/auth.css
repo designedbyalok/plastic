@@ -153,6 +153,21 @@
   font: inherit;
 }
 
+.auth-invite {
+  font-size: 12px;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+.auth-invite a {
+  color: var(--ui-accent-text);
+  text-decoration: none;
+}
+
+.auth-invite a:hover {
+  text-decoration: underline;
+}
+
 .auth-spin {
   animation: auth-spin 0.9s linear infinite;
 }

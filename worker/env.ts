@@ -14,6 +14,8 @@ export interface Env {
   readonly BETTER_AUTH_SECRET: string;
   /** Sending-only Resend key, configured as a Worker secret. */
   readonly RESEND_API_KEY?: string;
+  /** Comma-separated admin emails: they manage the waitlist and invites (see waitlist.ts). */
+  readonly ADMIN_EMAILS?: string;
   readonly GITHUB_CLIENT_ID?: string;
   readonly GITHUB_CLIENT_SECRET?: string;
   readonly GOOGLE_CLIENT_ID?: string;

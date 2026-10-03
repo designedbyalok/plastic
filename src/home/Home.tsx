@@ -4,7 +4,7 @@ import { FileSkeletons } from '../app/Skeleton.tsx';
  * in folders), the Archive, and their Profile. Each file is a folder of HTML and CSS; its name
  * is the document's <title> and its thumbnail is the design itself.
  */
-import { Archive, ArchiveRestore, ChevronRight, Clock, Cloud, FileUp, Folder, FolderInput, FolderPlus, HardDrive, LayoutGrid, List, Minus, MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ChevronRight, Clock, Cloud, Inbox, FileUp, Folder, FolderInput, FolderPlus, HardDrive, LayoutGrid, List, Minus, MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { fileHref, folderHref, linkClick, navigate, type Route } from '../app/router.ts';
 import type { DesignDocument } from '../document/types.ts';
@@ -15,6 +15,7 @@ import { AccountMenu } from './AccountMenu.tsx';
 import { DropOverlay, ImportDialog, isFigmaFile, useFileDrop, type ImportState } from './FigmaImport.tsx';
 import { MenuDivider, MenuHeading, MenuItem, useDismiss } from './Menu.tsx';
 import { ProfileView } from './Profile.tsx';
+import { AdminView } from './Admin.tsx';
 import { Thumbnail } from './Thumbnail.tsx';
 import { editedAgo } from './time.ts';
 import './home.css';
@@ -153,7 +154,7 @@ export function Home({ route }: { route: HomeRoute }) {
   const searching = !!query.trim();
 
   useEffect(() => {
-    document.title = route.name === 'profile' ? 'Profile • Plastic' : route.name === 'archive' ? 'Archive • Plastic' : folder ? `${folder.name} • Plastic` : 'Plastic • Indestructible Design';
+    document.title = route.name === 'admin' ? 'Waitlist • Plastic' : route.name === 'profile' ? 'Profile • Plastic' : route.name === 'archive' ? 'Archive • Plastic' : folder ? `${folder.name} • Plastic` : 'Plastic • Indestructible Design';
   }, [route.name, folder]);
 
   const visible = useMemo(() => {
@@ -297,7 +298,11 @@ export function Home({ route }: { route: HomeRoute }) {
       />
       <main className="home-main">
         {loadError && <div className="home-empty" role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Try Again</button></div>}
-        {route.name === 'profile' && !searching ? (
+        {route.name === 'admin' && !searching ? (
+          <section className="home-files" aria-label="Waitlist">
+            <AdminView />
+          </section>
+        ) : route.name === 'profile' && !searching ? (
           <section className="home-files" aria-label="Profile">
             <ProfileView profile={profile} onSaved={() => void refresh()} />
           </section>
@@ -659,6 +664,11 @@ function Sidebar({
           <NavItem href="/archive" active={route.name === 'archive'} icon={<Archive size={15} strokeWidth={1.5} />} onDropFile={(id) => onDropFile(id, 'archive')}>
             Archive
           </NavItem>
+          {profile?.admin && (
+            <NavItem href="/admin" active={route.name === 'admin'} icon={<Inbox size={15} strokeWidth={1.5} />}>
+              Waitlist
+            </NavItem>
+          )}
 
           {!cardDismissed && (
             <div className="home-card-note">

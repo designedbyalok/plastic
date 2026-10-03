@@ -1,0 +1,59 @@
+---
+import { Icon } from 'astro-icon/components';
+import { Image } from 'astro:assets';
+import logo from '../assets/logo.webp';
+import { SITE } from '../data/site';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="/" aria-label="Plastic home">
+          <Image src={logo} alt="" width={56} height={56} />
+          Plastic
+        </a>
+        <p class="footer-tagline">Indestructible Design. A visual editor where HTML and CSS are the design.</p>
+      </div>
+      <div>
+        <h2>Product</h2>
+        <ul>
+          <li><a href="/#features">Features</a></li>
+          <li><a href="/#agents">AI agents</a></li>
+          <li><a href="/#how">How it works</a></li>
+          <li><a href="/changelog">Changelog</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Get Plastic</h2>
+        <ul>
+          <li><a href="/#waitlist">Join the waitlist</a></li>
+          <li><a href="/download">Download</a></li>
+          <li><a href={SITE.signIn}>Sign in</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Learn</h2>
+        <ul>
+          <li><a href="/#faq">FAQ</a></li>
+          <li><a href="/#invite-only">Why invite-only</a></li>
+          <li><a href="/sitemap.xml">Sitemap</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-base">
+      <span>© {year} Plastic. Made for ideas that become real interfaces.</span>
+      <span class="footer-made"><Icon name="simple-icons:cloudflare" width={14} height={14} aria-hidden="true" /> Served from the edge</span>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer-made {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>

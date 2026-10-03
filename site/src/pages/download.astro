@@ -1,0 +1,333 @@
+---
+import { Icon } from 'astro-icon/components';
+import Base from '../layouts/Base.astro';
+import WaitlistForm from '../components/WaitlistForm.astro';
+import { SITE } from '../data/site';
+
+const description = 'Download Plastic for macOS, Windows and Linux. The desktop app is coming soon; use Plastic in your browser today with an invite.';
+
+/** No builds yet: each platform shows its status. Add `href` and `size` when a release exists. */
+const platforms = [
+  { id: 'macos', icon: 'simple-icons:apple', name: 'macOS', detail: 'Apple silicon and Intel', file: 'Universal .dmg' },
+  { id: 'windows', icon: 'simple-icons:windows', name: 'Windows', detail: '64-bit', file: '.msi installer' },
+  { id: 'linux', icon: 'simple-icons:linux', name: 'Linux', detail: 'x86-64', file: '.AppImage and .deb' },
+];
+
+const desktop = [
+  { icon: 'lucide:folder-git-2', title: 'Your folders, on your disk', body: 'Open any folder of Plastic files directly. Edit them in Plastic, a text editor or Git — the editor follows every change.' },
+  { icon: 'lucide:wifi-off', title: 'Works offline', body: 'Design on a plane or a train. Files are local first; nothing waits on a connection.' },
+  { icon: 'lucide:plug', title: 'Local agents, zero setup', body: 'Coding agents on your machine connect over MCP to the designs on your disk, with their edits live on the canvas.' },
+  { icon: 'lucide:zap', title: 'Native and light', body: 'A small native shell around the same editor you use in the browser, with system menus and shortcuts.' },
+];
+
+const schema = [
+  {
+    '@type': 'WebPage',
+    name: 'Download Plastic',
+    url: `${SITE.url}/download`,
+    description,
+    isPartOf: { '@id': `${SITE.url}/#website` },
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Plastic', item: SITE.url },
+      { '@type': 'ListItem', position: 2, name: 'Download', item: `${SITE.url}/download` },
+    ],
+  },
+];
+---
+
+<Base title="Download" description={description} path="/download" schema={schema}>
+  <section class="dl-hero">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="wrap dl-hero-inner">
+      <p class="kicker reveal"><span class="dot warn"></span>Desktop app • Coming soon</p>
+      <h1 class="display reveal">Plastic,<br /><span class="chrome-text">on your desktop.</span></h1>
+      <p class="lede reveal">A native app for macOS, Windows and Linux is on the way — local files, offline work and your agents, all on your machine. Leave your email and we’ll tell you the day it’s ready.</p>
+    </div>
+  </section>
+
+  <section class="dl-platforms" aria-label="Platforms">
+    <div class="wrap">
+      <ul class="platform-grid">
+        {
+          platforms.map((p) => (
+            <li class="platform card reveal" id={p.id}>
+              <span class="platform-icon"><Icon name={p.icon} aria-hidden="true" /></span>
+              <h2>{p.name}</h2>
+              <p>{p.detail}</p>
+              <span class="platform-file">{p.file}</span>
+              <span class="button platform-button" aria-disabled="true">
+                <Icon name="lucide:clock" aria-hidden="true" />
+                Coming soon
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="dl-notify">
+    <div class="wrap">
+      <div class="dl-notify-inner card reveal">
+        <div>
+          <span class="icon-chip"><Icon name="lucide:bell" aria-hidden="true" /></span>
+          <h2>Get the desktop app first</h2>
+          <p>Join the waitlist and we’ll email you when the first desktop build is ready — along with your invite.</p>
+        </div>
+        <WaitlistForm id="download-join" source="download" page="/download" cta="Notify me" />
+      </div>
+    </div>
+  </section>
+
+  <section class="dl-why hairline">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="kicker">Why desktop</p>
+        <h2 class="title">Everything you like about Plastic,<br />closer to your files.</h2>
+      </div>
+      <ul class="why-grid">
+        {
+          desktop.map((d) => (
+            <li class="reveal">
+              <span class="icon-chip"><Icon name={d.icon} aria-hidden="true" /></span>
+              <h3>{d.title}</h3>
+              <p>{d.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="dl-web hairline">
+    <div class="wrap dl-web-inner">
+      <div class="reveal">
+        <p class="kicker">Available now</p>
+        <h2 class="title">No need to wait.<br />Plastic runs in your browser.</h2>
+        <p class="lede">The full editor works today in any modern browser, with cloud storage and live sync between your devices. Invited already? Sign in and keep going.</p>
+        <div class="dl-web-actions">
+          <a class="button primary large" href={SITE.signIn}>
+            <Icon name="lucide:globe" aria-hidden="true" />
+            Open Plastic on the web
+          </a>
+          <a class="button large" href="/#waitlist">Request an invite</a>
+        </div>
+      </div>
+      <ul class="browsers reveal" aria-label="Supported browsers">
+        <li><Icon name="simple-icons:googlechrome" aria-hidden="true" />Chrome</li>
+        <li><Icon name="simple-icons:safari" aria-hidden="true" />Safari</li>
+        <li><Icon name="simple-icons:firefoxbrowser" aria-hidden="true" />Firefox</li>
+        <li><Icon name="lucide:globe" aria-hidden="true" />Edge and other modern browsers</li>
+      </ul>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .dl-hero {
+    padding-bottom: clamp(40px, 6vw, 64px);
+    overflow: hidden;
+  }
+
+  .hero-glow {
+    position: absolute;
+    inset: -30% -10% auto;
+    height: 700px;
+    background:
+      radial-gradient(40% 50% at 30% 40%, color-mix(in srgb, var(--peach) 14%, transparent), transparent 70%),
+      radial-gradient(40% 50% at 70% 30%, color-mix(in srgb, var(--ice) 16%, transparent), transparent 70%);
+    filter: blur(20px);
+    pointer-events: none;
+  }
+
+  .dl-hero-inner {
+    position: relative;
+    text-align: center;
+  }
+
+  .dl-hero-inner .lede {
+    margin-inline: auto;
+  }
+
+  .dot.warn {
+    background: var(--warn);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 18%, transparent);
+  }
+
+  .dl-platforms {
+    padding: 0 0 clamp(40px, 6vw, 64px);
+  }
+
+  .platform-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 860px) {
+    .platform-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .platform {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 28px;
+  }
+
+  .platform-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    corner-shape: superellipse(1.3);
+    background: var(--fill-strong);
+  }
+
+  .platform-icon svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .platform h2 {
+    margin-top: 22px;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+  }
+
+  .platform p {
+    margin: 4px 0 0;
+    color: var(--text-2);
+  }
+
+  .platform-file {
+    margin-top: 2px;
+    color: var(--text-3);
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+
+  .platform-button {
+    margin-top: 24px;
+    cursor: default;
+    opacity: 0.7;
+  }
+
+  .platform-button:hover {
+    background: var(--fill-strong);
+  }
+
+  .dl-notify {
+    padding: 0 0 clamp(72px, 11vw, 140px);
+  }
+
+  .dl-notify-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 32px;
+    padding: clamp(24px, 4vw, 40px);
+  }
+
+  .dl-notify-inner h2 {
+    margin-top: 18px;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+  }
+
+  .dl-notify-inner p {
+    margin: 8px 0 0;
+    color: var(--text-2);
+  }
+
+  @media (max-width: 860px) {
+    .dl-notify-inner {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 960px) {
+    .why-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 560px) {
+    .why-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .why-grid h3 {
+    margin: 18px 0 8px;
+    font-size: 18px;
+    letter-spacing: -0.015em;
+  }
+
+  .why-grid p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 15px;
+  }
+
+  .dl-web-inner {
+    display: grid;
+    grid-template-columns: 1.3fr 0.7fr;
+    align-items: center;
+    gap: clamp(32px, 6vw, 80px);
+  }
+
+  @media (max-width: 860px) {
+    .dl-web-inner {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .dl-web-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 32px;
+  }
+
+  .browsers {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    list-style: none;
+  }
+
+  .browsers li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    color: var(--text-2);
+  }
+
+  .browsers svg {
+    width: 18px;
+    height: 18px;
+  }
+</style>

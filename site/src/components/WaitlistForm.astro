@@ -1,0 +1,214 @@
+---
+/**
+ * Pre-sign-up. Posts JSON in place when JavaScript runs (see Base.astro); otherwise a normal form
+ * post, after which the server redirects back to `#<id>-joined` and :target shows the note.
+ */
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  id: string;
+  source: 'home' | 'download' | 'changelog';
+  /** Path the no-JavaScript submission returns to. */
+  page: string;
+  variant?: 'inline' | 'full';
+  cta?: string;
+}
+
+const { id, source, page, variant = 'inline', cta = 'Join the waitlist' } = Astro.props;
+const joined = `${id}-joined`;
+---
+
+<form class:list={['waitlist', `waitlist-${variant}`]} id={id} method="post" action="/api/waitlist" data-waitlist>
+  <input type="hidden" name="source" value={source} />
+  <input type="hidden" name="redirect" value={`${page}#${joined}`} />
+  <div class="honeypot" aria-hidden="true">
+    <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+  </div>
+
+  <div class="join-fields">
+    {
+      variant === 'inline' ? (
+        <div class="inline-row">
+          <label class="sr-only" for={`${id}-email`}>Email address</label>
+          <input class="input" id={`${id}-email`} name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@company.com" required maxlength="254" />
+          <button class="button primary large" type="submit">
+            {cta}
+            <Icon name="lucide:arrow-right" aria-hidden="true" />
+          </button>
+        </div>
+      ) : (
+        <div class="full-grid">
+          <label class="field">
+            <span class="field-label">Work email</span>
+            <input class="input" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@company.com" required maxlength="254" />
+          </label>
+          <label class="field">
+            <span class="field-label">Name <span class="optional">optional</span></span>
+            <input class="input" name="name" type="text" autocomplete="name" placeholder="Ada Lovelace" maxlength="80" />
+          </label>
+          <label class="field">
+            <span class="field-label">What best describes you?</span>
+            <select class="select" name="role">
+              <option value="">Choose one</option>
+              <option value="designer">Designer</option>
+              <option value="design-engineer">Design engineer</option>
+              <option value="engineer">Engineer</option>
+              <option value="product">Product manager</option>
+              <option value="founder">Founder</option>
+              <option value="student">Student</option>
+              <option value="other">Something else</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">Team size</span>
+            <select class="select" name="teamSize">
+              <option value="">Choose one</option>
+              <option value="solo">Just me</option>
+              <option value="2-10">2–10</option>
+              <option value="11-50">11–50</option>
+              <option value="51-200">51–200</option>
+              <option value="200+">200+</option>
+            </select>
+          </label>
+          <label class="field span">
+            <span class="field-label">What would you make first? <span class="optional">optional, helps us prioritize invites</span></span>
+            <textarea class="textarea" name="useCase" maxlength="500" placeholder="A marketing site, a design system, our product’s settings pages…"></textarea>
+          </label>
+          <div class="span submit-row">
+            <button class="button primary large" type="submit">
+              {cta}
+              <Icon name="lucide:arrow-right" aria-hidden="true" />
+            </button>
+            <p class="fine">One email when your invite is ready. No newsletters unless you ask.</p>
+          </div>
+        </div>
+      )
+    }
+  </div>
+
+  <div class="joined-note" id={joined} tabindex="-1" role="status">
+    <span class="joined-icon"><Icon name="lucide:circle-check" aria-hidden="true" /></span>
+    <div>
+      <strong>You’re on the list.</strong>
+      <p>We send invites in small waves. When yours is ready, it arrives at the address you gave us with a sign-up link.</p>
+    </div>
+  </div>
+  <p class="form-status" aria-live="polite"></p>
+</form>
+
+<style>
+  .waitlist {
+    position: relative;
+    width: 100%;
+  }
+
+  .inline-row {
+    display: flex;
+    gap: 8px;
+    max-width: 520px;
+    padding: 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: 16px;
+    corner-shape: superellipse(1.3);
+    background: rgb(var(--ink) / 0.04);
+    box-shadow: 0 20px 60px -20px #000000a0, inset 0 1px 0 rgb(var(--ink) / 0.06);
+    backdrop-filter: blur(10px);
+  }
+
+  .inline-row .input {
+    min-height: 48px;
+    border: 0;
+    background: transparent;
+    font-size: 16px;
+  }
+
+  .inline-row .input:focus {
+    background: transparent;
+  }
+
+  .inline-row:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+
+  @media (max-width: 520px) {
+    .inline-row {
+      flex-direction: column;
+    }
+    .inline-row .button {
+      width: 100%;
+    }
+  }
+
+  .full-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .span {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 640px) {
+    .full-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .field-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .optional {
+    color: var(--text-3);
+    font-weight: 400;
+  }
+
+  .submit-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    margin-top: 4px;
+  }
+
+  .fine {
+    margin: 0;
+    color: var(--text-3);
+    font-size: 13px;
+  }
+
+  .joined-note {
+    align-items: flex-start;
+    gap: 14px;
+    max-width: 520px;
+    padding: 18px 20px;
+    border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+    border-radius: 16px;
+    corner-shape: superellipse(1.3);
+    background: color-mix(in srgb, var(--success) 8%, transparent);
+    outline: none;
+  }
+
+  .joined-note strong {
+    font-weight: 600;
+  }
+
+  .joined-note p {
+    margin: 4px 0 0;
+    color: var(--text-2);
+    font-size: 14px;
+  }
+
+  .joined-icon {
+    color: var(--success);
+  }
+
+  .joined-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+</style>

@@ -1,0 +1,11 @@
+# Plastic: the public site is /, /changelog and /download. The app and its API need an account.
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /file/
+Disallow: /files
+Disallow: /archive
+Disallow: /profile
+Disallow: /admin
+
+Sitemap: https://useplastic.app/sitemap.xml

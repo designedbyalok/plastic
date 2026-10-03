@@ -95,6 +95,19 @@ Set the auth secret once with `openssl rand -hex 32 | bunx wrangler secret put B
 The app is served on https://useplastic.app (`routes` and `BETTER_AUTH_URL` in `wrangler.jsonc`; `.dev.vars` sets `BETTER_AUTH_URL=http://localhost:8787` for `wrangler dev`). GitHub/Google sign-in turn on when
 `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` (or the `GOOGLE_` pair) are set as secrets.
 
+## Public site, waitlist and invites
+
+The landing page, `/changelog` and `/download` are an [Astro](https://astro.build) site in `site/`
+(`bun run site:dev` to work on it; `bun run build` builds it into `dist/site/` after the app). The
+Worker serves it on the same domain: visitors and search engines get the site at `/`, anyone
+signed in (or on an auth link) gets the app. Icons come from Lucide and Simple Icons via
+`astro-icon`; release notes live in `site/src/data/changelog.ts`.
+
+Plastic is invite-only. The site's forms add people to the `waitlist` table, and only invited
+emails (or `ADMIN_EMAILS` in `wrangler.jsonc`) can create an account, by any sign-up method.
+Admins see **Waitlist** in the sidebar (`/admin`): **Invite** emails a sign-up link through
+Resend. Apply `migrations/0007_waitlist.sql` with `bun run db:migrate:remote` before deploying.
+
 ## Docs
 
 - [Agents (MCP)](docs/AGENTS.md) — connecting coding agents, and the tools they get.

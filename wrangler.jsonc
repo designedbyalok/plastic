@@ -13,7 +13,8 @@
     "binding": "ASSETS",
     // The editor is a single-page app: /file/<id> and other routes serve index.html.
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/file/*"]
+    // The Worker picks site or app for "/" (see worker/site.ts) and serves the site's other pages.
+    "run_worker_first": ["/api/*", "/file/*", "/", "/changelog", "/changelog/", "/download", "/download/", "/sitemap.xml"]
   },
   "d1_databases": [
     {
@@ -38,7 +39,9 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ProjectRoom"] }],
   "vars": {
     // Public URL of the app. `wrangler dev` overrides it from .dev.vars.
-    "BETTER_AUTH_URL": "https://useplastic.app"
+    "BETTER_AUTH_URL": "https://useplastic.app",
+    // Who can see the waitlist and send invites (comma-separated). Set to your own email.
+    "ADMIN_EMAILS": "designedbyalok@gmail.com"
   },
   // Hourly + weekly sweep of superseded file revisions (worker/cleanup.ts). Cron triggers are free.
   // The weekly expression must match WEEKLY_CRON in cleanup.ts.

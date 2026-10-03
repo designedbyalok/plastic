@@ -20,22 +20,30 @@ const buttons: Record<Mode, string> = {
   'reset-password': 'Save New Password',
   'magic-link': 'Send Magic Link',
 };
+/** Plastic is invite-only: account creation without an invite is refused by the server. */
+const INVITE_ONLY = 'Plastic is invite-only for now. Join the waitlist and we’ll email you an invite.';
+/** What an OAuth sign-up refused by the invite check comes back with. */
+const INVITE_ERRORS = new Set(['unable_to_create_user', 'invite_only', 'INVITE_ONLY']);
+
 export function SignIn({ providers }: { providers: readonly string[] }) {
   const query = new URLSearchParams(location.search);
   const initialMode = query.get('auth');
   const [mode, setMode] = useState<Mode>(
     initialMode === 'reset-password'
       ? 'reset-password'
+      : initialMode === 'sign-up'
+        ? 'sign-up'
       : initialMode === 'forgot-password' && providers.includes('password-reset')
         ? 'forgot-password'
         : 'sign-in',
   );
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  // Invite links carry the invited address (/?auth=sign-up&email=…).
+  const [email, setEmail] = useState(() => query.get('email') ?? '');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [error, setError] = useState<string | null>(
-    query.has('error') ? 'This link has expired or is invalid. Request a new one below.' : null,
+    query.has('error') ? (INVITE_ERRORS.has(query.get('error') ?? '') ? INVITE_ONLY : 'This link has expired or is invalid. Request a new one below.') : null,
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [verify, setVerify] = useState(false);
@@ -102,9 +110,11 @@ export function SignIn({ providers }: { providers: readonly string[] }) {
         } else setError(result.error.message ?? 'Something went wrong. Try again.');
       } else if (mode === 'sign-up' && mailEnabled) {
         setVerify(true);
-        setNotice('Check your inbox to verify your email and open your workspace.');
+        // The server answers the same whether or not the address was invited (so invites can't
+        // be probed); without an invite no email is sent and no account is created.
+        setNotice('If this email has an invite, a verification link is on its way. Check your inbox to open your workspace. No invite yet? Join the waitlist.');
       } else if (mode === 'forgot-password') setNotice('If an account exists for this email, a password-reset link is on its way.');
-      else if (mode === 'magic-link') setNotice('Check your inbox for your sign-in link. It expires in 15 minutes.');
+      else if (mode === 'magic-link') setNotice('If this email has an account or an invite, a sign-in link is on its way. It expires in 15 minutes.');
       else if (mode === 'reset-password') {
         history.replaceState(null, '', location.pathname);
         setMode('sign-in');
@@ -138,7 +148,8 @@ export function SignIn({ providers }: { providers: readonly string[] }) {
     setBusy(true);
     setError(null);
     try {
-      const result = await authClient.signIn.social({ provider, callbackURL });
+      // Errors (such as no invite) come back to this screen instead of a bare error page.
+      const result = await authClient.signIn.social({ provider, callbackURL, errorCallbackURL: new URL('/?auth=sign-in', location.origin).href });
       if (result.error) {
         setBusy(false);
         setError(result.error.message ?? 'Something went wrong. Try again.');
@@ -254,6 +265,12 @@ export function SignIn({ providers }: { providers: readonly string[] }) {
             </button>
           )}
         </p>
+        {mode === 'sign-up' && (
+          <p className="auth-switch auth-invite">
+            Plastic is invite-only. Use the email your invite was sent to. No invite yet?{' '}
+            <a href="/#waitlist">Join the waitlist</a>
+          </p>
+        )}
         {mode === 'reset-password' && (
           <p className="auth-switch">
             <button type="button" disabled={busy} onClick={() => switchMode('forgot-password')}>

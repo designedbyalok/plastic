@@ -1,0 +1,295 @@
+---
+import { Icon } from 'astro-icon/components';
+import Base from '../layouts/Base.astro';
+import WaitlistForm from '../components/WaitlistForm.astro';
+import { RELEASES } from '../data/changelog';
+import { SITE } from '../data/site';
+
+const description = 'Every Plastic release, newest first: canvas tools, vectors, components, Figma import, AI agents, performance and more.';
+const date = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const TAG_ICONS: Record<string, string> = {
+  New: 'lucide:sparkles',
+  Improved: 'lucide:wand-sparkles',
+  Fixed: 'lucide:wrench',
+  Performance: 'lucide:gauge',
+  Accounts: 'lucide:shield-check',
+};
+
+const schema = [
+  {
+    '@type': 'CollectionPage',
+    name: 'Plastic changelog',
+    url: `${SITE.url}/changelog`,
+    description,
+    isPartOf: { '@id': `${SITE.url}/#website` },
+    hasPart: RELEASES.map((r) => ({
+      '@type': 'Article',
+      headline: r.title,
+      description: r.summary,
+      datePublished: r.date,
+      url: `${SITE.url}/changelog#${r.id}`,
+      author: { '@id': `${SITE.url}/#organization` },
+    })),
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Plastic', item: SITE.url },
+      { '@type': 'ListItem', position: 2, name: 'Changelog', item: `${SITE.url}/changelog` },
+    ],
+  },
+];
+---
+
+<Base title="Changelog" description={description} path="/changelog" schema={schema}>
+  <section class="cl-hero">
+    <div class="wrap">
+      <p class="kicker reveal"><span class="dot"></span>{RELEASES.length} releases • Updated {date.format(new Date(RELEASES[0]!.date))}</p>
+      <h1 class="display reveal">What’s new<br /><span class="chrome-text">in Plastic.</span></h1>
+      <p class="lede reveal">Everything we ship, newest first. Plastic is in an invite-only preview, and it changes fast.</p>
+    </div>
+  </section>
+
+  <section class="cl-list hairline" aria-label="Releases">
+    <div class="wrap cl-grid">
+      <nav class="cl-index" aria-label="Releases on this page">
+        <p>On this page</p>
+        <ol>
+          {RELEASES.map((r) => <li><a href={`#${r.id}`}>{r.title}</a></li>)}
+        </ol>
+      </nav>
+      <div class="cl-entries">
+        {
+          RELEASES.map((release) => (
+            <article id={release.id} class="cl-entry reveal">
+              <div class="cl-meta">
+                <time datetime={release.date}>{date.format(new Date(release.date))}</time>
+                <ul class="cl-tags">
+                  {release.tags.map((tag) => (
+                    <li class={`tag tag-${tag.toLowerCase()}`}>
+                      <Icon name={TAG_ICONS[tag] ?? 'lucide:tag'} aria-hidden="true" />
+                      {tag}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div class="cl-body">
+                <h2>
+                  <a href={`#${release.id}`}>{release.title}</a>
+                </h2>
+                <p class="cl-summary">{release.summary}</p>
+                <ul class="cl-items">
+                  {release.items.map((item) => (
+                    <li>
+                      <Icon name="lucide:check" aria-hidden="true" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="cl-join hairline">
+    <div class="wrap cl-join-inner">
+      <div class="reveal">
+        <p class="kicker">Want in?</p>
+        <h2 class="title">Try what’s new<br />before everyone else.</h2>
+        <p class="lede">Join the waitlist and we’ll email you an invite to the preview.</p>
+      </div>
+      <div class="reveal">
+        <WaitlistForm id="changelog-join" source="changelog" page="/changelog" cta="Join the waitlist" />
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .cl-hero {
+    padding-bottom: clamp(48px, 7vw, 80px);
+  }
+
+  .cl-grid {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: clamp(32px, 6vw, 80px);
+    align-items: start;
+  }
+
+  .cl-index {
+    position: sticky;
+    top: 96px;
+    font-size: 13.5px;
+  }
+
+  .cl-index p {
+    margin: 0 0 12px;
+    color: var(--text-3);
+    font-weight: 500;
+  }
+
+  .cl-index ol {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cl-index a {
+    display: block;
+    padding: 6px 10px;
+    margin-left: -10px;
+    border-radius: 8px;
+    color: var(--text-2);
+    text-decoration: none;
+    line-height: 1.4;
+  }
+
+  .cl-index a:hover {
+    background: var(--fill);
+    color: var(--text);
+  }
+
+  @media (max-width: 900px) {
+    .cl-grid {
+      grid-template-columns: 1fr;
+    }
+    .cl-index {
+      display: none;
+    }
+  }
+
+  .cl-entries {
+    display: grid;
+  }
+
+  .cl-entry {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 32px;
+    padding: 40px 0;
+    border-bottom: 1px solid var(--line);
+    scroll-margin-top: 88px;
+  }
+
+  .cl-entry:first-child {
+    padding-top: 0;
+  }
+
+  @media (max-width: 640px) {
+    .cl-entry {
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+  }
+
+  .cl-meta time {
+    color: var(--text-2);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .cl-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 999px;
+    background: var(--fill-strong);
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .tag svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .tag-new {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+
+  .tag-performance {
+    background: color-mix(in srgb, var(--success) 16%, transparent);
+    color: var(--success);
+  }
+
+  .tag-accounts {
+    background: color-mix(in srgb, var(--peach) 16%, transparent);
+    color: var(--peach);
+  }
+
+  .cl-body h2 {
+    font-size: clamp(22px, 2.4vw, 28px);
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+
+  .cl-body h2 a {
+    text-decoration: none;
+  }
+
+  .cl-body h2 a:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 4px;
+  }
+
+  .cl-summary {
+    margin: 10px 0 0;
+    color: var(--text-2);
+    font-size: 17px;
+  }
+
+  .cl-items {
+    display: grid;
+    gap: 10px;
+    margin: 22px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cl-items li {
+    display: flex;
+    gap: 12px;
+    color: var(--text-2);
+  }
+
+  .cl-items svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-top: 5px;
+    color: var(--success);
+  }
+
+  .cl-join-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: clamp(32px, 6vw, 80px);
+  }
+
+  @media (max-width: 900px) {
+    .cl-join-inner {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

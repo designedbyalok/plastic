@@ -47,6 +47,8 @@ export interface Profile {
   readonly username: string | null;
   /** Account email (cloud only). */
   readonly email?: string;
+  /** Can manage the waitlist and invites (cloud only; ADMIN_EMAILS on the server). */
+  readonly admin?: boolean;
 }
 
 export interface ProjectStorage {
@@ -592,8 +594,8 @@ class CloudWorkspace implements Workspace {
 
   async profile(): Promise<Profile> {
     const { data } = await authClient.getSession();
-    const user = data?.user as { name?: string; email?: string; username?: string | null; displayUsername?: string | null } | undefined;
-    return { name: user?.name ?? '', username: user?.displayUsername ?? user?.username ?? null, email: user?.email };
+    const user = data?.user as { name?: string; email?: string; username?: string | null; displayUsername?: string | null; admin?: boolean } | undefined;
+    return { name: user?.name ?? '', username: user?.displayUsername ?? user?.username ?? null, email: user?.email, admin: user?.admin === true };
   }
 
   async updateProfile(profile: { name: string; username: string | null }): Promise<void> {

@@ -11,6 +11,22 @@
       "category": "transactional"
     },
     {
+      "id": "waitlist",
+      "page": "waitlist.html",
+      "frame": "waitlist-1",
+      "subject": "You’re on the Plastic waitlist",
+      "preheader": "Thanks for signing up. We’ll let you in to try Plastic soon.",
+      "category": "transactional"
+    },
+    {
+      "id": "invite",
+      "page": "invite.html",
+      "frame": "invite-1",
+      "subject": "You’re invited to Plastic",
+      "preheader": "Your spot on the waitlist came up. Create your account and open your workspace.",
+      "category": "transactional"
+    },
+    {
       "id": "welcome",
       "page": "welcome.html",
       "frame": "welcome-1",

@@ -6,7 +6,7 @@
   "description": "A visual editor for real interfaces: HTML and CSS are the design source.",
   "scripts": {
     "dev": "vite",
-    "build": "bun run emails:build && bun run typecheck && vite build",
+    "build": "bun run emails:build && bun run typecheck && vite build && bun run site:build",
     "emails:build": "node scripts/build-emails.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.worker.json",
     "test": "vitest run",
@@ -15,7 +15,9 @@
     "cf:dev": "vite build && wrangler dev --local-upstream localhost:8787",
     "db:migrate:local": "wrangler d1 migrations apply plastic --local",
     "db:migrate:remote": "wrangler d1 migrations apply plastic --remote",
-    "deploy": "bun run build && wrangler deploy"
+    "deploy": "bun run build && wrangler deploy",
+    "site:dev": "astro dev --root site",
+    "site:build": "astro build --root site"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",
@@ -55,11 +57,15 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261002.1",
+    "@iconify-json/lucide": "^1.2.139",
+    "@iconify-json/simple-icons": "^1.2.98",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "astro": "^7.3.5",
+    "astro-icon": "^1.2.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^5.0.3",

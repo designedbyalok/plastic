@@ -9,6 +9,7 @@ export type Route =
   | { readonly name: 'files'; readonly folderId: string | null }
   | { readonly name: 'archive' }
   | { readonly name: 'profile' }
+  | { readonly name: 'admin' }
   | { readonly name: 'file'; readonly id: string };
 
 const NAVIGATE_EVENT = 'plastic:navigate';
@@ -20,6 +21,7 @@ export function parseRoute(pathname: string): Route {
   if (folder) return { name: 'files', folderId: folder[1] ? decodeURIComponent(folder[1]) : null };
   if (/^\/archive\/?$/.test(pathname)) return { name: 'archive' };
   if (/^\/profile\/?$/.test(pathname)) return { name: 'profile' };
+  if (/^\/admin\/?$/.test(pathname)) return { name: 'admin' };
   return { name: 'home' };
 }
 
